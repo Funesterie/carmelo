@@ -1009,6 +1009,46 @@ button {
   gap: 10px;
 }
 
+.casino-slot-feature {
+  display: grid;
+  gap: 14px;
+}
+
+.casino-slot-feature__media {
+  position: relative;
+  overflow: hidden;
+  min-height: 220px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(3, 8, 12, 0.18), rgba(3, 8, 12, 0.82)),
+    rgba(7, 12, 18, 0.88);
+}
+
+.casino-slot-feature__video,
+.casino-slot-feature__poster {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.casino-slot-feature__copy {
+  display: grid;
+  gap: 10px;
+}
+
+.casino-slot-feature__copy strong {
+  font-family: "Cinzel", serif;
+  font-size: 1.12rem;
+}
+
+.casino-slot-feature__copy p {
+  margin: 0;
+  color: var(--casino-muted);
+  line-height: 1.6;
+}
+
 .casino-prize-card {
   display: flex;
   align-items: center;
@@ -1651,6 +1691,10 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .casino-slot-feature__media {
+    min-height: 180px;
+  }
+
   .casino-district-grid,
   .casino-roulette-quickbets,
   .casino-roulette-board {
@@ -1734,6 +1778,10 @@ button {
 
   .casino-roulette-board__numbers {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .casino-slot-feature__media {
+    min-height: 154px;
   }
 
   .casino-ambient-corner__copy {

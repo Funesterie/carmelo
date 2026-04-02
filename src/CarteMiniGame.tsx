@@ -1,4 +1,6 @@
 import * as React from "react";
+import failSound from "./audio/fail.mp3";
+import moneySound from "./audio/money.mp3";
 import { useMemo, useState } from "react";
 import carteImg from "./images/carte.png";
 import coffreImg from "./images/coffre.png";
@@ -31,6 +33,8 @@ export default function CarteMiniGame({
   const [status, setStatus] = useState("Etudie la carte et choisis la bonne croix.");
   const [working, setWorking] = useState(false);
   const [lastDelta, setLastDelta] = useState(0);
+  const moneyAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const failAudioRef = React.useRef<HTMLAudioElement | null>(null);
 
   const canPlay = profile.wallet.balance >= MAP_ROOM_COST;
   const isWin = phase === "resolved" && selectedPoint && selectedPoint === winningPoint;
@@ -39,6 +43,28 @@ export default function CarteMiniGame({
     if (phase === "idle") return 0;
     return lastDelta;
   }, [lastDelta, phase]);
+
+  function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
+    if (!ref.current) {
+      ref.current = new Audio(src);
+      ref.current.preload = "auto";
+    }
+    ref.current.pause();
+    try {
+      ref.current.currentTime = 0;
+    } catch {
+      // ignore
+    }
+    ref.current.volume = volume;
+    void ref.current.play().catch(() => undefined);
+  }
+
+  React.useEffect(() => {
+    return () => {
+      moneyAudioRef.current?.pause();
+      failAudioRef.current?.pause();
+    };
+  }, []);
 
   function startSearch() {
     onError("");
@@ -68,6 +94,11 @@ export default function CarteMiniGame({
           ? `Trouve. Le coffre rapporte ${formatCredits(result.result.reward)} credits.`
           : "Mauvaise crique. La carte se referme sans recompense."
       );
+      if (result.result.reward > 0) {
+        playCue(moneyAudioRef, moneySound, 0.8);
+      } else {
+        playCue(failAudioRef, failSound, 0.72);
+      }
       onProfileChange(result.profile);
     } catch (error_) {
       onError(error_ instanceof Error ? error_.message : "La carte n'a pas pu etre jouee.");

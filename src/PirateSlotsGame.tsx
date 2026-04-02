@@ -1,13 +1,32 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import alerteSound from "./audio/alerte.mp3";
+import bingoSound from "./audio/bingo.mp3";
+import piratesongAudio from "./audio/piratesong.mp3";
 import BlackjackRoom from "./BlackjackRoom";
 import CarteMiniGame from "./CarteMiniGame";
 import MiniTreasureGame from "./MiniTreasureGame";
 import PokerRoom from "./PokerRoom";
 import RouletteRoom from "./RouletteRoom";
+import casinoPoster from "./images/casino.png";
 import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
+import chauveImg from "./images/chauve.png";
+import elephantImg from "./images/elephant.png";
+import gunImg from "./images/gun.png";
+import mapImg from "./images/map.png";
+import perroImg from "./images/perro.png";
 import rouletteArtwork from "./images/casino ats.png";
+import soldatImg from "./images/soldat.png";
 import districtArtwork from "./images/ChatGPT Image 2 avr. 2026, 21_17_56.png";
+import flushImg from "./images/flush.png";
+import fondImg from "./images/fond.png";
+import batVideo from "./videos/bat.mp4";
+import boobaVideo from "./videos/booba.mp4";
+import expVideo from "./videos/exp.mp4";
+import jokerVideo from "./videos/joker.mp4";
+import powerVideo from "./videos/power.mp4";
+import rangerVideo from "./videos/ranger.mp4";
+import spartaVideo from "./videos/sparta.mp4";
 import { formatCredits } from "./lib/casinoRoomState";
 import {
   spinCasinoSlots,
@@ -103,6 +122,86 @@ const DISTRICT_CARDS = [
 
 type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 
+type SlotFeatureKey =
+  | "idle"
+  | "joker"
+  | "elephant"
+  | "soldat"
+  | "bat"
+  | "gun"
+  | "parrot"
+  | "map"
+  | "pirate"
+  | "bigwin";
+
+const SLOT_FEATURE_MEDIA: Record<
+  SlotFeatureKey,
+  {
+    title: string;
+    body: string;
+    image: string;
+    video?: string;
+  }
+> = {
+  idle: {
+    title: "Pont principal",
+    body: "Le salon pirate diffuse ses relais visuels entre deux spins.",
+    image: casinoPoster,
+  },
+  joker: {
+    title: "Flush Joker",
+    body: "Le joker allume l'alerte et verrouille la table visuelle.",
+    image: flushImg,
+    video: jokerVideo,
+  },
+  elephant: {
+    title: "Charge des elephants",
+    body: "Un alignement royal qui ouvre le grand show de la salle.",
+    image: elephantImg,
+    video: boobaVideo,
+  },
+  soldat: {
+    title: "Escouade spartiate",
+    body: "Les soldats prennent le plateau et declenchent la parade.",
+    image: soldatImg,
+    video: spartaVideo,
+  },
+  bat: {
+    title: "Nuée de chauves-souris",
+    body: "Le ciel du casino se ferme quand les BAT se mettent d'accord.",
+    image: chauveImg,
+    video: batVideo,
+  },
+  gun: {
+    title: "Canon court en feu",
+    body: "Les blunderbuss chargent un clip d'impact a chaque serie lourde.",
+    image: gunImg,
+    video: expVideo,
+  },
+  parrot: {
+    title: "Perroquet veilleur",
+    body: "Le perroquet prend l'affiche quand le plateau s'emballe sans jackpot.",
+    image: perroImg,
+  },
+  map: {
+    title: "Cartographie du butin",
+    body: "Une série de cartes au tresor illumine la cale des gains.",
+    image: mapImg,
+  },
+  pirate: {
+    title: "Pavillon noir",
+    body: "Le drapeau pirate s'impose quand les reels se mettent au diapason.",
+    image: fondImg,
+    video: rangerVideo,
+  },
+  bigwin: {
+    title: "Big Win",
+    body: "Le power clip prend le relai pour les gros paiements machine a sous.",
+    image: cardArtwork,
+    video: powerVideo,
+  },
+};
+
 export type RouletteSoundEvent =
   | { type: "enter" | "join"; roundId: number; participants: number }
   | { type: "spin"; roundId: number; resultId: number; winningNumber: number | null };
@@ -152,6 +251,25 @@ function formatTransactionTime(value: string | null) {
   }
 }
 
+function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
+  if (!spin) return "idle";
+
+  const flattened = spin.grid.flat();
+  const hasJoker = flattened.includes("JOKER");
+  if (hasJoker) return "joker";
+
+  const strongestWin = [...spin.wins].sort((left, right) => right.payout - left.payout)[0];
+  if (strongestWin?.symbol === "ELEPHANT" && strongestWin.matchCount >= 4) return "elephant";
+  if (strongestWin?.symbol === "SOLDAT" && strongestWin.matchCount >= 4) return "soldat";
+  if (strongestWin?.symbol === "BAT" && strongestWin.matchCount >= 4) return "bat";
+  if (strongestWin?.symbol === "BLUNDERBUSS" && strongestWin.matchCount >= 4) return "gun";
+  if (strongestWin?.symbol === "PARROT" && strongestWin.matchCount >= 3) return "parrot";
+  if (strongestWin?.symbol === "MAP" && strongestWin.matchCount >= 3) return "map";
+  if (strongestWin?.symbol === "PIRATE" && strongestWin.matchCount >= 4) return "pirate";
+  if (spin.totalPayout >= spin.bet * 5) return "bigwin";
+  return "idle";
+}
+
 function SlotsRoom({
   profile,
   busy,
@@ -163,8 +281,13 @@ function SlotsRoom({
   const [spinState, setSpinState] = useState<"idle" | "spinning">("idle");
   const [lastSpin, setLastSpin] = useState<CasinoSpin | null>(null);
   const [lastMessage, setLastMessage] = useState("Pret a lancer les reels.");
+  const [activeFeature, setActiveFeature] = useState<SlotFeatureKey>("idle");
   const intervalRef = useRef<number | null>(null);
   const timeoutRef = useRef<number | null>(null);
+  const featureTimeoutRef = useRef<number | null>(null);
+  const ambienceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const alertAudioRef = useRef<HTMLAudioElement | null>(null);
+  const bingoAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setBet((current) => {
@@ -175,9 +298,45 @@ function SlotsRoom({
   }, [profile.wallet.maxBet, profile.wallet.minBet]);
 
   useEffect(() => {
+    let pointerCleanup: (() => void) | null = null;
+    if (!ambienceAudioRef.current) {
+      ambienceAudioRef.current = new Audio(piratesongAudio);
+      ambienceAudioRef.current.loop = true;
+      ambienceAudioRef.current.volume = 0.08;
+      ambienceAudioRef.current.preload = "metadata";
+    }
+
+    const startAmbience = () => {
+      if (!ambienceAudioRef.current) return;
+      ambienceAudioRef.current.volume = 0.08;
+      void ambienceAudioRef.current.play().catch(() => undefined);
+    };
+
+    startAmbience();
+
+    const unlockOnPointer = () => {
+      startAmbience();
+    };
+
+    window.addEventListener("pointerdown", unlockOnPointer, { once: true });
+    pointerCleanup = () => window.removeEventListener("pointerdown", unlockOnPointer);
+
+    return () => {
+      pointerCleanup?.();
+      if (ambienceAudioRef.current) {
+        ambienceAudioRef.current.pause();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+      if (featureTimeoutRef.current) window.clearTimeout(featureTimeoutRef.current);
+      ambienceAudioRef.current?.pause();
+      alertAudioRef.current?.pause();
+      bingoAudioRef.current?.pause();
     };
   }, []);
 
@@ -196,6 +355,46 @@ function SlotsRoom({
   }, [lastSpin]);
 
   const recentTransactions = useMemo(() => profile.recentTransactions.slice(0, 8), [profile.recentTransactions]);
+  const featureMedia = SLOT_FEATURE_MEDIA[activeFeature];
+
+  function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
+    if (!ref.current) {
+      ref.current = new Audio(src);
+      ref.current.preload = "auto";
+    }
+    ref.current.pause();
+    try {
+      ref.current.currentTime = 0;
+    } catch {
+      // ignore
+    }
+    ref.current.volume = volume;
+    void ref.current.play().catch(() => undefined);
+  }
+
+  function triggerSlotFeedback(spin: CasinoSpin) {
+    const nextFeature = chooseSlotFeature(spin);
+    setActiveFeature(nextFeature);
+
+    if (featureTimeoutRef.current) {
+      window.clearTimeout(featureTimeoutRef.current);
+      featureTimeoutRef.current = null;
+    }
+
+    if (nextFeature !== "idle") {
+      featureTimeoutRef.current = window.setTimeout(() => {
+        setActiveFeature("idle");
+      }, 9000);
+    }
+
+    if (spin.grid.flat().includes("JOKER")) {
+      playCue(alertAudioRef, alerteSound, 0.78);
+    }
+
+    if (spin.totalPayout >= spin.bet * 5) {
+      playCue(bingoAudioRef, bingoSound, 0.26);
+    }
+  }
 
   async function handleSpin() {
     if (!canSpin) return;
@@ -218,6 +417,7 @@ function SlotsRoom({
       timeoutRef.current = window.setTimeout(() => {
         setDisplayGrid(result.spin.grid);
         setLastSpin(result.spin);
+        triggerSlotFeedback(result.spin);
         setSpinState("idle");
         setLastMessage(
           result.spin.totalPayout > 0
@@ -346,6 +546,40 @@ function SlotsRoom({
       </div>
 
       <aside className="casino-side-rail">
+        <section className="casino-panel">
+          <div className="casino-panel__header">
+            <span className="casino-chip">Projecteur</span>
+            <h3>Coup du tour</h3>
+          </div>
+
+          <div className={`casino-slot-feature ${featureMedia.video ? "has-video" : ""}`}>
+            <div className="casino-slot-feature__media">
+              {featureMedia.video ? (
+                <video
+                  key={featureMedia.video}
+                  className="casino-slot-feature__video"
+                  src={featureMedia.video}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  poster={featureMedia.image}
+                />
+              ) : (
+                <img src={featureMedia.image} alt={featureMedia.title} className="casino-slot-feature__poster" />
+              )}
+            </div>
+
+            <div className="casino-slot-feature__copy">
+              <strong>{featureMedia.title}</strong>
+              <p>{featureMedia.body}</p>
+              <span className="casino-chip">
+                {activeFeature === "idle" ? "Ambiance du salon" : "Declencheur media actif"}
+              </span>
+            </div>
+          </div>
+        </section>
+
         <section className="casino-panel">
           <div className="casino-panel__header">
             <span className="casino-chip">Session</span>

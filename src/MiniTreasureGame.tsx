@@ -1,4 +1,8 @@
 import * as React from "react";
+import canonSound from "./audio/canon.mp3";
+import opaleSound from "./audio/opale.mp3";
+import rubisSound from "./audio/rubis.mp3";
+import saphirSound from "./audio/saphir.mp3";
 import { useMemo, useState } from "react";
 import marineImg from "./images/marine.png";
 import opaleImg from "./images/opale.png";
@@ -38,6 +42,10 @@ export default function MiniTreasureGame({
   const [state, setState] = useState<TreasureHuntState | null>(null);
   const [status, setStatus] = useState("Lance une expedition et tire trois salves sur la baie.");
   const [working, setWorking] = useState(false);
+  const canonAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const opaleAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const rubisAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const saphirAudioRef = React.useRef<HTMLAudioElement | null>(null);
 
   const phase = state?.phase || "idle";
   const revealedPrizes = useMemo(
@@ -45,6 +53,30 @@ export default function MiniTreasureGame({
     [state],
   );
   const lastDelta = phase === "resolved" ? (state?.reward || 0) - ROOM_COST : 0;
+
+  function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
+    if (!ref.current) {
+      ref.current = new Audio(src);
+      ref.current.preload = "auto";
+    }
+    ref.current.pause();
+    try {
+      ref.current.currentTime = 0;
+    } catch {
+      // ignore
+    }
+    ref.current.volume = volume;
+    void ref.current.play().catch(() => undefined);
+  }
+
+  React.useEffect(() => {
+    return () => {
+      canonAudioRef.current?.pause();
+      opaleAudioRef.current?.pause();
+      rubisAudioRef.current?.pause();
+      saphirAudioRef.current?.pause();
+    };
+  }, []);
 
   async function handleStartRound() {
     onError("");
@@ -71,6 +103,17 @@ export default function MiniTreasureGame({
       const result = await revealTreasureHuntTile(state.token, tileId);
       setState(result.state);
       setStatus(result.state.message);
+      const revealedTile = result.state.board.find((tile) => tile.id === tileId);
+      const reward = Number(revealedTile?.reward || 0);
+      if (reward >= 520) {
+        playCue(opaleAudioRef, opaleSound, 0.84);
+      } else if (reward >= 320) {
+        playCue(rubisAudioRef, rubisSound, 0.82);
+      } else if (reward >= 180) {
+        playCue(saphirAudioRef, saphirSound, 0.8);
+      } else {
+        playCue(canonAudioRef, canonSound, 0.76);
+      }
       if (result.profile) {
         onProfileChange(result.profile);
       }
