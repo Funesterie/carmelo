@@ -103,11 +103,16 @@ const DISTRICT_CARDS = [
 
 type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 
+export type RouletteSoundEvent =
+  | { type: "enter" | "join"; roundId: number; participants: number }
+  | { type: "spin"; roundId: number; resultId: number; winningNumber: number | null };
+
 type PirateSlotsGameProps = {
   profile: CasinoProfile;
   busy: boolean;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;
+  onRouletteEvent?: (event: RouletteSoundEvent) => void;
 };
 
 function randomSymbolId() {
@@ -472,7 +477,7 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
       case "poker":
         return <PokerRoom playerName={props.profile.user.username} profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "roulette":
-        return <RouletteRoom profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
+        return <RouletteRoom profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} onRouletteEvent={props.onRouletteEvent} />;
       default:
         return <SlotsRoom {...props} />;
     }

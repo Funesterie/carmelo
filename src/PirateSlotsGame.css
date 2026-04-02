@@ -357,6 +357,156 @@ button {
   width: min(1360px, 100%);
   display: grid;
   gap: 18px;
+  position: relative;
+}
+
+.casino-ambient-corner {
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.casino-ambient-corner__frame {
+  position: relative;
+  width: min(360px, 36vw);
+  min-height: 188px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(3, 8, 12, 0.14), rgba(3, 8, 12, 0.9)),
+    rgba(7, 12, 18, 0.92);
+  box-shadow: var(--casino-shadow);
+}
+
+.casino-ambient-corner__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.casino-ambient-corner__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 10, 0.08), rgba(2, 6, 10, 0.72)),
+    radial-gradient(circle at top right, rgba(78, 197, 255, 0.2), transparent 28%);
+}
+
+.casino-ambient-corner__copy {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px 18px;
+}
+
+.casino-ambient-corner__copy strong,
+.casino-ambient-corner__copy small {
+  display: block;
+}
+
+.casino-ambient-corner__copy strong {
+  font-family: "Cinzel", serif;
+  font-size: 1.2rem;
+}
+
+.casino-ambient-corner__copy small {
+  color: var(--casino-muted);
+  font-size: 0.78rem;
+}
+
+.casino-immersion-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background-position: center;
+  background-size: cover;
+}
+
+.casino-immersion-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 200, 87, 0.16), transparent 24%),
+    radial-gradient(circle at 80% 18%, rgba(78, 197, 255, 0.12), transparent 20%),
+    rgba(2, 6, 10, 0.48);
+}
+
+.casino-immersion-overlay__panel {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.7fr);
+  gap: 20px;
+  padding: 26px;
+  border-radius: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(7, 12, 18, 0.76);
+  box-shadow: var(--casino-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.casino-immersion-overlay__copy {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+}
+
+.casino-immersion-overlay__copy h2 {
+  margin: 0;
+  font-family: "Cinzel", serif;
+  font-size: clamp(2.4rem, 4vw, 4rem);
+}
+
+.casino-immersion-overlay__copy p {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--casino-muted);
+  line-height: 1.7;
+}
+
+.casino-immersion-overlay__stats {
+  display: grid;
+  gap: 10px;
+}
+
+.casino-immersion-overlay__stats span {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(246, 239, 224, 0.92);
+}
+
+.casino-immersion-overlay__video-shell {
+  position: relative;
+  overflow: hidden;
+  min-height: 260px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-position: center;
+  background-size: cover;
+}
+
+.casino-immersion-overlay__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.88;
 }
 
 .casino-account-bar {
@@ -1399,6 +1549,10 @@ button {
   .casino-district-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  .casino-immersion-overlay__panel {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 780px) {
@@ -1417,6 +1571,15 @@ button {
   .casino-account-bar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .casino-ambient-corner {
+    justify-content: stretch;
+  }
+
+  .casino-ambient-corner__frame {
+    width: 100%;
+    min-height: 172px;
   }
 
   .casino-room-hero,
@@ -1497,6 +1660,14 @@ button {
   .casino-roulette-board__numbers {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
+
+  .casino-immersion-overlay {
+    padding: 14px;
+  }
+
+  .casino-immersion-overlay__panel {
+    padding: 18px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -1563,5 +1734,17 @@ button {
 
   .casino-roulette-board__numbers {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .casino-ambient-corner__copy {
+    padding: 14px;
+  }
+
+  .casino-immersion-overlay__copy h2 {
+    font-size: 2rem;
+  }
+
+  .casino-immersion-overlay__video-shell {
+    min-height: 220px;
   }
 }

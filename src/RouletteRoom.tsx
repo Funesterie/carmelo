@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { RouletteSoundEvent } from "./PirateSlotsGame";
 import rouletteArtwork from "./images/casino ats.png";
 import {
   fetchRouletteRoom,
@@ -26,6 +27,7 @@ type RouletteRoomProps = {
   profile: CasinoProfile;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;
+  onRouletteEvent?: (event: RouletteSoundEvent) => void;
 };
 
 function getNumberColor(number: number) {
@@ -42,6 +44,7 @@ export default function RouletteRoom({
   profile,
   onProfileChange,
   onError,
+  onRouletteEvent,
 }: RouletteRoomProps) {
   const [room, setRoom] = useState<RouletteRoom | null>(null);
   const [amount, setAmount] = useState(AMOUNT_PRESETS[2]);
@@ -50,6 +53,10 @@ export default function RouletteRoom({
   const [nowTick, setNowTick] = useState(() => Date.now());
   const onProfileChangeRef = useRef(onProfileChange);
   const onErrorRef = useRef(onError);
+  const onRouletteEventRef = useRef(onRouletteEvent);
+  const previousParticipantCountRef = useRef<number | null>(null);
+  const latestResolvedIdRef = useRef<number | null>(null);
+  const announcedRoomEntryRef = useRef(false);
 
   useEffect(() => {
     onProfileChangeRef.current = onProfileChange;
@@ -58,6 +65,10 @@ export default function RouletteRoom({
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+
+  useEffect(() => {
+    onRouletteEventRef.current = onRouletteEvent;
+  }, [onRouletteEvent]);
 
   useEffect(() => {
     let mounted = true;
@@ -92,6 +103,46 @@ export default function RouletteRoom({
     if (!closesAt) return 0;
     return Math.max(0, closesAt - nowTick);
   }, [nowTick, room?.round.closesAt]);
+
+  useEffect(() => {
+    if (!room) return;
+
+    const participantCount = Number(room.round.playerCount || 0);
+    if (!announcedRoomEntryRef.current) {
+      announcedRoomEntryRef.current = true;
+      onRouletteEventRef.current?.({
+        type: "enter",
+        roundId: room.round.id,
+        participants: participantCount,
+      });
+    } else if (
+      previousParticipantCountRef.current !== null
+      && participantCount > previousParticipantCountRef.current
+    ) {
+      onRouletteEventRef.current?.({
+        type: "join",
+        roundId: room.round.id,
+        participants: participantCount,
+      });
+    }
+    previousParticipantCountRef.current = participantCount;
+
+    const resolvedId = room.latestResolved?.id ?? null;
+    if (latestResolvedIdRef.current === null) {
+      latestResolvedIdRef.current = resolvedId;
+      return;
+    }
+
+    if (resolvedId && resolvedId !== latestResolvedIdRef.current) {
+      latestResolvedIdRef.current = resolvedId;
+      onRouletteEventRef.current?.({
+        type: "spin",
+        roundId: room.round.id,
+        resultId: resolvedId,
+        winningNumber: room.latestResolved?.winningNumber ?? null,
+      });
+    }
+  }, [room]);
 
   async function submitBet() {
     if (!selectedBet || working) return;
