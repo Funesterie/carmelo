@@ -570,6 +570,10 @@ button {
   gap: 12px;
 }
 
+.casino-status-strip--poker {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .casino-status-strip article {
   border-radius: 22px;
   padding: 16px 18px;
@@ -685,9 +689,13 @@ button {
     rgba(7, 12, 18, 0.94);
 }
 
-.casino-reel-cell__emoji {
-  font-size: clamp(2.1rem, 5vw, 3.2rem);
-  line-height: 1;
+.casino-reel-cell__art {
+  width: clamp(54px, 8vw, 78px);
+  height: clamp(54px, 8vw, 78px);
+  object-fit: contain;
+  filter:
+    drop-shadow(0 12px 24px rgba(0, 0, 0, 0.3))
+    drop-shadow(0 0 18px color-mix(in srgb, var(--cell-accent) 34%, transparent));
 }
 
 .casino-reel-cell__label {
@@ -796,9 +804,11 @@ button {
   gap: 12px;
 }
 
-.casino-paytable__symbol span,
-.casino-win-entry > div:first-child span {
-  font-size: 1.4rem;
+.casino-paytable__symbol-art {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.26));
 }
 
 .casino-history-entry {
@@ -933,6 +943,13 @@ button {
   gap: 10px;
 }
 
+.casino-command-deck__spotlight-art {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.32));
+}
+
 .casino-command-deck__spotlight strong {
   font-family: "Cinzel", serif;
   font-size: 1.52rem;
@@ -962,6 +979,13 @@ button {
   text-align: left;
   display: grid;
   gap: 10px;
+}
+
+.casino-command-card__icon {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 20px rgba(0, 0, 0, 0.28));
 }
 
 .casino-command-card strong {
@@ -1294,6 +1318,130 @@ button {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.casino-poker-street-rail {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.casino-poker-street-step {
+  min-height: 104px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.casino-poker-street-step span,
+.casino-poker-street-step strong,
+.casino-poker-street-step small {
+  display: block;
+}
+
+.casino-poker-street-step span {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(246, 239, 224, 0.92);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.casino-poker-street-step strong {
+  font-family: "Cinzel", serif;
+  font-size: 1rem;
+}
+
+.casino-poker-street-step small {
+  color: var(--casino-muted);
+  line-height: 1.5;
+}
+
+.casino-poker-street-step.is-current {
+  background:
+    linear-gradient(180deg, rgba(255, 200, 87, 0.16), rgba(255, 200, 87, 0.06)),
+    rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 200, 87, 0.36);
+  box-shadow: 0 0 0 1px rgba(255, 200, 87, 0.18);
+}
+
+.casino-poker-street-step.is-current span,
+.casino-poker-street-step.is-complete span {
+  background: rgba(255, 200, 87, 0.14);
+  border-color: rgba(255, 200, 87, 0.28);
+}
+
+.casino-poker-street-step.is-complete {
+  background: rgba(121, 213, 142, 0.08);
+  border-color: rgba(121, 213, 142, 0.22);
+}
+
+.casino-poker-decision-bar {
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(7, 12, 18, 0.84), rgba(7, 12, 18, 0.66)),
+    rgba(255, 255, 255, 0.04);
+  display: grid;
+  gap: 14px;
+}
+
+.casino-poker-decision-bar__copy {
+  display: grid;
+  gap: 8px;
+}
+
+.casino-poker-decision-bar__copy strong {
+  font-family: "Cinzel", serif;
+  font-size: 1.18rem;
+}
+
+.casino-poker-decision-bar__copy p {
+  margin: 0;
+  color: var(--casino-muted);
+  line-height: 1.65;
+}
+
+.casino-poker-betbox {
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(7, 12, 18, 0.84), rgba(7, 12, 18, 0.66)),
+    rgba(255, 255, 255, 0.04);
+  display: grid;
+  gap: 14px;
+}
+
+.casino-poker-betbox__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.casino-poker-betbox__header strong,
+.casino-poker-betbox__header b {
+  display: block;
+}
+
+.casino-poker-betbox__header b {
+  font-size: 1.26rem;
+  font-family: "Cinzel", serif;
+}
+
+.casino-poker-betbox__slider {
+  width: 100%;
+  accent-color: var(--casino-gold);
 }
 
 .casino-chip-row {
@@ -1635,6 +1783,14 @@ button {
   justify-content: center;
 }
 
+.casino-poker-board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .casino-empty-seat {
   width: 100%;
   min-height: 96px;
@@ -1875,6 +2031,19 @@ button {
   z-index: 3;
 }
 
+.casino-oval-seat.is-winner {
+  box-shadow:
+    0 0 0 1px rgba(255, 200, 87, 0.44),
+    0 0 0 8px rgba(255, 200, 87, 0.08),
+    0 18px 32px rgba(0, 0, 0, 0.18);
+}
+
+.casino-oval-seat.is-folded {
+  opacity: 0.72;
+  border-color: rgba(255, 255, 255, 0.04);
+  filter: saturate(0.72);
+}
+
 .casino-oval-seat--blackjack-player {
   top: 83%;
 }
@@ -1936,6 +2105,11 @@ button {
 .casino-table-core--blackjack {
   top: 59%;
   width: min(48%, 360px);
+}
+
+.casino-table-core--poker {
+  top: 50%;
+  width: min(68%, 520px);
 }
 
 .casino-table-core__headline {
@@ -2360,9 +2534,35 @@ button {
   box-shadow: 0 16px 24px rgba(0, 0, 0, 0.18);
 }
 
+.pirate-card--dealt {
+  animation: pirateCardDealIn 680ms cubic-bezier(0.18, 0.8, 0.22, 1) both;
+  animation-delay: var(--pirate-card-deal-delay, 0ms);
+}
+
+.pirate-card--strong.pirate-card--dealt {
+  animation-name: pirateCardDealInStrong;
+}
+
 .pirate-card--empty {
   background: rgba(255, 255, 255, 0.04);
   border-style: dashed;
+}
+
+.pirate-card--ghost {
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(145deg, rgba(7, 12, 18, 0.38), rgba(24, 14, 14, 0.28)),
+    rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  color: rgba(246, 239, 224, 0.58);
+}
+
+.pirate-card--ghost span {
+  display: block;
+  font-family: "Cinzel", serif;
+  font-size: 1.08rem;
+  letter-spacing: 0.12em;
 }
 
 .pirate-card--face {
@@ -2444,6 +2644,40 @@ button {
   transform: translateY(-4px);
 }
 
+@keyframes pirateCardDealIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -38px, 0) scale(0.72) rotate(-12deg);
+  }
+
+  62% {
+    opacity: 1;
+    transform: translate3d(0, 4px, 0) scale(1.03) rotate(2deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes pirateCardDealInStrong {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -38px, 0) scale(0.72) rotate(-12deg);
+  }
+
+  62% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1.03) rotate(2deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, -4px, 0) scale(1) rotate(0deg);
+  }
+}
+
 @keyframes spinRing {
   to {
     transform: rotate(360deg);
@@ -2461,6 +2695,10 @@ button {
   }
 
   .casino-side-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .casino-poker-street-rail {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2515,6 +2753,10 @@ button {
 
   .casino-command-grid,
   .casino-salon-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .casino-poker-street-rail {
     grid-template-columns: 1fr;
   }
 
@@ -2632,6 +2874,10 @@ button {
     min-height: 96px;
   }
 
+  .casino-poker-board {
+    gap: 8px;
+  }
+
   .casino-slot-feature__media {
     min-height: 180px;
   }
@@ -2743,6 +2989,11 @@ button {
   .pirate-card {
     width: 74px;
     min-height: 108px;
+  }
+
+  .casino-poker-street-step {
+    min-height: 92px;
+    padding: 12px 14px;
   }
 
   .casino-felt-table {

@@ -26,7 +26,7 @@ import {
   requestCasinoPasswordReset,
   type CasinoProfile,
 } from "./lib/casinoApi";
-import type { RouletteSoundEvent } from "./PirateSlotsGame";
+import type { RoomId, RouletteSoundEvent } from "./PirateSlotsGame";
 import freshVideo from "./videos/fresh.mp4";
 
 const PirateSlotsGame = lazy(() => import("./PirateSlotsGame"));
@@ -98,6 +98,7 @@ export default function App() {
   const [queuedImmersionName, setQueuedImmersionName] = useState("");
   const [ambientVideoAudible, setAmbientVideoAudible] = useState(false);
   const [mediaReady, setMediaReady] = useState(false);
+  const [activeCasinoRoom, setActiveCasinoRoom] = useState<RoomId>("slots");
 
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
   const cueAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -157,7 +158,7 @@ export default function App() {
 
   useEffect(() => {
     if (!profile) return;
-    void syncAmbientVideo(mediaUnlockedRef.current);
+    void syncAmbientVideo(mediaUnlockedRef.current, activeCasinoRoom !== "slots");
 
     const unlockOnFirstGesture = () => {
       void armMediaPlayback();
@@ -167,7 +168,7 @@ export default function App() {
     return () => {
       window.removeEventListener("pointerdown", unlockOnFirstGesture);
     };
-  }, [profile]);
+  }, [activeCasinoRoom, profile]);
 
   const displayName = useMemo(() => {
     return profile?.user?.username || getCasinoDisplayName() || "Capitaine";
@@ -235,9 +236,15 @@ export default function App() {
     });
   }
 
-  async function syncAmbientVideo(withSound: boolean) {
+  async function syncAmbientVideo(withSound: boolean, shouldPlay = true) {
     const video = ambientVideoRef.current;
     if (!video) return;
+
+    if (!shouldPlay) {
+      stopMedia(video);
+      setAmbientVideoAudible(false);
+      return;
+    }
 
     video.volume = withSound ? 0.14 : 0;
     video.muted = !withSound;
@@ -272,14 +279,14 @@ export default function App() {
       setMediaReady(false);
     }
 
-    await syncAmbientVideo(mediaUnlockedRef.current);
+    await syncAmbientVideo(mediaUnlockedRef.current, activeCasinoRoom !== "slots");
   }
 
   async function runConnectionImmersion(playerName: string) {
     clearImmersionTimers();
     setImmersionLine(`Pont prive en preparation pour ${playerName || "le capitaine"}...`);
     setShowImmersion(true);
-    await syncAmbientVideo(mediaUnlockedRef.current);
+    await syncAmbientVideo(mediaUnlockedRef.current, activeCasinoRoom !== "slots");
     void playAudioClip(introAudioRef, funesterieAudio, 0.56);
 
     introHideTimeoutRef.current = window.setTimeout(() => {
@@ -410,6 +417,7 @@ export default function App() {
     clearImmersionTimers();
     setShowImmersion(false);
     setQueuedImmersionName("");
+    setActiveCasinoRoom("slots");
     setAmbientVideoAudible(false);
     setMediaReady(false);
     stopMedia(introAudioRef.current);
@@ -559,25 +567,27 @@ export default function App() {
         </div>
       ) : (
         <div className="casino-game-shell">
-          <div className="casino-ambient-corner">
-            <div className="casino-ambient-corner__frame">
-              <video
-                ref={ambientVideoRef}
-                className="casino-ambient-corner__video"
-                src={freshVideo}
-                autoPlay
-                loop
-                playsInline
-                muted
-              />
-              <div className="casino-ambient-corner__veil" />
-              <div className="casino-ambient-corner__copy">
-                <span className="casino-chip">Pont ATS</span>
-                <strong>Ambiance live</strong>
-                <small>{ambientVideoAudible ? "Son d'ambiance reduit actif" : "Le son s'activera au premier geste."}</small>
+          {activeCasinoRoom !== "slots" ? (
+            <div className="casino-ambient-corner">
+              <div className="casino-ambient-corner__frame">
+                <video
+                  ref={ambientVideoRef}
+                  className="casino-ambient-corner__video"
+                  src={freshVideo}
+                  autoPlay
+                  loop
+                  playsInline
+                  muted
+                />
+                <div className="casino-ambient-corner__veil" />
+                <div className="casino-ambient-corner__copy">
+                  <span className="casino-chip">Pont ATS</span>
+                  <strong>Ambiance live</strong>
+                  <small>{ambientVideoAudible ? "Son d'ambiance reduit actif" : "Le son s'activera au premier geste."}</small>
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
           {showImmersion ? (
             <div
@@ -658,6 +668,7 @@ export default function App() {
                 if (message) setNotice(message);
               }}
               onError={(message) => setError(message)}
+              onRoomChange={setActiveCasinoRoom}
             />
           </Suspense>
         </div>

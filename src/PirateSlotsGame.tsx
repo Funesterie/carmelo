@@ -1,18 +1,27 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import alerteSound from "./audio/alerte.mp3";
-import piratesongAudio from "./audio/piratesong.mp3";
 import BlackjackRoom from "./BlackjackRoom";
 import CarteMiniGame from "./CarteMiniGame";
 import MiniTreasureGame from "./MiniTreasureGame";
 import PokerRoom from "./PokerRoom";
 import RouletteRoom from "./RouletteRoom";
+import amightImg from "./images/amight.png";
+import batIconImg from "./images/bat.png";
 import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
 import chauveImg from "./images/chauve.png";
+import coffreImg from "./images/coffre.png";
+import dragonImg from "./images/dragon.png";
+import dragoncImg from "./images/dragonc.png";
 import drapImg from "./images/drap.png";
 import elephantImg from "./images/elephant.png";
+import flushImg from "./images/flush.png";
 import gunImg from "./images/gun.png";
 import lingotImg from "./images/lingot.png";
+import mapImg from "./images/map.png";
+import perroImg from "./images/perro.png";
+import qflushImg from "./images/qflush.png";
+import romeImg from "./images/rome.png";
 import rouletteArtwork from "./images/casino ats.png";
 import soldatImg from "./images/soldat.png";
 import districtArtwork from "./images/ChatGPT Image 2 avr. 2026, 21_17_56.png";
@@ -25,6 +34,7 @@ import oneVideo from "./videos/one.mp4";
 import powerVideo from "./videos/power.mp4";
 import rangerVideo from "./videos/ranger.mp4";
 import spartaVideo from "./videos/sparta.mp4";
+import deppVideo from "./videos/depp.mp4";
 import { formatCredits } from "./lib/casinoRoomState";
 import {
   spinCasinoSlots,
@@ -37,17 +47,17 @@ const BET_PRESETS = [20, 50, 100, 200, 500];
 const SPIN_ANIMATION_STEPS = 11;
 const SPIN_ANIMATION_INTERVAL_MS = 95;
 
-const SYMBOL_META: Record<string, { emoji: string; label: string; accent: string }> = {
-  PIRATE: { emoji: "🏴‍☠️", label: "Pavillon noir", accent: "var(--casino-gold)" },
-  CHEST: { emoji: "🧰", label: "Coffre", accent: "var(--casino-copper)" },
-  COIN: { emoji: "🪙", label: "Piastres", accent: "var(--casino-sun)" },
-  BAT: { emoji: "🦇", label: "Chauve-souris", accent: "var(--casino-rose)" },
-  BLUNDERBUSS: { emoji: "🔫", label: "Canon court", accent: "var(--casino-fire)" },
-  MAP: { emoji: "🗺️", label: "Carte", accent: "var(--casino-sea)" },
-  PARROT: { emoji: "🦜", label: "Perroquet", accent: "var(--casino-lime)" },
-  SOLDAT: { emoji: "🛡️", label: "Spartiate", accent: "var(--casino-silver)" },
-  ELEPHANT: { emoji: "🐘", label: "Elephant royal", accent: "var(--casino-ice)" },
-  JOKER: { emoji: "🃏", label: "Joker royal", accent: "var(--casino-violet)" },
+const SYMBOL_META: Record<string, { emoji: string; label: string; accent: string; image: string }> = {
+  PIRATE: { emoji: "🏴‍☠️", label: "Pavillon noir", accent: "var(--casino-gold)", image: drapImg },
+  CHEST: { emoji: "🧰", label: "Coffre", accent: "var(--casino-copper)", image: coffreImg },
+  COIN: { emoji: "🪙", label: "Piastres", accent: "var(--casino-sun)", image: lingotImg },
+  BAT: { emoji: "🦇", label: "Chauve-souris", accent: "var(--casino-rose)", image: chauveImg },
+  BLUNDERBUSS: { emoji: "🔫", label: "Canon court", accent: "var(--casino-fire)", image: gunImg },
+  MAP: { emoji: "🗺️", label: "Carte", accent: "var(--casino-sea)", image: mapImg },
+  PARROT: { emoji: "🦜", label: "Perroquet", accent: "var(--casino-lime)", image: perroImg },
+  SOLDAT: { emoji: "🛡️", label: "Spartiate", accent: "var(--casino-silver)", image: soldatImg },
+  ELEPHANT: { emoji: "🐘", label: "Elephant royal", accent: "var(--casino-ice)", image: elephantImg },
+  JOKER: { emoji: "🃏", label: "Joker royal", accent: "var(--casino-violet)", image: flushImg },
 };
 
 const PAYOUT_TABLE = [
@@ -65,6 +75,7 @@ const ROOM_DEFINITIONS = [
     chip: "Machine a sous",
     title: "Salon principal",
     body: "Le coeur du casino, avec la machine a sous branchee sur le vrai backend A11 et le solde persistant.",
+    icon: qflushImg,
   },
   {
     id: "treasure-map",
@@ -72,6 +83,7 @@ const ROOM_DEFINITIONS = [
     chip: "Carte au tresor",
     title: "Archiviste des criques",
     body: "Une seule croix, une seule chance, mais un positionnement enfin propre et lisible jusque sur telephone.",
+    icon: dragoncImg,
   },
   {
     id: "treasure-hunt",
@@ -79,6 +91,7 @@ const ROOM_DEFINITIONS = [
     chip: "Chasse navale",
     title: "Baie aux epaves",
     body: "Trois tirs, trois navires caches, et une lecture de plateau robuste au lieu des vieux overlays fragiles.",
+    icon: dragonImg,
   },
   {
     id: "blackjack",
@@ -86,6 +99,7 @@ const ROOM_DEFINITIONS = [
     chip: "Table des lanternes",
     title: "Blackjack pirate",
     body: "Une vraie table avec croupier, quatre IA autour de toi et des mises qui debitent le wallet A11 en direct.",
+    icon: amightImg,
   },
   {
     id: "poker",
@@ -93,6 +107,7 @@ const ROOM_DEFINITIONS = [
     chip: "Salon hold'em",
     title: "Texas hold'em rapide",
     body: "Cinq joueurs a table, quatre IA, un showdown net et des paiements serves par le backend A11.",
+    icon: romeImg,
   },
   {
     id: "roulette",
@@ -100,10 +115,27 @@ const ROOM_DEFINITIONS = [
     chip: "ATS live",
     title: "Roulette multijoueur",
     body: "Une salle commune, un compte a rebours partage, des mises visibles par plusieurs comptes et un tir serveur unique pour toute la table.",
+    icon: batIconImg,
   },
 ] as const;
 
-type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
+const SLOT_VIDEO_INTRO_SESSION_KEY = "funesterie-slots-intro-played";
+
+const SLOT_INTRO_MEDIA = {
+  title: "Introduction du salon",
+  body: "L'introduction passe une seule fois, puis la machine a sous bascule sur son ambiance video continue.",
+  image: fondImg,
+  video: oneVideo,
+} as const;
+
+const SLOT_AMBIENT_MEDIA = {
+  title: "Ambiance machine a sous",
+  body: "La video d'ambiance Depp prend ensuite le relai tant qu'aucune alerte de gain ne lui coupe la route.",
+  image: fondImg,
+  video: deppVideo,
+} as const;
+
+export type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 
 type SlotFeatureKey =
   | "idle"
@@ -186,6 +218,7 @@ type PirateSlotsGameProps = {
   onError: (message: string) => void;
   onRequestMediaPlayback?: () => void;
   onRouletteEvent?: (event: RouletteSoundEvent) => void;
+  onRoomChange?: (roomId: RoomId) => void;
 };
 
 function randomSymbolId() {
@@ -296,6 +329,13 @@ function SlotsRoom({
   const [lastSpin, setLastSpin] = useState<CasinoSpin | null>(null);
   const [lastMessage, setLastMessage] = useState("Pret a lancer les reels.");
   const [activeFeature, setActiveFeature] = useState<SlotFeatureKey>("idle");
+  const [slotIntroPlayed, setSlotIntroPlayed] = useState(() => {
+    try {
+      return sessionStorage.getItem(SLOT_VIDEO_INTRO_SESSION_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [bonusHeldIndexes, setBonusHeldIndexes] = useState<number[]>([]);
   const [goldRain, setGoldRain] = useState<
     Array<{ id: string; left: string; delay: string; duration: string; scale: string; drift: string }>
@@ -304,7 +344,6 @@ function SlotsRoom({
   const featureTimeoutRef = useRef<number | null>(null);
   const goldRainTimeoutRef = useRef<number | null>(null);
   const spinRunIdRef = useRef(0);
-  const ambienceAudioRef = useRef<HTMLAudioElement | null>(null);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const featureVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -317,44 +356,11 @@ function SlotsRoom({
   }, [profile.wallet.maxBet, profile.wallet.minBet]);
 
   useEffect(() => {
-    let pointerCleanup: (() => void) | null = null;
-    if (!ambienceAudioRef.current) {
-      ambienceAudioRef.current = new Audio(piratesongAudio);
-      ambienceAudioRef.current.loop = true;
-      ambienceAudioRef.current.volume = 0.08;
-      ambienceAudioRef.current.preload = "metadata";
-    }
-
-    const startAmbience = () => {
-      if (!ambienceAudioRef.current) return;
-      ambienceAudioRef.current.volume = 0.08;
-      void ambienceAudioRef.current.play().catch(() => undefined);
-    };
-
-    startAmbience();
-
-    const unlockOnPointer = () => {
-      startAmbience();
-    };
-
-    window.addEventListener("pointerdown", unlockOnPointer, { once: true });
-    pointerCleanup = () => window.removeEventListener("pointerdown", unlockOnPointer);
-
-    return () => {
-      pointerCleanup?.();
-      if (ambienceAudioRef.current) {
-        ambienceAudioRef.current.pause();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     return () => {
       spinRunIdRef.current += 1;
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       if (featureTimeoutRef.current) window.clearTimeout(featureTimeoutRef.current);
       if (goldRainTimeoutRef.current) window.clearTimeout(goldRainTimeoutRef.current);
-      ambienceAudioRef.current?.pause();
       alertAudioRef.current?.pause();
     };
   }, []);
@@ -374,16 +380,34 @@ function SlotsRoom({
   }, [lastSpin]);
 
   const recentTransactions = useMemo(() => profile.recentTransactions.slice(0, 8), [profile.recentTransactions]);
-  const featureMedia = SLOT_FEATURE_MEDIA[activeFeature];
+  const isAlertFeatureActive = activeFeature !== "idle";
+  const featureMedia = isAlertFeatureActive
+    ? SLOT_FEATURE_MEDIA[activeFeature]
+    : slotIntroPlayed
+      ? SLOT_AMBIENT_MEDIA
+      : SLOT_INTRO_MEDIA;
 
   useEffect(() => {
     const video = featureVideoRef.current;
     if (!video || !featureMedia.video) return;
-    const shouldUseAudio = activeFeature === "idle" && mediaReady;
+    const shouldUseAudio = mediaReady;
+    const volume = isAlertFeatureActive ? 0.5 : slotIntroPlayed ? 0.34 : 0.42;
     video.muted = !shouldUseAudio;
-    video.volume = shouldUseAudio ? 0.34 : 0;
+    video.volume = shouldUseAudio ? volume : 0;
     void video.play().catch(() => undefined);
-  }, [activeFeature, featureMedia.video, mediaReady]);
+  }, [featureMedia.video, isAlertFeatureActive, mediaReady, slotIntroPlayed]);
+
+  function markSlotsIntroPlayed() {
+    setSlotIntroPlayed((current) => {
+      if (current) return current;
+      try {
+        sessionStorage.setItem(SLOT_VIDEO_INTRO_SESSION_KEY, "1");
+      } catch {
+        // ignore storage failures
+      }
+      return true;
+    });
+  }
 
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
     if (!ref.current) {
@@ -418,6 +442,9 @@ function SlotsRoom({
 
   function triggerSlotFeedback(spin: CasinoSpin) {
     const nextFeature = chooseSlotFeature(spin);
+    if (nextFeature !== "idle") {
+      markSlotsIntroPlayed();
+    }
     setActiveFeature(nextFeature);
 
     if (featureTimeoutRef.current) {
@@ -530,9 +557,7 @@ function SlotsRoom({
         className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${isHeldJoker ? "is-bonus-held" : ""}`}
         style={{ ["--cell-accent" as string]: meta.accent }}
       >
-        <span className="casino-reel-cell__emoji" aria-hidden="true">
-          {meta.emoji}
-        </span>
+        <img className="casino-reel-cell__art" src={meta.image} alt="" aria-hidden="true" />
         <span className="casino-reel-cell__label">{meta.label}</span>
       </div>
     );
@@ -661,11 +686,16 @@ function SlotsRoom({
                   className="casino-slot-feature__video"
                   src={featureMedia.video}
                   autoPlay
-                  loop
-                  muted={!mediaReady || activeFeature !== "idle"}
+                  loop={slotIntroPlayed || isAlertFeatureActive}
+                  muted={!mediaReady}
                   playsInline
                   poster={featureMedia.image}
-                  controls={activeFeature === "idle"}
+                  controls={false}
+                  onEnded={() => {
+                    if (!slotIntroPlayed && !isAlertFeatureActive) {
+                      markSlotsIntroPlayed();
+                    }
+                  }}
                   onPlay={() => {
                     onRequestMediaPlayback?.();
                   }}
@@ -682,7 +712,11 @@ function SlotsRoom({
               <strong>{featureMedia.title}</strong>
               <p>{featureMedia.body}</p>
               <span className="casino-chip">
-                {activeFeature === "idle" ? "Entree du salon" : "Alerte video active"}
+                {isAlertFeatureActive
+                  ? "Alerte video prioritaire"
+                  : slotIntroPlayed
+                    ? "Ambiance machine a sous active"
+                    : "Intro unique avant ambiance"}
               </span>
             </div>
           </div>
@@ -724,7 +758,7 @@ function SlotsRoom({
               return (
                 <div key={entry.symbol} className="casino-paytable__row">
                   <div className="casino-paytable__symbol">
-                    <span aria-hidden="true">{meta.emoji}</span>
+                    <img className="casino-paytable__symbol-art" src={meta.image} alt="" aria-hidden="true" />
                     <strong>{meta.label}</strong>
                   </div>
                   <span>{entry.three}</span>
@@ -775,7 +809,7 @@ function SlotsRoom({
                   return (
                     <article key={`${win.lineIndex}-${win.symbol}`} className="casino-win-entry">
                       <div>
-                        <span aria-hidden="true">{meta.emoji}</span>
+                        <img className="casino-paytable__symbol-art" src={meta.image} alt="" aria-hidden="true" />
                         <div>
                           <strong>{win.label}</strong>
                           <span>
@@ -816,6 +850,10 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
     }
   }, [activeRoom, props.onRequestMediaPlayback]);
 
+  useEffect(() => {
+    props.onRoomChange?.(activeRoom);
+  }, [activeRoom, props.onRoomChange]);
+
   function renderRoom() {
     switch (activeRoom) {
       case "treasure-map":
@@ -855,6 +893,7 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
           </div>
 
           <div className="casino-command-deck__spotlight">
+            <img className="casino-command-deck__spotlight-art" src={currentRoom.icon} alt="" aria-hidden="true" />
             <span className="casino-chip">Salle active</span>
             <strong>{currentRoom.label}</strong>
             <p>Une navigation compacte, lisible, et tous les jeux a portee de main sans doubler le menu.</p>
@@ -871,6 +910,7 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
               role="tab"
               aria-selected={room.id === activeRoom}
             >
+              <img className="casino-command-card__icon" src={room.icon} alt="" aria-hidden="true" />
               <span className="casino-chip">{room.chip}</span>
               <strong>{room.label}</strong>
               <p>{room.body}</p>

@@ -1,5 +1,6 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useTableAudio } from "./audio/useTableAudio";
 import PiratePlayingCardView from "./PiratePlayingCard";
 import jetonImg from "./images/jeton.png";
 import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
@@ -21,6 +22,27 @@ const BLACKJACK_SEAT_LAYOUT = [
   { x: "67%", y: "35%", align: "center", tag: "Spot 3" },
   { x: "84%", y: "54%", align: "end", tag: "Spot 4" },
 ] as const;
+const TABLE_DEAL_STEP_MS = 96;
+
+function getBlackjackCardKeys(state: BlackjackState | null) {
+  const keys: string[] = [];
+
+  state?.dealerCards.forEach((card, index) => {
+    keys.push(`dealer-${card.id}-${index}`);
+  });
+
+  state?.aiSeats.forEach((seat) => {
+    seat.cards.forEach((card, index) => {
+      keys.push(`${seat.id}-${card.id}-${index}`);
+    });
+  });
+
+  state?.playerCards.forEach((card, index) => {
+    keys.push(`player-${card.id}-${index}`);
+  });
+
+  return keys;
+}
 
 type BlackjackRoomProps = {
   playerName: string;
@@ -40,6 +62,10 @@ export default function BlackjackRoom({
   const [working, setWorking] = useState(false);
   const [roomId, setRoomId] = useState(BLACKJACK_SALONS[0].id);
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
+  const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
+  const previousCardKeysRef = useRef<string[]>([]);
+  const clearDealAnimationTimeoutRef = useRef<number | null>(null);
+  const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio();
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
@@ -69,8 +95,55 @@ export default function BlackjackRoom({
     };
   }, [onError, roomId]);
 
+  useEffect(() => {
+    return () => {
+      if (clearDealAnimationTimeoutRef.current) {
+        window.clearTimeout(clearDealAnimationTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const currentCardKeys = getBlackjackCardKeys(state);
+    const previousCardKeys = new Set(previousCardKeysRef.current);
+    const nextFreshKeys = currentCardKeys.filter((key) => !previousCardKeys.has(key));
+    previousCardKeysRef.current = currentCardKeys;
+
+    if (!nextFreshKeys.length) return;
+
+    const nextDelays = nextFreshKeys.reduce<Record<string, number>>((accumulator, key, index) => {
+      accumulator[key] = index * TABLE_DEAL_STEP_MS;
+      return accumulator;
+    }, {});
+
+    setDealtCardDelays((current) => ({ ...current, ...nextDelays }));
+    playCardBurst(nextFreshKeys.length, { stepMs: TABLE_DEAL_STEP_MS, volume: 0.7 });
+
+    if (clearDealAnimationTimeoutRef.current) {
+      window.clearTimeout(clearDealAnimationTimeoutRef.current);
+    }
+
+    clearDealAnimationTimeoutRef.current = window.setTimeout(() => {
+      setDealtCardDelays((current) => {
+        const remaining = { ...current };
+        nextFreshKeys.forEach((key) => {
+          delete remaining[key];
+        });
+        return remaining;
+      });
+      clearDealAnimationTimeoutRef.current = null;
+    }, 1100 + nextFreshKeys.length * TABLE_DEAL_STEP_MS);
+  }, [state]);
+
   async function startRound() {
     onError("");
+    clearQueuedAudio();
+    previousCardKeysRef.current = [];
+    setDealtCardDelays({});
+    if (clearDealAnimationTimeoutRef.current) {
+      window.clearTimeout(clearDealAnimationTimeoutRef.current);
+      clearDealAnimationTimeoutRef.current = null;
+    }
     setWorking(true);
     try {
       const result = await startBlackjackRound(bet, roomId);
@@ -88,6 +161,9 @@ export default function BlackjackRoom({
   async function act(action: "hit" | "stand") {
     if (!state?.token || stage !== "player-turn" || working) return;
     onError("");
+    if (action === "hit") {
+      playCheck();
+    }
     setWorking(true);
     try {
       const result = await actBlackjackRound(state.token, action);
@@ -130,6 +206,13 @@ export default function BlackjackRoom({
                 className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
                 onClick={() => {
                   if (roomSwitchLocked || working) return;
+                  clearQueuedAudio();
+                  previousCardKeysRef.current = [];
+                  setDealtCardDelays({});
+                  if (clearDealAnimationTimeoutRef.current) {
+                    window.clearTimeout(clearDealAnimationTimeoutRef.current);
+                    clearDealAnimationTimeoutRef.current = null;
+                  }
                   setState(null);
                   setRoomId(salon.id);
                 }}
@@ -181,6 +264,8 @@ export default function BlackjackRoom({
                         key={`dealer-${card.id}-${index}`}
                         card={card}
                         hidden={Boolean(state?.dealerHidden && index === 1)}
+                        dealt={Boolean(dealtCardDelays[`dealer-${card.id}-${index}`] !== undefined)}
+                        dealDelayMs={dealtCardDelays[`dealer-${card.id}-${index}`] || 0}
                       />
                     ))
                   ) : (
@@ -208,7 +293,12 @@ export default function BlackjackRoom({
                     <div className="casino-card-row casino-card-row--compact casino-card-row--tight">
                       {seat.cards.length ? (
                         seat.cards.map((card, cardIndex) => (
-                          <PiratePlayingCardView key={`${seat.id}-${card.id}-${cardIndex}`} card={card} />
+                          <PiratePlayingCardView
+                            key={`${seat.id}-${card.id}-${cardIndex}`}
+                            card={card}
+                            dealt={Boolean(dealtCardDelays[`${seat.id}-${card.id}-${cardIndex}`] !== undefined)}
+                            dealDelayMs={dealtCardDelays[`${seat.id}-${card.id}-${cardIndex}`] || 0}
+                          />
                         ))
                       ) : (
                         <div className="casino-empty-seat">En attente</div>
@@ -241,7 +331,13 @@ export default function BlackjackRoom({
                 <div className="casino-card-row casino-card-row--player">
                   {state?.playerCards.length ? (
                     state.playerCards.map((card, index) => (
-                      <PiratePlayingCardView key={`player-${card.id}-${index}`} card={card} emphasis="strong" />
+                      <PiratePlayingCardView
+                        key={`player-${card.id}-${index}`}
+                        card={card}
+                        emphasis="strong"
+                        dealt={Boolean(dealtCardDelays[`player-${card.id}-${index}`] !== undefined)}
+                        dealDelayMs={dealtCardDelays[`player-${card.id}-${index}`] || 0}
+                      />
                     ))
                   ) : (
                     <div className="casino-empty-seat">Le sabot n'est pas encore ouvert.</div>

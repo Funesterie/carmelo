@@ -355,6 +355,10 @@ export type PokerSeat = {
   hand: PokerScore | null;
   read: string;
   isWinner: boolean;
+  folded?: boolean;
+  lastAction?: string;
+  totalCommitted?: number;
+  streetCommitted?: number;
 };
 
 export type PokerState = {
@@ -369,6 +373,17 @@ export type PokerState = {
   aiSeats: PokerSeat[];
   playerFolded: boolean;
   playerHand: PokerScore | null;
+  playerChips: number;
+  playerCommitted: number;
+  playerStreetCommitted: number;
+  currentBet: number;
+  toCall: number;
+  minBet: number;
+  minRaiseTo: number;
+  legalActions: Array<"check" | "call" | "bet" | "raise" | "fold">;
+  aggressorId?: string | null;
+  aggressorName?: string | null;
+  actionLog: string[];
   lastDelta: number;
   payoutAmount: number;
   message: string;
@@ -524,8 +539,16 @@ export async function startPokerRound(ante: number, roomId?: string) {
   return postCasinoAuthed<PokerResponse>("/api/casino/poker/start", { ante, roomId });
 }
 
-export async function actPokerRound(token: string, action: "reveal" | "showdown" | "fold") {
-  return postCasinoAuthed<PokerResponse>("/api/casino/poker/action", { token, action });
+export async function actPokerRound(
+  token: string,
+  action: "reveal" | "showdown" | "check" | "call" | "bet" | "raise" | "fold",
+  amount?: number
+) {
+  return postCasinoAuthed<PokerResponse>("/api/casino/poker/action", {
+    token,
+    action,
+    ...(typeof amount === "number" ? { amount } : {}),
+  });
 }
 
 export async function fetchRouletteRoom() {
