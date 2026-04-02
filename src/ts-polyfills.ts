@@ -1,21 +1,21 @@
 // Polyfills pour les méthodes modernes si besoin (pour Vite/TS)
 if (!Array.prototype.includes) {
-  Array.prototype.includes = function(searchElement, fromIndex) {
+  Array.prototype.includes = function <T>(this: T[], searchElement: T, fromIndex?: number) {
     return this.indexOf(searchElement, fromIndex) !== -1;
   };
 }
 if (!Array.prototype.flat) {
-  Array.prototype.flat = function(depth) {
-    var flattend = [];
-    (function flat(arr, d) {
+  Array.prototype.flat = function <A, D extends number = 1>(this: A, depth?: D) {
+    var flattend: FlatArray<A, D>[] = [];
+    (function flat(arr: any[], d: number | undefined) {
       for (var i = 0; i < arr.length; i++) {
         if (Array.isArray(arr[i]) && (d > 0 || d === undefined)) {
           flat(arr[i], d === undefined ? 1 : d - 1);
         } else {
-          flattend.push(arr[i]);
+          flattend.push(arr[i] as FlatArray<A, D>);
         }
       }
-    })(this, isNaN(depth) ? 1 : Number(depth));
+    })(Array.isArray(this) ? this : [this], isNaN(depth as number) ? 1 : Number(depth));
     return flattend;
   };
 }

@@ -14,10 +14,6 @@ declare global {
       refresh?(): Timeout;
     }
   }
-
-  namespace JSX {
-    interface Element {}
-  }
 }
 
 // Asset modules

@@ -1,21 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["ES2019", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "skipLibCheck": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": false,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": false
+    "allowSyntheticDefaultImports": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "build", "**/*.test.tsx", "C:\\Users\\cella\\AppData\\Local\\Temp"]
+  "include": ["src", "src/env.d.ts", "src/vite-env.d.ts"]
 }
