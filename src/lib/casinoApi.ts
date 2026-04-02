@@ -19,6 +19,29 @@ export type CasinoWin = {
   lineRows: number[];
 };
 
+export type CasinoSpinBonusStage = {
+  step: number;
+  ratio: number;
+  heldIndexes: number[];
+  jokerCount: number;
+  grid: string[][];
+};
+
+export type CasinoSpinBonus = {
+  triggered: boolean;
+  trigger: string;
+  triggerIndexes: number[];
+  initialJokerCount: number;
+  openingGrid: string[][];
+  stages: CasinoSpinBonusStage[];
+  finalJokerCount: number;
+  crossJoker: boolean;
+  fullJoker: boolean;
+  feature: "joker_line" | "joker_cross" | "joker_full";
+  holdDurationMs: number;
+  stageDurationMs: number;
+};
+
 export type CasinoSpin = {
   bet: number;
   lineBet: number;
@@ -29,6 +52,7 @@ export type CasinoSpin = {
   wins: CasinoWin[];
   totalPayout: number;
   netChange: number;
+  bonus: CasinoSpinBonus | null;
   generatedAt: string;
 };
 

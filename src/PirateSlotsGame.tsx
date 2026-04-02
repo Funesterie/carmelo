@@ -1,29 +1,27 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import alerteSound from "./audio/alerte.mp3";
-import bingoSound from "./audio/bingo.mp3";
 import piratesongAudio from "./audio/piratesong.mp3";
 import BlackjackRoom from "./BlackjackRoom";
 import CarteMiniGame from "./CarteMiniGame";
 import MiniTreasureGame from "./MiniTreasureGame";
 import PokerRoom from "./PokerRoom";
 import RouletteRoom from "./RouletteRoom";
-import casinoPoster from "./images/casino.png";
 import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
 import chauveImg from "./images/chauve.png";
+import drapImg from "./images/drap.png";
 import elephantImg from "./images/elephant.png";
 import gunImg from "./images/gun.png";
-import mapImg from "./images/map.png";
-import perroImg from "./images/perro.png";
+import lingotImg from "./images/lingot.png";
 import rouletteArtwork from "./images/casino ats.png";
 import soldatImg from "./images/soldat.png";
 import districtArtwork from "./images/ChatGPT Image 2 avr. 2026, 21_17_56.png";
-import flushImg from "./images/flush.png";
 import fondImg from "./images/fond.png";
 import batVideo from "./videos/bat.mp4";
 import boobaVideo from "./videos/booba.mp4";
 import expVideo from "./videos/exp.mp4";
 import jokerVideo from "./videos/joker.mp4";
+import oneVideo from "./videos/one.mp4";
 import powerVideo from "./videos/power.mp4";
 import rangerVideo from "./videos/ranger.mp4";
 import spartaVideo from "./videos/sparta.mp4";
@@ -124,15 +122,13 @@ type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 
 type SlotFeatureKey =
   | "idle"
-  | "joker"
   | "elephant"
   | "soldat"
   | "bat"
   | "gun"
-  | "parrot"
-  | "map"
-  | "pirate"
-  | "bigwin";
+  | "joker-line"
+  | "joker-cross"
+  | "joker-full";
 
 const SLOT_FEATURE_MEDIA: Record<
   SlotFeatureKey,
@@ -144,14 +140,15 @@ const SLOT_FEATURE_MEDIA: Record<
   }
 > = {
   idle: {
-    title: "Pont principal",
-    body: "Le salon pirate diffuse ses relais visuels entre deux spins.",
-    image: casinoPoster,
+    title: "Ouverture du salon",
+    body: "Le relais d'entree de la machine a sous tourne en boucle pendant que la cale se charge.",
+    image: fondImg,
+    video: oneVideo,
   },
-  joker: {
-    title: "Flush Joker",
-    body: "Le joker allume l'alerte et verrouille la table visuelle.",
-    image: flushImg,
+  "joker-line": {
+    title: "Alignement joker",
+    body: "Le drapeau joker ouvre la phase bonus et garde chaque symbole royal a sa place.",
+    image: drapImg,
     video: jokerVideo,
   },
   elephant: {
@@ -178,27 +175,17 @@ const SLOT_FEATURE_MEDIA: Record<
     image: gunImg,
     video: expVideo,
   },
-  parrot: {
-    title: "Perroquet veilleur",
-    body: "Le perroquet prend l'affiche quand le plateau s'emballe sans jackpot.",
-    image: perroImg,
-  },
-  map: {
-    title: "Cartographie du butin",
-    body: "Une série de cartes au tresor illumine la cale des gains.",
-    image: mapImg,
-  },
-  pirate: {
-    title: "Pavillon noir",
-    body: "Le drapeau pirate s'impose quand les reels se mettent au diapason.",
-    image: fondImg,
-    video: rangerVideo,
-  },
-  bigwin: {
-    title: "Big Win",
-    body: "Le power clip prend le relai pour les gros paiements machine a sous.",
-    image: cardArtwork,
+  "joker-cross": {
+    title: "Croix joker",
+    body: "Les jokers forment une croix complete sur les diagonales et passent en phase power.",
+    image: drapImg,
     video: powerVideo,
+  },
+  "joker-full": {
+    title: "Full joker",
+    body: "La grille entiere se transforme en jokers. Le ranger prend le pont pour la pluie de lingots.",
+    image: drapImg,
+    video: rangerVideo,
   },
 };
 
@@ -251,23 +238,61 @@ function formatTransactionTime(value: string | null) {
   }
 }
 
+function waitForMs(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+}
+
+function getJokerIndexes(grid: string[][]) {
+  return grid.flatMap((row, rowIndex) =>
+    row.flatMap((symbolId, columnIndex) => (symbolId === "JOKER" ? [rowIndex * row.length + columnIndex] : [])),
+  );
+}
+
+function buildGoldRainDrops(totalPayout: number, bet: number) {
+  const ratio = totalPayout / Math.max(1, bet);
+  const count = Math.max(0, Math.min(40, Math.round(ratio * 4)));
+  return Array.from({ length: count }, (_, index) => ({
+    id: `gold-${Date.now()}-${index}`,
+    left: `${4 + ((index * 11) % 88)}%`,
+    delay: `${(index % 8) * 0.12}s`,
+    duration: `${1.8 + (index % 5) * 0.22}s`,
+    scale: `${0.68 + (index % 4) * 0.15}`,
+    drift: `${-18 + (index % 7) * 6}px`,
+  }));
+}
+
 function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
   if (!spin) return "idle";
 
-  const flattened = spin.grid.flat();
-  const hasJoker = flattened.includes("JOKER");
-  if (hasJoker) return "joker";
+  if (spin.bonus?.feature === "joker_full") return "joker-full";
+  if (spin.bonus?.feature === "joker_cross") return "joker-cross";
+  if (spin.bonus?.feature === "joker_line") return "joker-line";
 
   const strongestWin = [...spin.wins].sort((left, right) => right.payout - left.payout)[0];
-  if (strongestWin?.symbol === "ELEPHANT" && strongestWin.matchCount >= 4) return "elephant";
-  if (strongestWin?.symbol === "SOLDAT" && strongestWin.matchCount >= 4) return "soldat";
-  if (strongestWin?.symbol === "BAT" && strongestWin.matchCount >= 4) return "bat";
-  if (strongestWin?.symbol === "BLUNDERBUSS" && strongestWin.matchCount >= 4) return "gun";
-  if (strongestWin?.symbol === "PARROT" && strongestWin.matchCount >= 3) return "parrot";
-  if (strongestWin?.symbol === "MAP" && strongestWin.matchCount >= 3) return "map";
-  if (strongestWin?.symbol === "PIRATE" && strongestWin.matchCount >= 4) return "pirate";
-  if (spin.totalPayout >= spin.bet * 5) return "bigwin";
+  if (strongestWin?.symbol === "ELEPHANT") return "elephant";
+  if (strongestWin?.symbol === "SOLDAT") return "soldat";
+  if (strongestWin?.symbol === "BAT") return "bat";
+  if (strongestWin?.symbol === "BLUNDERBUSS") return "gun";
   return "idle";
+}
+
+function getBonusNarration(spin: CasinoSpin) {
+  if (spin.bonus?.feature === "joker_full") {
+    return "Full joker verrouille. Toute la grille bascule sous le ranger.";
+  }
+  if (spin.bonus?.feature === "joker_cross") {
+    return "Croix joker detectee. Les diagonales sont tenues.";
+  }
+  if (spin.bonus?.triggered) {
+    return spin.bonus.trigger === "joker_count"
+      ? "Cinq jokers disperses ouvrent la phase bonus."
+      : "Alignement joker detecte. Les symboles royaux restent figes.";
+  }
+  return spin.totalPayout > 0
+    ? `Table gagnee: +${formatCredits(spin.totalPayout)} credits.`
+    : "Aucun alignement cette fois. La maison respire encore.";
 }
 
 function SlotsRoom({
@@ -278,16 +303,20 @@ function SlotsRoom({
 }: PirateSlotsGameProps) {
   const [bet, setBet] = useState(() => Math.max(profile.wallet.minBet, BET_PRESETS[1]));
   const [displayGrid, setDisplayGrid] = useState<string[][]>(() => buildPlaceholderGrid());
-  const [spinState, setSpinState] = useState<"idle" | "spinning">("idle");
+  const [spinState, setSpinState] = useState<"idle" | "spinning" | "bonus">("idle");
   const [lastSpin, setLastSpin] = useState<CasinoSpin | null>(null);
   const [lastMessage, setLastMessage] = useState("Pret a lancer les reels.");
   const [activeFeature, setActiveFeature] = useState<SlotFeatureKey>("idle");
+  const [bonusHeldIndexes, setBonusHeldIndexes] = useState<number[]>([]);
+  const [goldRain, setGoldRain] = useState<
+    Array<{ id: string; left: string; delay: string; duration: string; scale: string; drift: string }>
+  >([]);
   const intervalRef = useRef<number | null>(null);
-  const timeoutRef = useRef<number | null>(null);
   const featureTimeoutRef = useRef<number | null>(null);
+  const goldRainTimeoutRef = useRef<number | null>(null);
+  const spinRunIdRef = useRef(0);
   const ambienceAudioRef = useRef<HTMLAudioElement | null>(null);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
-  const bingoAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setBet((current) => {
@@ -331,12 +360,12 @@ function SlotsRoom({
 
   useEffect(() => {
     return () => {
+      spinRunIdRef.current += 1;
       if (intervalRef.current) window.clearInterval(intervalRef.current);
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
       if (featureTimeoutRef.current) window.clearTimeout(featureTimeoutRef.current);
+      if (goldRainTimeoutRef.current) window.clearTimeout(goldRainTimeoutRef.current);
       ambienceAudioRef.current?.pause();
       alertAudioRef.current?.pause();
-      bingoAudioRef.current?.pause();
     };
   }, []);
 
@@ -345,7 +374,7 @@ function SlotsRoom({
     return new Set(lastSpin.wins.flatMap((entry) => entry.indexes));
   }, [lastSpin]);
 
-  const canSpin = spinState !== "spinning" && !busy && profile.wallet.balance >= bet;
+  const canSpin = spinState === "idle" && !busy && profile.wallet.balance >= bet;
 
   const netChangeTone = useMemo(() => {
     if (!lastSpin) return "neutral";
@@ -372,6 +401,22 @@ function SlotsRoom({
     void ref.current.play().catch(() => undefined);
   }
 
+  function triggerGoldRain(spin: CasinoSpin) {
+    if (goldRainTimeoutRef.current) {
+      window.clearTimeout(goldRainTimeoutRef.current);
+      goldRainTimeoutRef.current = null;
+    }
+
+    const nextDrops = buildGoldRainDrops(spin.totalPayout, spin.bet);
+    setGoldRain(nextDrops);
+    if (!nextDrops.length) return;
+
+    goldRainTimeoutRef.current = window.setTimeout(() => {
+      setGoldRain([]);
+      goldRainTimeoutRef.current = null;
+    }, 4800);
+  }
+
   function triggerSlotFeedback(spin: CasinoSpin) {
     const nextFeature = chooseSlotFeature(spin);
     setActiveFeature(nextFeature);
@@ -387,19 +432,60 @@ function SlotsRoom({
       }, 9000);
     }
 
-    if (spin.grid.flat().includes("JOKER")) {
+    if (SLOT_FEATURE_MEDIA[nextFeature].video && nextFeature !== "idle") {
       playCue(alertAudioRef, alerteSound, 0.78);
     }
+  }
 
-    if (spin.totalPayout >= spin.bet * 5) {
-      playCue(bingoAudioRef, bingoSound, 0.26);
+  async function animateResolvedSpin(result: Awaited<ReturnType<typeof spinCasinoSlots>>, runId: number) {
+    const bonus = result.spin.bonus;
+
+    if (bonus?.triggered) {
+      setSpinState("bonus");
+      setDisplayGrid(bonus.openingGrid);
+      setBonusHeldIndexes(getJokerIndexes(bonus.openingGrid));
+      setLastMessage(getBonusNarration(result.spin));
+      await waitForMs(bonus.holdDurationMs);
+
+      if (spinRunIdRef.current !== runId) return;
+
+      for (const stage of bonus.stages) {
+        setDisplayGrid(stage.grid);
+        setBonusHeldIndexes(stage.heldIndexes);
+        setLastMessage(
+          bonus.fullJoker && stage === bonus.stages[bonus.stages.length - 1]
+            ? "Full joker en approche. Les jokers tiennent toute la grille."
+            : `Phase bonus joker ${stage.step}/${bonus.stages.length} · ${stage.jokerCount} jokers figes.`,
+        );
+        await waitForMs(bonus.stageDurationMs);
+        if (spinRunIdRef.current !== runId) return;
+      }
+    } else {
+      setBonusHeldIndexes([]);
+      setDisplayGrid(result.spin.grid);
     }
+
+    if (spinRunIdRef.current !== runId) return;
+
+    setDisplayGrid(result.spin.grid);
+    setBonusHeldIndexes(result.spin.bonus ? getJokerIndexes(result.spin.grid) : []);
+    setLastSpin(result.spin);
+    triggerSlotFeedback(result.spin);
+    triggerGoldRain(result.spin);
+    setSpinState("idle");
+    setLastMessage(getBonusNarration(result.spin));
+    onProfileChange(result.profile);
   }
 
   async function handleSpin() {
     if (!canSpin) return;
     onError("");
+    spinRunIdRef.current += 1;
+    const runId = spinRunIdRef.current;
     setSpinState("spinning");
+    setGoldRain([]);
+    setBonusHeldIndexes([]);
+    setActiveFeature("idle");
     setLastMessage("Les tambours roulent...");
 
     try {
@@ -414,18 +500,13 @@ function SlotsRoom({
         }
       }, SPIN_ANIMATION_INTERVAL_MS);
 
-      timeoutRef.current = window.setTimeout(() => {
-        setDisplayGrid(result.spin.grid);
-        setLastSpin(result.spin);
-        triggerSlotFeedback(result.spin);
-        setSpinState("idle");
-        setLastMessage(
-          result.spin.totalPayout > 0
-            ? `Table gagnee: +${formatCredits(result.spin.totalPayout)} credits.`
-            : "Aucun alignement cette fois. La maison respire encore.",
-        );
-        onProfileChange(result.profile);
-      }, SPIN_ANIMATION_INTERVAL_MS * (SPIN_ANIMATION_STEPS + 1));
+      await waitForMs(SPIN_ANIMATION_INTERVAL_MS * (SPIN_ANIMATION_STEPS + 1));
+      if (spinRunIdRef.current !== runId) return;
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      await animateResolvedSpin(result, runId);
     } catch (error_) {
       setSpinState("idle");
       onError(error_ instanceof Error ? error_.message : "Le spin a echoue.");
@@ -442,11 +523,12 @@ function SlotsRoom({
   function renderCell(symbolId: string, cellIndex: number) {
     const meta = SYMBOL_META[symbolId] || SYMBOL_META.COIN;
     const isHighlighted = highlightedIndexes.has(cellIndex);
+    const isHeldJoker = bonusHeldIndexes.includes(cellIndex) && symbolId === "JOKER";
 
     return (
       <div
         key={`${symbolId}-${cellIndex}`}
-        className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""}`}
+        className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${isHeldJoker ? "is-bonus-held" : ""}`}
         style={{ ["--cell-accent" as string]: meta.accent }}
       >
         <span className="casino-reel-cell__emoji" aria-hidden="true">
@@ -477,7 +559,7 @@ function SlotsRoom({
           </article>
         </div>
 
-        <div className="casino-reel-shell casino-room-shell">
+        <div className="casino-reel-shell casino-room-shell casino-reel-shell--slots">
           <div className="casino-reel-shell__header">
             <div>
               <span className="casino-chip">Machine a sous</span>
@@ -486,7 +568,26 @@ function SlotsRoom({
             <p>{lastMessage}</p>
           </div>
 
-          <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""}`}>
+          {goldRain.length ? (
+            <div className="casino-gold-rain" aria-hidden="true">
+              {goldRain.map((drop) => (
+                <span
+                  key={drop.id}
+                  className="casino-gold-rain__bar"
+                  style={{
+                    left: drop.left,
+                    animationDelay: drop.delay,
+                    animationDuration: drop.duration,
+                    transform: `translateX(${drop.drift}) scale(${drop.scale})`,
+                  }}
+                >
+                  <img src={lingotImg} alt="" />
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""}`}>
             {displayGrid.flatMap((row, rowIndex) =>
               row.map((symbolId, columnIndex) =>
                 renderCell(symbolId, rowIndex * displayGrid[0].length + columnIndex),
@@ -533,7 +634,7 @@ function SlotsRoom({
               onClick={handleSpin}
               disabled={!canSpin}
             >
-              {spinState === "spinning" ? "Reels en cours..." : "Lancer le spin"}
+              {spinState === "spinning" ? "Reels en cours..." : spinState === "bonus" ? "Bonus joker..." : "Lancer le spin"}
             </button>
           </div>
 
@@ -574,7 +675,7 @@ function SlotsRoom({
               <strong>{featureMedia.title}</strong>
               <p>{featureMedia.body}</p>
               <span className="casino-chip">
-                {activeFeature === "idle" ? "Ambiance du salon" : "Declencheur media actif"}
+                {activeFeature === "idle" ? "Entree du salon" : "Alerte video active"}
               </span>
             </div>
           </div>
@@ -696,6 +797,8 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
   const currentRoomArtwork =
     activeRoom === "roulette"
       ? rouletteArtwork
+      : activeRoom === "slots"
+        ? fondImg
       : activeRoom === "treasure-map" || activeRoom === "treasure-hunt"
         ? districtArtwork
         : cardArtwork;

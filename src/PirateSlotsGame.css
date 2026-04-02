@@ -22,7 +22,8 @@
   --casino-bg:
     radial-gradient(circle at top left, rgba(255, 200, 87, 0.18), transparent 30%),
     radial-gradient(circle at 85% 18%, rgba(78, 197, 255, 0.16), transparent 22%),
-    linear-gradient(140deg, #08111a 0%, #102030 42%, #180f14 100%);
+    linear-gradient(140deg, rgba(8, 17, 26, 0.82) 0%, rgba(16, 32, 48, 0.72) 42%, rgba(24, 15, 20, 0.82) 100%),
+    url("./images/fond.png") center/cover fixed no-repeat;
 }
 
 * {
@@ -616,6 +617,10 @@ button {
   animation: reelPulse 220ms ease-in-out infinite alternate;
 }
 
+.casino-reel-grid.is-bonus .casino-reel-cell:not(.is-bonus-held) {
+  opacity: 0.94;
+}
+
 @keyframes reelPulse {
   from {
     transform: translateY(0) scale(1);
@@ -652,6 +657,17 @@ button {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--cell-accent) 24%, transparent), rgba(255, 255, 255, 0.02)),
     rgba(7, 12, 18, 0.92);
+}
+
+.casino-reel-cell.is-bonus-held {
+  box-shadow:
+    0 0 0 1px rgba(255, 223, 107, 0.72),
+    0 0 0 8px rgba(158, 107, 255, 0.14),
+    0 0 32px rgba(158, 107, 255, 0.28);
+  border-color: rgba(255, 223, 107, 0.46);
+  background:
+    linear-gradient(180deg, rgba(158, 107, 255, 0.18), rgba(255, 255, 255, 0.02)),
+    rgba(7, 12, 18, 0.94);
 }
 
 .casino-reel-cell__emoji {
@@ -969,6 +985,49 @@ button {
 
 .casino-room-shell {
   position: relative;
+}
+
+.casino-reel-shell--slots {
+  overflow: hidden;
+}
+
+.casino-gold-rain {
+  position: absolute;
+  inset: 96px 0 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.casino-gold-rain__bar {
+  position: absolute;
+  top: -12%;
+  width: clamp(22px, 2.8vw, 34px);
+  animation-name: goldRainDrop;
+  animation-timing-function: ease-in;
+  animation-iteration-count: infinite;
+}
+
+.casino-gold-rain__bar img {
+  width: 100%;
+  display: block;
+  filter: drop-shadow(0 8px 14px rgba(255, 200, 87, 0.34));
+}
+
+@keyframes goldRainDrop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -8%, 0) rotate(0deg) scale(0.72);
+  }
+
+  14% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.96;
+    transform: translate3d(18px, 118%, 0) rotate(280deg) scale(1);
+  }
 }
 
 .casino-room-shell--cards {
