@@ -1,5 +1,11 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import BlackjackRoom from "./BlackjackRoom";
+import CarteMiniGame from "./CarteMiniGame";
+import MiniTreasureGame from "./MiniTreasureGame";
+import PokerRoom from "./PokerRoom";
+import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
+import { formatCredits } from "./lib/casinoRoomState";
 import {
   spinCasinoSlots,
   type CasinoProfile,
@@ -32,6 +38,46 @@ const PAYOUT_TABLE = [
   { symbol: "CHEST", three: "x8", four: "x18", five: "x40" },
 ];
 
+const ROOM_DEFINITIONS = [
+  {
+    id: "slots",
+    label: "Slots",
+    chip: "Machine a sous",
+    title: "Salon principal",
+    body: "Le coeur du casino, avec la machine a sous branchee sur le vrai backend A11 et le solde persistant.",
+  },
+  {
+    id: "treasure-map",
+    label: "Carte",
+    chip: "Carte au tresor",
+    title: "Archiviste des criques",
+    body: "Une seule croix, une seule chance, mais un positionnement enfin propre et lisible jusque sur telephone.",
+  },
+  {
+    id: "treasure-hunt",
+    label: "Chasse",
+    chip: "Chasse navale",
+    title: "Baie aux epaves",
+    body: "Trois tirs, trois navires caches, et une lecture de plateau robuste au lieu des vieux overlays fragiles.",
+  },
+  {
+    id: "blackjack",
+    label: "Blackjack",
+    chip: "Table des lanternes",
+    title: "Blackjack pirate",
+    body: "Une vraie table avec croupier, quatre IA autour de toi et des cartes facon qflush sur feutre noir.",
+  },
+  {
+    id: "poker",
+    label: "Poker",
+    chip: "Salon hold'em",
+    title: "Texas hold'em rapide",
+    body: "Cinq joueurs a table, quatre IA et un showdown net, sans casser le rythme du casino.",
+  },
+] as const;
+
+type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
+
 type PirateSlotsGameProps = {
   profile: CasinoProfile;
   busy: boolean;
@@ -46,12 +92,8 @@ function randomSymbolId() {
 
 function buildPlaceholderGrid(rows = 3, reels = 5) {
   return Array.from({ length: rows }, () =>
-    Array.from({ length: reels }, () => randomSymbolId())
+    Array.from({ length: reels }, () => randomSymbolId()),
   );
-}
-
-function formatCredits(value: number) {
-  return new Intl.NumberFormat("fr-FR").format(Number(value || 0));
 }
 
 function formatTransactionLabel(kind: string) {
@@ -80,7 +122,7 @@ function formatTransactionTime(value: string | null) {
   }
 }
 
-export default function PirateSlotsGame({
+function SlotsRoom({
   profile,
   busy,
   onProfileChange,
@@ -104,12 +146,8 @@ export default function PirateSlotsGame({
 
   useEffect(() => {
     return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-      }
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -127,9 +165,7 @@ export default function PirateSlotsGame({
     return "neutral";
   }, [lastSpin]);
 
-  const recentTransactions = useMemo(() => {
-    return profile.recentTransactions.slice(0, 8);
-  }, [profile.recentTransactions]);
+  const recentTransactions = useMemo(() => profile.recentTransactions.slice(0, 8), [profile.recentTransactions]);
 
   async function handleSpin() {
     if (!canSpin) return;
@@ -156,7 +192,7 @@ export default function PirateSlotsGame({
         setLastMessage(
           result.spin.totalPayout > 0
             ? `Table gagnee: +${formatCredits(result.spin.totalPayout)} credits.`
-            : "Aucun alignement cette fois. La maison respire encore."
+            : "Aucun alignement cette fois. La maison respire encore.",
         );
         onProfileChange(result.profile);
       }, SPIN_ANIMATION_INTERVAL_MS * (SPIN_ANIMATION_STEPS + 1));
@@ -196,7 +232,7 @@ export default function PirateSlotsGame({
       <div className="casino-stage">
         <div className="casino-status-strip">
           <article>
-            <span>Solde</span>
+            <span>Solde serveur</span>
             <strong>{formatCredits(profile.wallet.balance)} credits</strong>
           </article>
           <article>
@@ -211,7 +247,7 @@ export default function PirateSlotsGame({
           </article>
         </div>
 
-        <div className="casino-reel-shell">
+        <div className="casino-reel-shell casino-room-shell">
           <div className="casino-reel-shell__header">
             <div>
               <span className="casino-chip">Machine a sous</span>
@@ -223,14 +259,19 @@ export default function PirateSlotsGame({
           <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""}`}>
             {displayGrid.flatMap((row, rowIndex) =>
               row.map((symbolId, columnIndex) =>
-                renderCell(symbolId, rowIndex * displayGrid[0].length + columnIndex)
-              )
+                renderCell(symbolId, rowIndex * displayGrid[0].length + columnIndex),
+              ),
             )}
           </div>
 
           <div className="casino-controls">
             <div className="casino-bet-controls">
-              <button type="button" className="casino-ghost-button" onClick={() => adjustBet(-1)} disabled={spinState === "spinning"}>
+              <button
+                type="button"
+                className="casino-ghost-button"
+                onClick={() => adjustBet(-1)}
+                disabled={spinState === "spinning"}
+              >
                 - Miser
               </button>
               <div className="casino-bet-pills">
@@ -246,12 +287,22 @@ export default function PirateSlotsGame({
                   </button>
                 ))}
               </div>
-              <button type="button" className="casino-ghost-button" onClick={() => adjustBet(1)} disabled={spinState === "spinning"}>
+              <button
+                type="button"
+                className="casino-ghost-button"
+                onClick={() => adjustBet(1)}
+                disabled={spinState === "spinning"}
+              >
                 Miser +
               </button>
             </div>
 
-            <button type="button" className="casino-primary-button casino-primary-button--spin" onClick={handleSpin} disabled={!canSpin}>
+            <button
+              type="button"
+              className="casino-primary-button casino-primary-button--spin"
+              onClick={handleSpin}
+              disabled={!canSpin}
+            >
               {spinState === "spinning" ? "Reels en cours..." : "Lancer le spin"}
             </button>
           </div>
@@ -355,7 +406,9 @@ export default function PirateSlotsGame({
                         <span aria-hidden="true">{meta.emoji}</span>
                         <div>
                           <strong>{win.label}</strong>
-                          <span>Ligne {win.lineIndex + 1} · {win.matchCount} symboles</span>
+                          <span>
+                            Ligne {win.lineIndex + 1} · {win.matchCount} symboles
+                          </span>
                         </div>
                       </div>
                       <b>+{formatCredits(win.payout)}</b>
@@ -369,6 +422,59 @@ export default function PirateSlotsGame({
           </section>
         ) : null}
       </aside>
+    </section>
+  );
+}
+
+export default function PirateSlotsGame(props: PirateSlotsGameProps) {
+  const [activeRoom, setActiveRoom] = useState<RoomId>("slots");
+  const currentRoom = ROOM_DEFINITIONS.find((room) => room.id === activeRoom) || ROOM_DEFINITIONS[0];
+
+  function renderRoom() {
+    switch (activeRoom) {
+      case "treasure-map":
+        return <CarteMiniGame playerName={props.profile.user.username} />;
+      case "treasure-hunt":
+        return <MiniTreasureGame playerName={props.profile.user.username} />;
+      case "blackjack":
+        return <BlackjackRoom playerName={props.profile.user.username} />;
+      case "poker":
+        return <PokerRoom playerName={props.profile.user.username} />;
+      default:
+        return <SlotsRoom {...props} />;
+    }
+  }
+
+  return (
+    <section className="casino-floor">
+      <div
+        className="casino-room-hero"
+        style={{ ["--room-art" as string]: `url("${cardArtwork}")` }}
+      >
+        <div className="casino-room-hero__copy">
+          <span className="casino-chip">{currentRoom.chip}</span>
+          <h2>{currentRoom.title}</h2>
+          <p>{currentRoom.body}</p>
+        </div>
+
+        <div className="casino-floor-nav" role="tablist" aria-label="Salles de jeu">
+          {ROOM_DEFINITIONS.map((room) => (
+            <button
+              key={room.id}
+              type="button"
+              className={`casino-floor-nav__button ${room.id === activeRoom ? "is-active" : ""}`}
+              onClick={() => setActiveRoom(room.id)}
+              role="tab"
+              aria-selected={room.id === activeRoom}
+            >
+              <strong>{room.label}</strong>
+              <span>{room.chip}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {renderRoom()}
     </section>
   );
 }

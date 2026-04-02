@@ -1,242 +1,229 @@
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import marineImg from "./images/marine.png";
-import saphirImg from "./images/saphir.png";
-import rubisImg from "./images/rubis.png";
 import opaleImg from "./images/opale.png";
-import saphirSound from "./audio/saphir.mp3";
-import rubisSound from "./audio/rubis.mp3";
-import opaleSound from "./audio/opale.mp3";
+import rubisImg from "./images/rubis.png";
+import saphirImg from "./images/saphir.png";
 import drapImg from "./images/drap.png";
-import canonSound from "./audio/canon.mp3";
+import { formatCredits, usePersistentRoomChips } from "./lib/casinoRoomState";
 
-const diamonds = [
-  { img: opaleImg, reward: 500, alt: "opale (gros gain)", sound: opaleSound },
-  { img: rubisImg, reward: 300, alt: "rubis (gain moyen)", sound: rubisSound },
-  { img: saphirImg, reward: 150, alt: "saphir (petit gain)", sound: saphirSound },
-];
-
-type Boat = {
+type TreasureTile = {
   id: number;
-  diamond: { img: string; reward: number; alt: string; sound: string } | null;
-  sunk: boolean;
+  reward: number;
+  revealed: boolean;
 };
 
-export default function MiniTreasureGame({
-  onClose,
-  onWin,
-  shots = 3, // valeur par défaut
-  resetBonusVideos // <-- Ajout d'une prop callback optionnelle
-}: {
-  onClose: () => void;
-  onWin: (reward: number) => void;
-  shots?: number;
-  resetBonusVideos?: () => void;
-}) {
-  const [boats, setBoats] = useState<Boat[]>(() => {
-    const indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 3);
-    return Array.from({ length: 9 }, (_, i) => ({
-      id: i,
-      diamond: indexes.includes(i)
-        ? diamonds[indexes.indexOf(i)]
-        : null,
-      sunk: false,
-    }));
+const ROOM_COST = 120;
+const HUNT_PRIZES = [
+  { reward: 520, label: "Opale reine", art: opaleImg },
+  { reward: 320, label: "Rubis braise", art: rubisImg },
+  { reward: 180, label: "Saphir du sillage", art: saphirImg },
+];
+
+function buildTreasureBoard() {
+  const winningSlots = [...Array.from({ length: 9 }, (_, index) => index)]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, HUNT_PRIZES.length);
+
+  return Array.from({ length: 9 }, (_, index) => {
+    const prizeIndex = winningSlots.indexOf(index);
+    return {
+      id: index,
+      reward: prizeIndex >= 0 ? HUNT_PRIZES[prizeIndex].reward : 0,
+      revealed: false,
+    };
   });
+}
 
-  const [shotsLeft, setShotsLeft] = useState(shots);
-  const [finished, setFinished] = useState(false);
-  const [totalWin, setTotalWin] = useState(0);
-  const [showResult, setShowResult] = useState(false);
+function getPrizeMeta(reward: number) {
+  return HUNT_PRIZES.find((entry) => entry.reward === reward) || null;
+}
 
-  function shootBoat(id: number) {
-    if (finished || shotsLeft <= 0) return;
-    setBoats((prev) => prev.map((b) => (b.id === id ? { ...b, sunk: true } : b)));
-    const boat = boats.find((b) => b.id === id);
-    if (!boat) return;
-    if (boat.diamond) {
-      setTotalWin((w) => w + boat.diamond.reward);
-      // Joue le son associé à la pierre précieuse
-      const audio = new Audio(boat.diamond.sound);
-      audio.play();
-    } else {
-      // Joue le son de canon si ce n'est pas une gemme
-      const audio = new Audio(canonSound);
-      audio.play();
+export default function MiniTreasureGame({ playerName }: { playerName: string }) {
+  const [tableChips, setTableChips] = usePersistentRoomChips(
+    "treasure-hunt",
+    playerName,
+    1800,
+  );
+  const [board, setBoard] = useState<TreasureTile[]>(() => buildTreasureBoard());
+  const [shotsLeft, setShotsLeft] = useState(0);
+  const [roundReward, setRoundReward] = useState(0);
+  const [status, setStatus] = useState("Lance une expedition et tire trois salves sur la baie.");
+  const [phase, setPhase] = useState<"idle" | "playing" | "resolved">("idle");
+
+  const revealedPrizes = useMemo(
+    () => board.filter((tile) => tile.revealed && tile.reward > 0),
+    [board],
+  );
+
+  function startRound() {
+    if (tableChips < ROOM_COST) {
+      setStatus("Tes jetons de salle sont trop bas pour affreter une nouvelle expedition.");
+      return;
     }
-    const left = shotsLeft - 1;
-    setShotsLeft(left);
-    if (left === 0) {
-      setFinished(true);
-      setShowResult(true);
-    }
+
+    setTableChips((current) => current - ROOM_COST);
+    setBoard(buildTreasureBoard());
+    setShotsLeft(3);
+    setRoundReward(0);
+    setPhase("playing");
+    setStatus("Trois tirs, trois chances. Choisis tes navires avec soin.");
   }
 
-  function handleClose() {
-    if (showResult) {
-      onWin(totalWin);
-      onClose();
-      if (typeof resetBonusVideos === 'function') {
-        resetBonusVideos();
-      }
-    }
-  }
+  function revealTile(tileId: number) {
+    if (phase !== "playing" || shotsLeft <= 0) return;
 
-  // Ajout : reset du jeu si le nombre de tirs change (bonus relancé)
-  useEffect(() => {
-    setBoats(() => {
-      const indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 3);
-      return Array.from({ length: 9 }, (_, i) => ({
-        id: i,
-        diamond: indexes.includes(i)
-          ? diamonds[indexes.indexOf(i)]
-          : null,
-        sunk: false,
-      }));
-    });
-    setShotsLeft(shots);
-    setFinished(false);
-    setTotalWin(0);
-    setShowResult(false);
-  }, [shots]);
+    const tile = board.find((entry) => entry.id === tileId);
+    if (!tile || tile.revealed) return;
+
+    const reward = tile.reward;
+    const remainingShots = shotsLeft - 1;
+    const nextReward = roundReward + reward;
+
+    setBoard((current) =>
+      current.map((entry) =>
+        entry.id === tileId ? { ...entry, revealed: true } : entry,
+      ),
+    );
+    setShotsLeft(remainingShots);
+    setRoundReward(nextReward);
+
+    if (remainingShots === 0) {
+      setPhase("resolved");
+      setTableChips((current) => current + nextReward);
+      setStatus(
+        reward > 0
+          ? `Derniere salve reussie. La cale remonte avec ${formatCredits(nextReward)} jetons.`
+          : `Expedition bouclee. Bilan de chasse: ${formatCredits(nextReward)} jetons.`,
+      );
+      return;
+    }
+
+    if (reward > 0) {
+      const prizeMeta = getPrizeMeta(reward);
+      setStatus(
+        `${prizeMeta?.label || "Tresor"} repere. Encore ${remainingShots} tir${remainingShots > 1 ? "s" : ""}.`,
+      );
+      return;
+    }
+
+    setStatus(`Rien que de l'ecume. Il reste ${remainingShots} tir${remainingShots > 1 ? "s" : ""}.`);
+  }
 
   return (
-    <div className="miniGameOverlay">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center' }}>
-        <img src={drapImg} alt="drapeau pirate" style={{ height: 48, verticalAlign: 'middle' }} />
-        <h2 style={{ margin: 0 }}>Chasse au Trésor</h2>
-      </div>
-      <p>Tirs restants : {shotsLeft}</p>
-      <div className="boatGrid" style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: 'clamp(12px, 3vw, 24px)',
-        width: 'clamp(280px, 90vw, 450px)',
-        maxWidth: '100%',
-        margin: '0 auto',
-        padding: 'clamp(8px, 2vw, 16px)'
-      }}>
-        {boats.map((b) => (
-          <button
-            key={b.id}
-            className={`boat ${b.sunk ? "sunk" : ""}`}
-            onClick={() => shootBoat(b.id)}
-            disabled={b.sunk || finished}
-            style={{
-              padding: '0',
-              background: 'rgba(30, 30, 40, 0.8)',
-              border: '2px solid rgba(255, 224, 130, 0.3)',
-              borderRadius: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              aspectRatio: '1/1',
-              minWidth: 0,
-              minHeight: 0,
-              maxWidth: '100%',
-              maxHeight: '100%',
-              cursor: (b.sunk || finished) ? 'not-allowed' : 'pointer',
-              opacity: (b.sunk || finished) ? 0.5 : 1,
-              transition: 'all 0.2s ease',
-              overflow: 'hidden',
-            }}
-            onMouseDown={(e) => {
-              if (!b.sunk && !finished) {
-                (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.95)';
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 16px rgba(255, 224, 130, 0.6)';
-              }
-            }}
-            onMouseUp={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 8px rgba(255, 224, 130, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 8px rgba(255, 224, 130, 0.3)';
-            }}
-            onMouseEnter={(e) => {
-              if (!b.sunk && !finished) {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 12px rgba(255, 224, 130, 0.5)';
-              }
-            }}
-          >
-            <div style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 'clamp(4px, 1.5vw, 8px)'
-            }}>
-              {!b.sunk ? (
-                <img
-                  src={marineImg}
-                  alt="bateau"
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    objectFit: 'cover', // Changement ici pour bien couvrir la case
-                    maxWidth: '100%',
-                    maxHeight: '100%'
-                  }}
-                />
-              ) : b.diamond ? (
-                <img
-                  src={b.diamond.img}
-                  alt={b.diamond.alt}
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    objectFit: 'contain',
-                    maxWidth: '100%',
-                    maxHeight: '100%'
-                  }}
-                />
-              ) : (
-                <span style={{ fontSize: 'clamp(28px, 5vw, 42px)', lineHeight: 1 }}>💥</span>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
-      {showResult && (
-        <div
-          style={{
-            marginTop: 'clamp(12px, 3vw, 24px)',
-            fontSize: 'clamp(16px, 4vw, 24px)',
-            color: "#ffe082",
-            textAlign: 'center',
-            fontWeight: 700
-          }}
-        >
-          Gain total : {totalWin} crédits
+    <section className="casino-table-layout">
+      <div className="casino-stage">
+        <div className="casino-status-strip">
+          <article>
+            <span>Jetons de salle</span>
+            <strong>{formatCredits(tableChips)}</strong>
+          </article>
+          <article>
+            <span>Affretement</span>
+            <strong>{formatCredits(ROOM_COST)}</strong>
+          </article>
+          <article className={phase === "resolved" && roundReward > ROOM_COST ? "tone-positive" : ""}>
+            <span>Gain de la manche</span>
+            <strong>{formatCredits(roundReward - ROOM_COST)}</strong>
+          </article>
         </div>
-      )}
-      <button
-        onClick={handleClose}
-        style={{ 
-          marginTop: 'clamp(12px, 3vw, 20px)', 
-          opacity: showResult ? 1 : 0.5, 
-          pointerEvents: showResult ? 'auto' : 'none',
-          padding: 'clamp(10px, 2vw, 14px) clamp(20px, 4vw, 28px)',
-          fontSize: 'clamp(14px, 3.5vw, 18px)',
-          borderRadius: '8px',
-          background: '#ff9800',
-          color: '#222',
-          border: 'none',
-          cursor: showResult ? 'pointer' : 'not-allowed',
-          fontWeight: 700,
-          transition: 'all 0.2s ease',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)'
-        }}
-      >
-        Quitter
-      </button>
-    </div>
+
+        <div className="casino-reel-shell casino-room-shell">
+          <div className="casino-reel-shell__header">
+            <div>
+              <span className="casino-chip">Chasse navale</span>
+              <h2>Baie aux epaves</h2>
+            </div>
+            <p>{status}</p>
+          </div>
+
+          <div className="casino-treasure-hunt">
+            <div className="casino-treasure-hunt__hero">
+              <img src={drapImg} alt="Drapeau pirate" />
+              <div>
+                <strong>Trois navires cachent des pierres fines.</strong>
+                <span>Les autres ne laissent qu’un nuage de poudre sur l’eau.</span>
+              </div>
+            </div>
+
+            <div className="casino-boat-grid">
+              {board.map((tile) => {
+                const prizeMeta = getPrizeMeta(tile.reward);
+                return (
+                  <button
+                    key={tile.id}
+                    type="button"
+                    className={`casino-boat-tile ${tile.revealed ? "is-revealed" : ""}`}
+                    disabled={phase !== "playing" || tile.revealed}
+                    onClick={() => revealTile(tile.id)}
+                  >
+                    {!tile.revealed ? (
+                      <img src={marineImg} alt="Navire" />
+                    ) : prizeMeta ? (
+                      <div className="casino-boat-tile__treasure">
+                        <img src={prizeMeta.art} alt={prizeMeta.label} />
+                        <strong>{formatCredits(prizeMeta.reward)}</strong>
+                      </div>
+                    ) : (
+                      <div className="casino-boat-tile__miss">
+                        <span>💥</span>
+                        <strong>Eau vide</strong>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="casino-action-row">
+              <div className="casino-chip-row">
+                <span className="casino-chip">Tirs restants: {shotsLeft}</span>
+                <span className="casino-chip">Pierres relevees: {revealedPrizes.length}</span>
+              </div>
+              <button
+                type="button"
+                className="casino-primary-button"
+                onClick={startRound}
+                disabled={phase === "playing"}
+              >
+                {phase === "playing" ? "Expedition en cours" : "Lancer une expedition"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside className="casino-side-rail">
+        <section className="casino-panel">
+          <div className="casino-panel__header">
+            <span className="casino-chip">Table</span>
+            <h3>Recompenses</h3>
+          </div>
+          <div className="casino-prize-stack">
+            {HUNT_PRIZES.map((entry) => (
+              <article key={entry.reward} className="casino-prize-card">
+                <img src={entry.art} alt={entry.label} />
+                <div>
+                  <strong>{entry.label}</strong>
+                  <span>+{formatCredits(entry.reward)} jetons</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="casino-panel">
+          <div className="casino-panel__header">
+            <span className="casino-chip">Regles</span>
+            <h3>Comment jouer</h3>
+          </div>
+          <div className="casino-rule-list">
+            <p>Chaque expedition coute {formatCredits(ROOM_COST)} jetons.</p>
+            <p>Tu as trois tirs pour reveler jusqu’a trois navires gagnants.</p>
+            <p>Les gains sont credites a la fin de la manche pour garder la lecture propre.</p>
+          </div>
+        </section>
+      </aside>
+    </section>
   );
 }

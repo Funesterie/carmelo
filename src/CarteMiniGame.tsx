@@ -1,102 +1,157 @@
 import * as React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import carteImg from "./images/carte.png";
-import moneySound from "./audio/money.mp3";
-import failSound from "./audio/fail.mp3";
 import coffreImg from "./images/coffre.png";
+import lingotImg from "./images/lingot.png";
+import { formatCredits, usePersistentRoomChips } from "./lib/casinoRoomState";
 
-export default function CarteMiniGame({
-  onClose,
-  onWin,
-  lingotImg
-}: {
-  onClose: () => void;
-  onWin: (reward: number) => void;
-  lingotImg?: string;
-}) {
-  // Coordonnées précises des 3 croix (ajustées pour coller aux croix sur l'image)
-  const crossZones = [
-    { left: "23.5%", top: "39.5%" },
-    { left: "53.5%", top: "62%" },
-    { left: "76.5%", top: "29.5%" }
-  ];
-  const [goldIndex, setGoldIndex] = useState(() => Math.floor(Math.random() * crossZones.length));
-  const [selected, setSelected] = useState<number | null>(null);
-  const [revealed, setRevealed] = useState(false);
-  const [message, setMessage] = useState("");
+const MAP_ROOM_COST = 90;
+const MAP_REWARD = 340;
+const TREASURE_POINTS = [
+  { id: "west", left: "24.8%", top: "37.4%", label: "Recif ouest" },
+  { id: "south", left: "35.6%", top: "69.7%", label: "Maree du sud" },
+  { id: "east", left: "68.3%", top: "53.8%", label: "Crique est" },
+];
 
-  function handleClick(idx: number) {
-    if (revealed) return;
-    setSelected(idx);
-    setRevealed(true);
-    if (idx === goldIndex) {
-      setMessage("Bravo ! Tu as trouvé le coffre !");
-      // Joue le son money.mp3 si gagné
-      const audio = new Audio(moneySound);
-      audio.volume = 0.85;
-      audio.loop = false;
-      audio.play();
-      setTimeout(() => onWin(300), 1200);
-    } else {
-      setMessage("Raté ! Pas de coffre ici...");
-      // Joue le son fail.mp3 si perdu
-      const audio = new Audio(failSound);
-      audio.volume = 0.7;
-      audio.play();
+export default function CarteMiniGame({ playerName }: { playerName: string }) {
+  const [tableChips, setTableChips] = usePersistentRoomChips("treasure-map", playerName, 1500);
+  const [winningPoint, setWinningPoint] = useState(() => TREASURE_POINTS[Math.floor(Math.random() * TREASURE_POINTS.length)]?.id || "west");
+  const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"idle" | "playing" | "resolved">("idle");
+  const [status, setStatus] = useState("Etudie la carte et choisis la bonne croix.");
+
+  const netChange = useMemo(() => {
+    if (phase !== "resolved") return -MAP_ROOM_COST;
+    return selectedPoint === winningPoint ? MAP_REWARD - MAP_ROOM_COST : -MAP_ROOM_COST;
+  }, [phase, selectedPoint, winningPoint]);
+
+  function startSearch() {
+    if (tableChips < MAP_ROOM_COST) {
+      setStatus("Il te manque des jetons de salle pour lancer une nouvelle recherche.");
+      return;
     }
+
+    setTableChips((current) => current - MAP_ROOM_COST);
+    setWinningPoint(TREASURE_POINTS[Math.floor(Math.random() * TREASURE_POINTS.length)]?.id || "west");
+    setSelectedPoint(null);
+    setPhase("playing");
+    setStatus("Une seule tentative. Choisis la croix qui te semble la plus juste.");
+  }
+
+  function choosePoint(pointId: string) {
+    if (phase !== "playing") return;
+
+    const foundTreasure = pointId === winningPoint;
+    setSelectedPoint(pointId);
+    setPhase("resolved");
+
+    if (foundTreasure) {
+      setTableChips((current) => current + MAP_REWARD);
+      setStatus(`Trouve. Le coffre rapporte ${formatCredits(MAP_REWARD)} jetons.`);
+      return;
+    }
+
+    setStatus("Mauvaise crique. La carte se referme sans recompense.");
   }
 
   return (
-    <div style={{
-      position: "fixed",
-      left: 0, top: 0, width: "100vw", height: "100vh",
-      background: "rgba(0,0,0,0.85)",
-      zIndex: 9999,
-      display: "flex", alignItems: "center", justifyContent: "center"
-    }}>
-      <div style={{ position: "relative", width: 520, height: 340, background: "#222", borderRadius: 16, boxShadow: "0 4px 32px #000" }}>
-        <img src={carteImg} alt="Carte au trésor" style={{ width: "100%", height: "100%", borderRadius: 16, objectFit: "cover" }} />
-        {/* Zones cliquables sur les croix */}
-        {crossZones.map((pos, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleClick(idx)}
-            disabled={revealed}
-            style={{
-              position: "absolute",
-              left: pos.left,
-              top: pos.top,
-              width: 90, height: 90, // 3x plus gros
-              background: "rgba(0,0,0,0.05)",
-              border: revealed && idx === goldIndex ? "4px solid gold" : "4px solid #c00",
-              borderRadius: "50%",
-              cursor: revealed ? "default" : "pointer",
-              transform: "translate(-50%, -50%)",
-              zIndex: 2,
-              outline: idx === selected ? "2px solid #ffe082" : "none",
-              boxShadow: revealed && idx === goldIndex ? "0 0 24px 8px gold" : "0 0 12px 4px #c00",
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: 0,
-              transition: 'all 0.2s',
-            }}
-          >
-            {/* Affiche le coffre géant si c'est la croix gagnante */}
-            {revealed && idx === goldIndex ? (
-              <img src={coffreImg} alt="Coffre" style={{ width: 70, height: 70, objectFit: 'contain', filter: 'drop-shadow(0 0 12px gold)' }} />
-            ) : null}
-          </button>
-        ))}
-        {/* Message résultat */}
-        {revealed && (
-          <div style={{
-            position: "absolute", left: 0, bottom: 12, width: "100%", textAlign: "center", color: "#ffe082", fontSize: 24, fontWeight: 700, textShadow: "1px 1px 8px #000"
-          }}>{message}</div>
-        )}
-        {/* Bouton fermer uniquement */}
-        <div style={{ position: "absolute", right: 16, top: 16, zIndex: 10, display: 'flex', gap: 8 }}>
-          <button onClick={onClose} style={{ fontSize: 18, padding: "6px 16px", borderRadius: 8, border: "none", background: "#222", color: "#ffe082", cursor: "pointer" }}>Fermer</button>
+    <section className="casino-table-layout">
+      <div className="casino-stage">
+        <div className="casino-status-strip">
+          <article>
+            <span>Jetons de salle</span>
+            <strong>{formatCredits(tableChips)}</strong>
+          </article>
+          <article>
+            <span>Cout de recherche</span>
+            <strong>{formatCredits(MAP_ROOM_COST)}</strong>
+          </article>
+          <article className={phase === "resolved" && selectedPoint === winningPoint ? "tone-positive" : phase === "resolved" ? "tone-negative" : ""}>
+            <span>Variation</span>
+            <strong>{phase === "idle" ? "Aucune" : `${netChange >= 0 ? "+" : ""}${formatCredits(netChange)}`}</strong>
+          </article>
+        </div>
+
+        <div className="casino-reel-shell casino-room-shell">
+          <div className="casino-reel-shell__header">
+            <div>
+              <span className="casino-chip">Carte au tresor</span>
+              <h2>Archiviste des criques</h2>
+            </div>
+            <p>{status}</p>
+          </div>
+
+          <div className="casino-map-board">
+            <div className="casino-map-board__frame">
+              <img src={carteImg} alt="Carte au tresor" className="casino-map-board__image" />
+              {TREASURE_POINTS.map((point) => {
+                const isSelected = selectedPoint === point.id;
+                const isWinner = phase === "resolved" && winningPoint === point.id;
+                return (
+                  <button
+                    key={point.id}
+                    type="button"
+                    className={`casino-map-marker ${isSelected ? "is-selected" : ""} ${isWinner ? "is-winning" : ""}`}
+                    style={{ left: point.left, top: point.top }}
+                    onClick={() => choosePoint(point.id)}
+                    disabled={phase !== "playing"}
+                    aria-label={point.label}
+                  >
+                    {isWinner ? <img src={coffreImg} alt="" /> : <span>✕</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="casino-action-row">
+            <div className="casino-chip-row">
+              <span className="casino-chip">
+                {phase === "playing" ? "Une seule tentative active" : "Recherche fermee"}
+              </span>
+              <span className="casino-chip">
+                Jackpot: +{formatCredits(MAP_REWARD)}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="casino-primary-button"
+              onClick={startSearch}
+              disabled={phase === "playing"}
+            >
+              {phase === "playing" ? "Carte ouverte" : "Ouvrir une carte"}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <aside className="casino-side-rail">
+        <section className="casino-panel">
+          <div className="casino-panel__header">
+            <span className="casino-chip">Butin</span>
+            <h3>Coffre du cartographe</h3>
+          </div>
+          <div className="casino-prize-card casino-prize-card--single">
+            <img src={lingotImg} alt="Lingot pirate" />
+            <div>
+              <strong>Cache principale</strong>
+              <span>+{formatCredits(MAP_REWARD)} jetons si la croix est juste</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="casino-panel">
+          <div className="casino-panel__header">
+            <span className="casino-chip">Repere</span>
+            <h3>Lecture de carte</h3>
+          </div>
+          <div className="casino-rule-list">
+            <p>Les marqueurs sont maintenant centres sur les croix de la carte, meme sur mobile.</p>
+            <p>Une carte coute {formatCredits(MAP_ROOM_COST)} jetons et ne donne qu’une chance.</p>
+            <p>Quand le coffre apparait, la manche se solde instantanement sans popup cassant la lecture.</p>
+          </div>
+        </section>
+      </aside>
+    </section>
   );
 }
