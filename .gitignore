@@ -13,3 +13,6 @@ src/audio/pirate.m4a
 *.swo
 *~
 .idea/
+
+# Local Netlify folder
+.netlify
