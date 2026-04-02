@@ -103,21 +103,6 @@ const ROOM_DEFINITIONS = [
   },
 ] as const;
 
-const DISTRICT_CARDS = [
-  { id: "freeland", title: "Freeland Archive", subtitle: "Cartes & butins", roomId: "treasure-map", col: 0, row: 0 },
-  { id: "nezlephant", title: "Nezlephant Vault", subtitle: "Salles denses", roomId: "treasure-hunt", col: 1, row: 0 },
-  { id: "rome", title: "Rome Table", subtitle: "Coupes rapides", roomId: "roulette", col: 2, row: 0 },
-  { id: "dragon", title: "Dragon High Rollers", subtitle: "Blackjack live", roomId: "blackjack", col: 0, row: 1 },
-  { id: "qflush", title: "Qflush Arcade", subtitle: "Slots A11", roomId: "slots", col: 1, row: 1 },
-  { id: "morphing", title: "Morphing Vault", subtitle: "Butins caches", roomId: "treasure-hunt", col: 2, row: 1 },
-  { id: "scream", title: "Scream Whisper Room", subtitle: "Tables noires", roomId: "blackjack", col: 0, row: 2 },
-  { id: "bat", title: "Bat Lantern Club", subtitle: "Croupier & cartes", roomId: "blackjack", col: 1, row: 2 },
-  { id: "allmight", title: "Allmight Showdown", subtitle: "Poker propre", roomId: "poker", col: 2, row: 2 },
-  { id: "contracts", title: "Dragon Contracts", subtitle: "Port prive", roomId: "roulette", col: 0, row: 3 },
-  { id: "upstream-a", title: "Upstream Forge", subtitle: "Jeux serveurs", roomId: "slots", col: 1, row: 3 },
-  { id: "upstream-b", title: "Upstream Duel", subtitle: "Tables actives", roomId: "poker", col: 2, row: 3 },
-] as const;
-
 type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
 
 type SlotFeatureKey =
@@ -196,8 +181,10 @@ export type RouletteSoundEvent =
 type PirateSlotsGameProps = {
   profile: CasinoProfile;
   busy: boolean;
+  mediaReady: boolean;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;
+  onRequestMediaPlayback?: () => void;
   onRouletteEvent?: (event: RouletteSoundEvent) => void;
 };
 
@@ -298,8 +285,10 @@ function getBonusNarration(spin: CasinoSpin) {
 function SlotsRoom({
   profile,
   busy,
+  mediaReady,
   onProfileChange,
   onError,
+  onRequestMediaPlayback,
 }: PirateSlotsGameProps) {
   const [bet, setBet] = useState(() => Math.max(profile.wallet.minBet, BET_PRESETS[1]));
   const [displayGrid, setDisplayGrid] = useState<string[][]>(() => buildPlaceholderGrid());
@@ -317,6 +306,7 @@ function SlotsRoom({
   const spinRunIdRef = useRef(0);
   const ambienceAudioRef = useRef<HTMLAudioElement | null>(null);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
+  const featureVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     setBet((current) => {
@@ -385,6 +375,15 @@ function SlotsRoom({
 
   const recentTransactions = useMemo(() => profile.recentTransactions.slice(0, 8), [profile.recentTransactions]);
   const featureMedia = SLOT_FEATURE_MEDIA[activeFeature];
+
+  useEffect(() => {
+    const video = featureVideoRef.current;
+    if (!video || !featureMedia.video) return;
+    const shouldUseAudio = activeFeature === "idle" && mediaReady;
+    video.muted = !shouldUseAudio;
+    video.volume = shouldUseAudio ? 0.34 : 0;
+    void video.play().catch(() => undefined);
+  }, [activeFeature, featureMedia.video, mediaReady]);
 
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
     if (!ref.current) {
@@ -657,14 +656,22 @@ function SlotsRoom({
             <div className="casino-slot-feature__media">
               {featureMedia.video ? (
                 <video
+                  ref={featureVideoRef}
                   key={featureMedia.video}
                   className="casino-slot-feature__video"
                   src={featureMedia.video}
                   autoPlay
                   loop
-                  muted
+                  muted={!mediaReady || activeFeature !== "idle"}
                   playsInline
                   poster={featureMedia.image}
+                  controls={activeFeature === "idle"}
+                  onPlay={() => {
+                    onRequestMediaPlayback?.();
+                  }}
+                  onClick={() => {
+                    onRequestMediaPlayback?.();
+                  }}
                 />
               ) : (
                 <img src={featureMedia.image} alt={featureMedia.title} className="casino-slot-feature__poster" />
@@ -803,6 +810,12 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
         ? districtArtwork
         : cardArtwork;
 
+  useEffect(() => {
+    if (activeRoom === "slots") {
+      props.onRequestMediaPlayback?.();
+    }
+  }, [activeRoom, props.onRequestMediaPlayback]);
+
   function renderRoom() {
     switch (activeRoom) {
       case "treasure-map":
@@ -822,57 +835,49 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
 
   return (
     <section className="casino-floor">
-      <div className="casino-district-grid">
-        {DISTRICT_CARDS.map((district) => {
-          const isActive = district.roomId === activeRoom;
-          return (
-            <button
-              key={district.id}
-              type="button"
-              className={`casino-district-card ${isActive ? "is-active" : ""}`}
-              onClick={() => setActiveRoom(district.roomId)}
-              style={{
-                ["--district-art" as string]: `url("${districtArtwork}")`,
-                ["--district-x" as string]: `${district.col * 50}%`,
-                ["--district-y" as string]: `${district.row * 33.3333}%`,
-              }}
-            >
-              <div className="casino-district-card__art" />
-              <div className="casino-district-card__copy">
-                <strong>{district.title}</strong>
-                <span>{district.subtitle}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        className="casino-room-hero"
-        style={{ ["--room-art" as string]: `url("${currentRoomArtwork}")` }}
+      <section
+        className="casino-command-deck"
+        style={{
+          ["--district-art" as string]: `url("${districtArtwork}")`,
+          ["--room-art" as string]: `url("${currentRoomArtwork}")`,
+        }}
       >
-        <div className="casino-room-hero__copy">
-          <span className="casino-chip">{currentRoom.chip}</span>
-          <h2>{currentRoom.title}</h2>
-          <p>{currentRoom.body}</p>
+        <div className="casino-command-deck__hero">
+          <div className="casino-command-deck__copy">
+            <span className="casino-chip">Pont central ATS</span>
+            <h2>{currentRoom.title}</h2>
+            <p>{currentRoom.body}</p>
+            <div className="casino-command-deck__meta">
+              <span>{props.profile.user.username}</span>
+              <span>{formatCredits(props.profile.wallet.balance)} credits</span>
+              <span>{currentRoom.chip}</span>
+            </div>
+          </div>
+
+          <div className="casino-command-deck__spotlight">
+            <span className="casino-chip">Salle active</span>
+            <strong>{currentRoom.label}</strong>
+            <p>Une navigation compacte, lisible, et tous les jeux a portee de main sans doubler le menu.</p>
+          </div>
         </div>
 
-        <div className="casino-floor-nav" role="tablist" aria-label="Salles de jeu">
+        <div className="casino-command-grid" role="tablist" aria-label="Salles de jeu">
           {ROOM_DEFINITIONS.map((room) => (
             <button
               key={room.id}
               type="button"
-              className={`casino-floor-nav__button ${room.id === activeRoom ? "is-active" : ""}`}
+              className={`casino-command-card ${room.id === activeRoom ? "is-active" : ""}`}
               onClick={() => setActiveRoom(room.id)}
               role="tab"
               aria-selected={room.id === activeRoom}
             >
+              <span className="casino-chip">{room.chip}</span>
               <strong>{room.label}</strong>
-              <span>{room.chip}</span>
+              <p>{room.body}</p>
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
       {renderRoom()}
     </section>

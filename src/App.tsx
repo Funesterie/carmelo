@@ -97,6 +97,7 @@ export default function App() {
   const [immersionLine, setImmersionLine] = useState("Ouverture du pont prive...");
   const [queuedImmersionName, setQueuedImmersionName] = useState("");
   const [ambientVideoAudible, setAmbientVideoAudible] = useState(false);
+  const [mediaReady, setMediaReady] = useState(false);
 
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
   const cueAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -265,8 +266,10 @@ export default function App() {
       intro.pause();
       intro.currentTime = 0;
       mediaUnlockedRef.current = true;
+      setMediaReady(true);
     } catch {
       mediaUnlockedRef.current = false;
+      setMediaReady(false);
     }
 
     await syncAmbientVideo(mediaUnlockedRef.current);
@@ -408,6 +411,7 @@ export default function App() {
     setShowImmersion(false);
     setQueuedImmersionName("");
     setAmbientVideoAudible(false);
+    setMediaReady(false);
     stopMedia(introAudioRef.current);
     stopMedia(cueAudioRef.current);
     stopMedia(cannonAudioRef.current);
@@ -644,7 +648,11 @@ export default function App() {
             <PirateSlotsGame
               profile={profile}
               busy={busy}
+              mediaReady={mediaReady}
               onRouletteEvent={handleRouletteEvent}
+              onRequestMediaPlayback={() => {
+                void armMediaPlayback();
+              }}
               onProfileChange={(nextProfile, message) => {
                 startTransition(() => setProfile(nextProfile));
                 if (message) setNotice(message);

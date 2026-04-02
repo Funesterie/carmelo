@@ -1,14 +1,18 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PiratePlayingCardView from "./PiratePlayingCard";
+import jetonImg from "./images/jeton.png";
 import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
 import {
   actPokerRound,
+  joinPokerRoom,
   startPokerRound,
+  type CasinoTableRoom,
   type CasinoProfile,
   type PokerState,
 } from "./lib/casinoApi";
 import { formatCredits } from "./lib/casinoRoomState";
+import { POKER_SALONS } from "./lib/tableSalons";
 
 const ANTE_PRESETS = [60, 120, 200, 320];
 const POKER_SEAT_LAYOUT = [
@@ -34,15 +38,42 @@ export default function PokerRoom({
   const [ante, setAnte] = useState(ANTE_PRESETS[1]);
   const [state, setState] = useState<PokerState | null>(null);
   const [working, setWorking] = useState(false);
+  const [roomId, setRoomId] = useState(POKER_SALONS[0].id);
+  const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
+  const roomSwitchLocked = !(stage === "idle" || stage === "showdown");
+  const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncRoom() {
+      try {
+        const result = await joinPokerRoom(roomId);
+        if (cancelled) return;
+        setRooms(result.rooms);
+      } catch (error_) {
+        if (cancelled) return;
+        onError(error_ instanceof Error ? error_.message : "Le salon poker ne repond pas.");
+      }
+    }
+
+    void syncRoom();
+    const intervalId = window.setInterval(() => void syncRoom(), 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [onError, roomId]);
 
   async function dealHand() {
     onError("");
     setWorking(true);
     try {
-      const result = await startPokerRound(ante);
+      const result = await startPokerRound(ante, roomId);
       setState(result.state);
       if (result.profile) {
         onProfileChange(result.profile);
@@ -77,16 +108,43 @@ export default function PokerRoom({
         <div className="casino-status-strip">
           <article>
             <span>Solde serveur</span>
-            <strong>{formatCredits(profile.wallet.balance)}</strong>
+            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(profile.wallet.balance)}</strong>
           </article>
           <article>
             <span>Ante</span>
-            <strong>{formatCredits(state?.ante || ante)}</strong>
+            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(state?.ante || ante)}</strong>
           </article>
           <article className={lastDelta >= 0 ? "tone-positive" : "tone-negative"}>
             <span>Derniere variation</span>
-            <strong>{`${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}`}</strong>
+            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{`${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}`}</strong>
           </article>
+        </div>
+
+        <div className="casino-salon-strip" role="tablist" aria-label="Salons poker">
+          {POKER_SALONS.map((salon) => {
+            const room = rooms.find((entry) => entry.id === salon.id);
+            return (
+              <button
+                key={salon.id}
+                type="button"
+                className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
+                onClick={() => {
+                  if (roomSwitchLocked || working) return;
+                  setState(null);
+                  setRoomId(salon.id);
+                }}
+                disabled={roomSwitchLocked || working}
+                role="tab"
+                aria-selected={salon.id === roomId}
+              >
+                <div>
+                  <strong>{salon.title}</strong>
+                  <span>{salon.chip}</span>
+                </div>
+                <b>{room?.playerCount || 0}</b>
+              </button>
+            );
+          })}
         </div>
 
         <div
@@ -98,7 +156,7 @@ export default function PokerRoom({
               <span className="casino-chip">Poker</span>
               <h2>Salon hold'em</h2>
             </div>
-            <p>{state?.message || "Cinq places autour d'un ovale pirate, quatre IA et un showdown net pilote par le wallet A11."}</p>
+            <p>{state?.message || "Cinq places autour d'un ovale pirate, quatre IA et un showdown net pilote par le wallet A11."} {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}</p>
           </div>
 
           <div className="casino-card-felt casino-card-felt--poker casino-card-felt--table">
@@ -119,7 +177,7 @@ export default function PokerRoom({
                     <span className="casino-oval-seat__tag">{layout.tag}</span>
                     <header>
                       <strong>{seat.name}</strong>
-                      <span>{formatCredits(seat.chips)} jetons</span>
+                      <span className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(seat.chips)}</span>
                     </header>
                     <div className="casino-card-row casino-card-row--compact casino-card-row--tight">
                       {seat.cards.length ? (
@@ -143,7 +201,7 @@ export default function PokerRoom({
               <section className="casino-table-core casino-table-core--poker">
                 <div className="casino-table-core__headline">
                   <strong>{state?.stageLabel || "Table au repos"}</strong>
-                  <span>Pot total: {formatCredits(state?.pot || 0)} jetons</span>
+                  <span className="casino-token-inline"><img src={jetonImg} alt="" />Pot {formatCredits(state?.pot || 0)}</span>
                 </div>
                 <div className="casino-chip-row">
                   <span className="casino-chip">Ante {formatCredits(state?.ante || ante)}</span>
@@ -221,6 +279,27 @@ export default function PokerRoom({
       <aside className="casino-side-rail">
         <section className="casino-panel">
           <div className="casino-panel__header">
+            <span className="casino-chip">Salons</span>
+            <h3>Canaux rejoignables</h3>
+          </div>
+          <div className="casino-salon-roster">
+            {POKER_SALONS.map((salon) => {
+              const room = rooms.find((entry) => entry.id === salon.id);
+              return (
+                <article key={salon.id} className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""}`}>
+                  <div>
+                    <strong>{salon.title}</strong>
+                    <span>{salon.blurb}</span>
+                  </div>
+                  <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="casino-panel">
+          <div className="casino-panel__header">
             <span className="casino-chip">Regles</span>
             <h3>Texas hold'em rapide</h3>
           </div>
@@ -233,24 +312,23 @@ export default function PokerRoom({
 
         <section className="casino-panel">
           <div className="casino-panel__header">
-            <span className="casino-chip">Lecture</span>
-            <h3>Ta meilleure main</h3>
+            <span className="casino-chip">Salon actif</span>
+            <h3>Joueurs presents</h3>
           </div>
           <div className="casino-prize-stack">
-            <article className="casino-prize-card">
-              <div className="casino-prize-card__glyph">♠</div>
-              <div>
-                <strong>Main du joueur</strong>
-                <span>{state?.playerFolded ? "Couchee" : state?.playerHand?.label || "Pas encore complete"}</span>
-              </div>
-            </article>
-            <article className="casino-prize-card">
-              <div className="casino-prize-card__glyph">◉</div>
-              <div>
-                <strong>Phase</strong>
-                <span>{state?.stageLabel || "Table au repos"}</span>
-              </div>
-            </article>
+            {(activeRoom?.participants || []).length ? (
+              activeRoom?.participants.map((participant) => (
+                <article key={participant.userId} className="casino-prize-card">
+                  <div className="casino-prize-card__glyph">♠</div>
+                  <div>
+                    <strong>{participant.username}</strong>
+                    <span>{participant.userId === profile.user.id ? "toi" : "connecte sur le salon"}</span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="casino-history-empty">Tu es seul sur ce salon pour le moment.</p>
+            )}
           </div>
         </section>
       </aside>

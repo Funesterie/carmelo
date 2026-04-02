@@ -323,6 +323,7 @@ export type BlackjackSeat = {
 
 export type BlackjackState = {
   token: string | null;
+  roomId?: string | null;
   stage: "player-turn" | "resolved";
   wager: number;
   dealerHidden: boolean;
@@ -358,6 +359,7 @@ export type PokerSeat = {
 
 export type PokerState = {
   token: string | null;
+  roomId?: string | null;
   stage: "preflop" | "flop" | "turn" | "river" | "showdown";
   stageLabel: string;
   ante: number;
@@ -411,6 +413,26 @@ export type RouletteRoom = {
   recentResults: RouletteResult[];
 };
 
+export type CasinoTableRoomParticipant = {
+  userId: string;
+  username: string;
+  updatedAt: string | null;
+};
+
+export type CasinoTableRoom = {
+  id: string;
+  playerCount: number;
+  participants: CasinoTableRoomParticipant[];
+  isCurrent: boolean;
+  hasSelf: boolean;
+};
+
+export type CasinoTableLobby = {
+  game: "blackjack" | "poker";
+  joinedRoomId: string;
+  rooms: CasinoTableRoom[];
+};
+
 type TreasureMapResponse = {
   ok: boolean;
   result: TreasureMapResult;
@@ -443,6 +465,14 @@ type RouletteResponse = {
   ok: boolean;
   room: RouletteRoom;
   profile: CasinoProfile;
+  error?: string;
+};
+
+type TableLobbyResponse = {
+  ok: boolean;
+  game: "blackjack" | "poker";
+  joinedRoomId: string;
+  rooms: CasinoTableRoom[];
   error?: string;
 };
 
@@ -482,16 +512,16 @@ export async function revealTreasureHuntTile(token: string, tileId: number) {
   return postCasinoAuthed<TreasureHuntResponse>("/api/casino/treasure-hunt/reveal", { token, tileId });
 }
 
-export async function startBlackjackRound(bet: number) {
-  return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/start", { bet });
+export async function startBlackjackRound(bet: number, roomId?: string) {
+  return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/start", { bet, roomId });
 }
 
 export async function actBlackjackRound(token: string, action: "hit" | "stand") {
   return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/action", { token, action });
 }
 
-export async function startPokerRound(ante: number) {
-  return postCasinoAuthed<PokerResponse>("/api/casino/poker/start", { ante });
+export async function startPokerRound(ante: number, roomId?: string) {
+  return postCasinoAuthed<PokerResponse>("/api/casino/poker/start", { ante, roomId });
 }
 
 export async function actPokerRound(token: string, action: "reveal" | "showdown" | "fold") {
@@ -504,4 +534,12 @@ export async function fetchRouletteRoom() {
 
 export async function placeRouletteBet(betType: string, betValue: string, amount: number) {
   return postCasinoAuthed<RouletteResponse>("/api/casino/roulette/bet", { betType, betValue, amount });
+}
+
+export async function joinBlackjackRoom(roomId: string) {
+  return postCasinoAuthed<TableLobbyResponse>("/api/casino/blackjack/rooms/join", { roomId });
+}
+
+export async function joinPokerRoom(roomId: string) {
+  return postCasinoAuthed<TableLobbyResponse>("/api/casino/poker/rooms/join", { roomId });
 }

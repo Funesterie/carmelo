@@ -2,6 +2,9 @@ import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RouletteSoundEvent } from "./PirateSlotsGame";
 import rouletteArtwork from "./images/casino ats.png";
+import jetonImg from "./images/jeton.png";
+import rouletteWheelImg from "./images/roulette.png";
+import rouletteFeltImg from "./images/tapis.png";
 import {
   fetchRouletteRoom,
   placeRouletteBet,
@@ -386,11 +389,11 @@ export default function RouletteRoom({
         <div className="casino-status-strip">
           <article>
             <span>Solde serveur</span>
-            <strong>{formatCredits(profile.wallet.balance)}</strong>
+            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(profile.wallet.balance)}</strong>
           </article>
           <article>
             <span>Mise selectionnee</span>
-            <strong>{formatCredits(amount)}</strong>
+            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(amount)}</strong>
           </article>
           <article className={remainingMs > 6000 ? "tone-positive" : ""}>
             <span>Cloture du tour</span>
@@ -400,7 +403,11 @@ export default function RouletteRoom({
 
         <div
           className="casino-reel-shell casino-room-shell casino-room-shell--roulette"
-          style={{ ["--room-art" as string]: `url("${rouletteArtwork}")` }}
+          style={{
+            ["--room-art" as string]: `url("${rouletteArtwork}")`,
+            ["--roulette-art" as string]: `url("${rouletteFeltImg}")`,
+            ["--roulette-wheel-art" as string]: `url("${rouletteWheelImg}")`,
+          }}
         >
           <div className="casino-reel-shell__header">
             <div>
@@ -416,7 +423,7 @@ export default function RouletteRoom({
 
           <div className="casino-roulette-stage">
             <div className={`casino-roulette-visual is-${animation.phase}`}>
-              <div className="casino-roulette-backdrop" style={{ ["--roulette-art" as string]: `url("${rouletteArtwork}")` }} />
+              <div className="casino-roulette-backdrop" />
 
               <div className="casino-roulette-cannon" style={{ ["--cannon-recoil" as string]: `${animation.recoil}` }}>
                 <div className="casino-roulette-cannon__barrel" />
@@ -433,6 +440,7 @@ export default function RouletteRoom({
                   style={{ transform: `translate(-50%, -50%) rotate(${animation.wheelRotation}deg)` }}
                 >
                   <div className="casino-roulette-wheel__track" />
+                  <div className="casino-roulette-wheel__art" />
                   <div className="casino-roulette-wheel__glow" />
                   {wheelPockets.map((pocket) => (
                     <div
@@ -526,7 +534,7 @@ export default function RouletteRoom({
 
               <div className="casino-action-row">
                 <div className="casino-chip-row">
-                  <span className="casino-chip">Pot de tour: {formatCredits(room?.round.totalPot || 0)}</span>
+                  <span className="casino-chip casino-chip--token"><img src={jetonImg} alt="" />Pot {formatCredits(room?.round.totalPot || 0)}</span>
                   <span className="casino-chip">Joueurs: {room?.round.playerCount || 0}</span>
                   <span className="casino-chip">{selectedBet ? selectedBet.label : "Aucune cible"}</span>
                 </div>
@@ -554,7 +562,7 @@ export default function RouletteRoom({
             {(room?.round.participants || []).length ? (
               room?.round.participants.map((entry) => (
                 <article key={entry.userId} className="casino-prize-card">
-                  <div className="casino-prize-card__glyph">◉</div>
+                  <div className="casino-prize-card__glyph"><img src={jetonImg} alt="" /></div>
                   <div>
                     <strong>{entry.username}</strong>
                     <span>{formatCredits(entry.totalAmount)} sur {entry.betCount} mise{entry.betCount > 1 ? "s" : ""}</span>
@@ -578,7 +586,7 @@ export default function RouletteRoom({
                 <article key={bet.id} className="casino-history-entry">
                   <div>
                     <span>{getBetLabel(bet.betType, bet.betValue)}</span>
-                    <strong>{formatCredits(bet.amount)}</strong>
+                    <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(bet.amount)}</strong>
                   </div>
                   <div className={bet.payout > 0 ? "is-positive" : ""}>
                     {bet.payout > 0 ? `+${formatCredits(bet.payout)}` : "en attente"}
