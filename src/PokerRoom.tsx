@@ -11,6 +11,12 @@ import {
 import { formatCredits } from "./lib/casinoRoomState";
 
 const ANTE_PRESETS = [60, 120, 200, 320];
+const POKER_SEAT_LAYOUT = [
+  { x: "15%", y: "34%", align: "start", tag: "UTG" },
+  { x: "35%", y: "18%", align: "center", tag: "HJ" },
+  { x: "65%", y: "18%", align: "center", tag: "CO" },
+  { x: "85%", y: "34%", align: "end", tag: "BTN" },
+] as const;
 
 type PokerRoomProps = {
   playerName: string;
@@ -92,62 +98,83 @@ export default function PokerRoom({
               <span className="casino-chip">Poker</span>
               <h2>Salon hold'em</h2>
             </div>
-            <p>{state?.message || "Table de hold'em rapide. Cinq places, quatre IA, une seule question: qui emporte le pot ?"}</p>
+            <p>{state?.message || "Cinq places autour d'un ovale pirate, quatre IA et un showdown net pilote par le wallet A11."}</p>
           </div>
 
-          <div className="casino-card-felt casino-card-felt--poker">
-            <div className="casino-seat-ring">
-              {(state?.aiSeats || []).map((seat) => (
-                <article key={seat.id} className={`casino-seat-chip ${seat.isWinner ? "is-winner" : ""}`}>
-                  <header>
-                    <strong>{seat.name}</strong>
-                    <span>{formatCredits(seat.chips)} jetons</span>
-                  </header>
-                  <div className="casino-card-row casino-card-row--compact">
-                    {seat.cards.length ? (
-                      seat.cards.map((card, index) => (
-                        <PiratePlayingCardView key={`${seat.id}-${card.id}-${index}`} card={card} hidden={stage !== "showdown"} />
-                      ))
-                    ) : (
-                      <div className="casino-empty-seat">En attente</div>
-                    )}
-                  </div>
-                  <p>{seat.read}</p>
-                  <small>{seat.hand?.label || "aucune lecture finale"}</small>
-                </article>
-              ))}
-            </div>
+          <div className="casino-card-felt casino-card-felt--poker casino-card-felt--table">
+            <div className="casino-felt-table casino-felt-table--poker">
+              <div className="casino-felt-table__halo" />
 
-            <div className="casino-community-lane">
-              <div className="casino-community-lane__meta">
-                <strong>{state?.stageLabel || "Table au repos"}</strong>
-                <span>Pot: {formatCredits(state?.pot || 0)} jetons</span>
-              </div>
-              <div className="casino-card-row casino-card-row--community">
-                {state?.communityCards.length ? (
-                  state.communityCards.map((card, index) => (
-                    <PiratePlayingCardView key={`community-${card.id}-${index}`} card={card} />
-                  ))
-                ) : (
-                  <div className="casino-empty-seat">Le board attend encore sa premiere carte.</div>
-                )}
-              </div>
-            </div>
+              {(state?.aiSeats || []).map((seat, index) => {
+                const layout = POKER_SEAT_LAYOUT[index] || POKER_SEAT_LAYOUT[POKER_SEAT_LAYOUT.length - 1];
+                return (
+                  <article
+                    key={seat.id}
+                    className={`casino-oval-seat casino-oval-seat--ai casino-oval-seat--${layout.align} ${seat.isWinner ? "is-winner" : ""}`}
+                    style={{
+                      ["--seat-x" as string]: layout.x,
+                      ["--seat-y" as string]: layout.y,
+                    }}
+                  >
+                    <span className="casino-oval-seat__tag">{layout.tag}</span>
+                    <header>
+                      <strong>{seat.name}</strong>
+                      <span>{formatCredits(seat.chips)} jetons</span>
+                    </header>
+                    <div className="casino-card-row casino-card-row--compact casino-card-row--tight">
+                      {seat.cards.length ? (
+                        seat.cards.map((card, cardIndex) => (
+                          <PiratePlayingCardView
+                            key={`${seat.id}-${card.id}-${cardIndex}`}
+                            card={card}
+                            hidden={stage !== "showdown"}
+                          />
+                        ))
+                      ) : (
+                        <div className="casino-empty-seat">En attente</div>
+                      )}
+                    </div>
+                    <p>{seat.read}</p>
+                    <small>{seat.hand?.label || "Cartes couvrees"}</small>
+                  </article>
+                );
+              })}
 
-            <div className={`casino-card-seat casino-card-seat--player ${state?.playerFolded ? "is-folded" : ""}`}>
-              <div className="casino-card-seat__meta">
-                <strong>{playerName}</strong>
-                <span>{state?.playerFolded ? "Main couchee" : state?.playerHand?.label || "Lecture incomplete"}</span>
-              </div>
-              <div className="casino-card-row">
-                {state?.playerCards.length ? (
-                  state.playerCards.map((card, index) => (
-                    <PiratePlayingCardView key={`poker-player-${card.id}-${index}`} card={card} emphasis="strong" />
-                  ))
-                ) : (
-                  <div className="casino-empty-seat">Le joueur n'a pas encore touche ses cartes.</div>
-                )}
-              </div>
+              <section className="casino-table-core casino-table-core--poker">
+                <div className="casino-table-core__headline">
+                  <strong>{state?.stageLabel || "Table au repos"}</strong>
+                  <span>Pot total: {formatCredits(state?.pot || 0)} jetons</span>
+                </div>
+                <div className="casino-chip-row">
+                  <span className="casino-chip">Ante {formatCredits(state?.ante || ante)}</span>
+                  <span className="casino-chip">{state?.playerFolded ? "Main couchee" : "Main active"}</span>
+                </div>
+                <div className="casino-card-row casino-card-row--community">
+                  {state?.communityCards.length ? (
+                    state.communityCards.map((card, index) => (
+                      <PiratePlayingCardView key={`community-${card.id}-${index}`} card={card} />
+                    ))
+                  ) : (
+                    <div className="casino-empty-seat">Le board attend encore sa premiere vague de cartes.</div>
+                  )}
+                </div>
+              </section>
+
+              <article className={`casino-oval-seat casino-oval-seat--player ${state?.playerFolded ? "is-folded" : ""}`}>
+                <div className="casino-card-seat__meta">
+                  <strong>{playerName}</strong>
+                  <span>{state?.playerFolded ? "Main couchee" : state?.playerHand?.label || "Lecture incomplete"}</span>
+                </div>
+                <div className="casino-card-row casino-card-row--player">
+                  {state?.playerCards.length ? (
+                    state.playerCards.map((card, index) => (
+                      <PiratePlayingCardView key={`poker-player-${card.id}-${index}`} card={card} emphasis="strong" />
+                    ))
+                  ) : (
+                    <div className="casino-empty-seat">Le joueur n'a pas encore touche ses cartes.</div>
+                  )}
+                </div>
+              </article>
             </div>
           </div>
 
@@ -159,7 +186,7 @@ export default function PokerRoom({
                   type="button"
                   className={`casino-bet-pill ${ante === preset ? "is-active" : ""}`}
                   onClick={() => setAnte(preset)}
-                  disabled={stage !== "idle" && stage !== "showdown" || working}
+                  disabled={((stage !== "idle" && stage !== "showdown")) || working}
                 >
                   {preset}
                 </button>
@@ -198,9 +225,9 @@ export default function PokerRoom({
             <h3>Texas hold'em rapide</h3>
           </div>
           <div className="casino-rule-list">
-            <p>Cinq joueurs a table: toi et quatre IA qui paient tous l’ante.</p>
-            <p>Le format va droit a l’essentiel: preflop, flop, turn, river, showdown.</p>
-            <p>Le pot et les paiements suivent maintenant le wallet backend A11.</p>
+            <p>Cinq joueurs a table: toi et quatre IA placees comme un vrai anneau de cash game.</p>
+            <p>Le format va droit a l'essentiel: preflop, flop, turn, river, showdown.</p>
+            <p>Le pot et les paiements suivent le wallet backend A11.</p>
           </div>
         </section>
 
