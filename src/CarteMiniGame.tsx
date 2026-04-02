@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import carteImg from "./images/carte.png";
 import coffreImg from "./images/coffre.png";
 import lingotImg from "./images/lingot.png";
-import { formatCredits, usePersistentRoomChips } from "./lib/casinoRoomState";
+import { type CasinoProfile, playTreasureMap } from "./lib/casinoApi";
+import { formatCredits } from "./lib/casinoRoomState";
 
 const MAP_ROOM_COST = 90;
 const MAP_REWARD = 340;
@@ -11,47 +12,68 @@ const TREASURE_POINTS = [
   { id: "west", left: "24.8%", top: "37.4%", label: "Recif ouest" },
   { id: "south", left: "35.6%", top: "69.7%", label: "Maree du sud" },
   { id: "east", left: "68.3%", top: "53.8%", label: "Crique est" },
-];
+] as const;
 
-export default function CarteMiniGame({ playerName }: { playerName: string }) {
-  const [tableChips, setTableChips] = usePersistentRoomChips("treasure-map", playerName, 1500);
-  const [winningPoint, setWinningPoint] = useState(() => TREASURE_POINTS[Math.floor(Math.random() * TREASURE_POINTS.length)]?.id || "west");
+type CarteMiniGameProps = {
+  profile: CasinoProfile;
+  onProfileChange: (profile: CasinoProfile, message?: string) => void;
+  onError: (message: string) => void;
+};
+
+export default function CarteMiniGame({
+  profile,
+  onProfileChange,
+  onError,
+}: CarteMiniGameProps) {
   const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
+  const [winningPoint, setWinningPoint] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "playing" | "resolved">("idle");
   const [status, setStatus] = useState("Etudie la carte et choisis la bonne croix.");
+  const [working, setWorking] = useState(false);
+  const [lastDelta, setLastDelta] = useState(0);
 
-  const netChange = useMemo(() => {
-    if (phase !== "resolved") return -MAP_ROOM_COST;
-    return selectedPoint === winningPoint ? MAP_REWARD - MAP_ROOM_COST : -MAP_ROOM_COST;
-  }, [phase, selectedPoint, winningPoint]);
+  const canPlay = profile.wallet.balance >= MAP_ROOM_COST;
+  const isWin = phase === "resolved" && selectedPoint && selectedPoint === winningPoint;
+
+  const visibleDelta = useMemo(() => {
+    if (phase === "idle") return 0;
+    return lastDelta;
+  }, [lastDelta, phase]);
 
   function startSearch() {
-    if (tableChips < MAP_ROOM_COST) {
-      setStatus("Il te manque des jetons de salle pour lancer une nouvelle recherche.");
+    onError("");
+    if (!canPlay) {
+      setStatus("Il te manque des credits serveur pour ouvrir une nouvelle carte.");
       return;
     }
-
-    setTableChips((current) => current - MAP_ROOM_COST);
-    setWinningPoint(TREASURE_POINTS[Math.floor(Math.random() * TREASURE_POINTS.length)]?.id || "west");
-    setSelectedPoint(null);
     setPhase("playing");
+    setSelectedPoint(null);
+    setWinningPoint(null);
+    setLastDelta(0);
     setStatus("Une seule tentative. Choisis la croix qui te semble la plus juste.");
   }
 
-  function choosePoint(pointId: string) {
-    if (phase !== "playing") return;
-
-    const foundTreasure = pointId === winningPoint;
-    setSelectedPoint(pointId);
-    setPhase("resolved");
-
-    if (foundTreasure) {
-      setTableChips((current) => current + MAP_REWARD);
-      setStatus(`Trouve. Le coffre rapporte ${formatCredits(MAP_REWARD)} jetons.`);
-      return;
+  async function choosePoint(pointId: string) {
+    if (phase !== "playing" || working) return;
+    onError("");
+    setWorking(true);
+    try {
+      const result = await playTreasureMap(pointId);
+      setSelectedPoint(result.result.selectedPoint);
+      setWinningPoint(result.result.winningPoint);
+      setPhase("resolved");
+      setLastDelta(result.result.netChange);
+      setStatus(
+        result.result.reward > 0
+          ? `Trouve. Le coffre rapporte ${formatCredits(result.result.reward)} credits.`
+          : "Mauvaise crique. La carte se referme sans recompense."
+      );
+      onProfileChange(result.profile);
+    } catch (error_) {
+      onError(error_ instanceof Error ? error_.message : "La carte n'a pas pu etre jouee.");
+    } finally {
+      setWorking(false);
     }
-
-    setStatus("Mauvaise crique. La carte se referme sans recompense.");
   }
 
   return (
@@ -59,16 +81,16 @@ export default function CarteMiniGame({ playerName }: { playerName: string }) {
       <div className="casino-stage">
         <div className="casino-status-strip">
           <article>
-            <span>Jetons de salle</span>
-            <strong>{formatCredits(tableChips)}</strong>
+            <span>Solde serveur</span>
+            <strong>{formatCredits(profile.wallet.balance)}</strong>
           </article>
           <article>
             <span>Cout de recherche</span>
             <strong>{formatCredits(MAP_ROOM_COST)}</strong>
           </article>
-          <article className={phase === "resolved" && selectedPoint === winningPoint ? "tone-positive" : phase === "resolved" ? "tone-negative" : ""}>
+          <article className={isWin ? "tone-positive" : phase === "resolved" ? "tone-negative" : ""}>
             <span>Variation</span>
-            <strong>{phase === "idle" ? "Aucune" : `${netChange >= 0 ? "+" : ""}${formatCredits(netChange)}`}</strong>
+            <strong>{phase === "idle" ? "Aucune" : `${visibleDelta >= 0 ? "+" : ""}${formatCredits(visibleDelta)}`}</strong>
           </article>
         </div>
 
@@ -93,8 +115,8 @@ export default function CarteMiniGame({ playerName }: { playerName: string }) {
                     type="button"
                     className={`casino-map-marker ${isSelected ? "is-selected" : ""} ${isWinner ? "is-winning" : ""}`}
                     style={{ left: point.left, top: point.top }}
-                    onClick={() => choosePoint(point.id)}
-                    disabled={phase !== "playing"}
+                    onClick={() => void choosePoint(point.id)}
+                    disabled={phase !== "playing" || working}
                     aria-label={point.label}
                   >
                     {isWinner ? <img src={coffreImg} alt="" /> : <span>✕</span>}
@@ -106,18 +128,14 @@ export default function CarteMiniGame({ playerName }: { playerName: string }) {
 
           <div className="casino-action-row">
             <div className="casino-chip-row">
-              <span className="casino-chip">
-                {phase === "playing" ? "Une seule tentative active" : "Recherche fermee"}
-              </span>
-              <span className="casino-chip">
-                Jackpot: +{formatCredits(MAP_REWARD)}
-              </span>
+              <span className="casino-chip">{phase === "playing" ? "Une seule tentative active" : "Recherche fermee"}</span>
+              <span className="casino-chip">Jackpot: +{formatCredits(MAP_REWARD)}</span>
             </div>
             <button
               type="button"
               className="casino-primary-button"
               onClick={startSearch}
-              disabled={phase === "playing"}
+              disabled={phase === "playing" || working}
             >
               {phase === "playing" ? "Carte ouverte" : "Ouvrir une carte"}
             </button>
@@ -135,7 +153,7 @@ export default function CarteMiniGame({ playerName }: { playerName: string }) {
             <img src={lingotImg} alt="Lingot pirate" />
             <div>
               <strong>Cache principale</strong>
-              <span>+{formatCredits(MAP_REWARD)} jetons si la croix est juste</span>
+              <span>+{formatCredits(MAP_REWARD)} credits si la croix est juste</span>
             </div>
           </div>
         </section>
@@ -146,9 +164,9 @@ export default function CarteMiniGame({ playerName }: { playerName: string }) {
             <h3>Lecture de carte</h3>
           </div>
           <div className="casino-rule-list">
-            <p>Les marqueurs sont maintenant centres sur les croix de la carte, meme sur mobile.</p>
-            <p>Une carte coute {formatCredits(MAP_ROOM_COST)} jetons et ne donne qu’une chance.</p>
-            <p>Quand le coffre apparait, la manche se solde instantanement sans popup cassant la lecture.</p>
+            <p>Les marqueurs restent centres sur les croix, meme sur mobile.</p>
+            <p>La carte est maintenant debitée et resolue cote serveur pour coller au vrai wallet A11.</p>
+            <p>Quand le coffre apparait, la manche se ferme sans popup parasite ni solde fantome.</p>
           </div>
         </section>
       </aside>

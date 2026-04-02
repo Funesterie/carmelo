@@ -5,13 +5,13 @@ import opaleImg from "./images/opale.png";
 import rubisImg from "./images/rubis.png";
 import saphirImg from "./images/saphir.png";
 import drapImg from "./images/drap.png";
-import { formatCredits, usePersistentRoomChips } from "./lib/casinoRoomState";
-
-type TreasureTile = {
-  id: number;
-  reward: number;
-  revealed: boolean;
-};
+import {
+  type CasinoProfile,
+  type TreasureHuntState,
+  revealTreasureHuntTile,
+  startTreasureHunt,
+} from "./lib/casinoApi";
+import { formatCredits } from "./lib/casinoRoomState";
 
 const ROOM_COST = 120;
 const HUNT_PRIZES = [
@@ -20,94 +20,65 @@ const HUNT_PRIZES = [
   { reward: 180, label: "Saphir du sillage", art: saphirImg },
 ];
 
-function buildTreasureBoard() {
-  const winningSlots = [...Array.from({ length: 9 }, (_, index) => index)]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, HUNT_PRIZES.length);
+type MiniTreasureGameProps = {
+  profile: CasinoProfile;
+  onProfileChange: (profile: CasinoProfile, message?: string) => void;
+  onError: (message: string) => void;
+};
 
-  return Array.from({ length: 9 }, (_, index) => {
-    const prizeIndex = winningSlots.indexOf(index);
-    return {
-      id: index,
-      reward: prizeIndex >= 0 ? HUNT_PRIZES[prizeIndex].reward : 0,
-      revealed: false,
-    };
-  });
-}
-
-function getPrizeMeta(reward: number) {
+function getPrizeMeta(reward: number | null) {
   return HUNT_PRIZES.find((entry) => entry.reward === reward) || null;
 }
 
-export default function MiniTreasureGame({ playerName }: { playerName: string }) {
-  const [tableChips, setTableChips] = usePersistentRoomChips(
-    "treasure-hunt",
-    playerName,
-    1800,
-  );
-  const [board, setBoard] = useState<TreasureTile[]>(() => buildTreasureBoard());
-  const [shotsLeft, setShotsLeft] = useState(0);
-  const [roundReward, setRoundReward] = useState(0);
+export default function MiniTreasureGame({
+  profile,
+  onProfileChange,
+  onError,
+}: MiniTreasureGameProps) {
+  const [state, setState] = useState<TreasureHuntState | null>(null);
   const [status, setStatus] = useState("Lance une expedition et tire trois salves sur la baie.");
-  const [phase, setPhase] = useState<"idle" | "playing" | "resolved">("idle");
+  const [working, setWorking] = useState(false);
 
+  const phase = state?.phase || "idle";
   const revealedPrizes = useMemo(
-    () => board.filter((tile) => tile.revealed && tile.reward > 0),
-    [board],
+    () => (state?.board || []).filter((tile) => tile.revealed && (tile.reward || 0) > 0),
+    [state],
   );
+  const lastDelta = phase === "resolved" ? (state?.reward || 0) - ROOM_COST : 0;
 
-  function startRound() {
-    if (tableChips < ROOM_COST) {
-      setStatus("Tes jetons de salle sont trop bas pour affreter une nouvelle expedition.");
-      return;
+  async function handleStartRound() {
+    onError("");
+    setWorking(true);
+    try {
+      const result = await startTreasureHunt();
+      setState(result.state);
+      setStatus(result.state.message);
+      if (result.profile) {
+        onProfileChange(result.profile);
+      }
+    } catch (error_) {
+      onError(error_ instanceof Error ? error_.message : "L'expedition n'a pas pu etre lancee.");
+    } finally {
+      setWorking(false);
     }
-
-    setTableChips((current) => current - ROOM_COST);
-    setBoard(buildTreasureBoard());
-    setShotsLeft(3);
-    setRoundReward(0);
-    setPhase("playing");
-    setStatus("Trois tirs, trois chances. Choisis tes navires avec soin.");
   }
 
-  function revealTile(tileId: number) {
-    if (phase !== "playing" || shotsLeft <= 0) return;
-
-    const tile = board.find((entry) => entry.id === tileId);
-    if (!tile || tile.revealed) return;
-
-    const reward = tile.reward;
-    const remainingShots = shotsLeft - 1;
-    const nextReward = roundReward + reward;
-
-    setBoard((current) =>
-      current.map((entry) =>
-        entry.id === tileId ? { ...entry, revealed: true } : entry,
-      ),
-    );
-    setShotsLeft(remainingShots);
-    setRoundReward(nextReward);
-
-    if (remainingShots === 0) {
-      setPhase("resolved");
-      setTableChips((current) => current + nextReward);
-      setStatus(
-        reward > 0
-          ? `Derniere salve reussie. La cale remonte avec ${formatCredits(nextReward)} jetons.`
-          : `Expedition bouclee. Bilan de chasse: ${formatCredits(nextReward)} jetons.`,
-      );
-      return;
+  async function revealTile(tileId: number) {
+    if (!state?.token || phase !== "playing" || working) return;
+    onError("");
+    setWorking(true);
+    try {
+      const result = await revealTreasureHuntTile(state.token, tileId);
+      setState(result.state);
+      setStatus(result.state.message);
+      if (result.profile) {
+        onProfileChange(result.profile);
+      }
+    } catch (error_) {
+      onError(error_ instanceof Error ? error_.message : "La salve n'a pas pu etre jouee.");
+    } finally {
+      setWorking(false);
     }
-
-    if (reward > 0) {
-      const prizeMeta = getPrizeMeta(reward);
-      setStatus(
-        `${prizeMeta?.label || "Tresor"} repere. Encore ${remainingShots} tir${remainingShots > 1 ? "s" : ""}.`,
-      );
-      return;
-    }
-
-    setStatus(`Rien que de l'ecume. Il reste ${remainingShots} tir${remainingShots > 1 ? "s" : ""}.`);
   }
 
   return (
@@ -115,16 +86,16 @@ export default function MiniTreasureGame({ playerName }: { playerName: string })
       <div className="casino-stage">
         <div className="casino-status-strip">
           <article>
-            <span>Jetons de salle</span>
-            <strong>{formatCredits(tableChips)}</strong>
+            <span>Solde serveur</span>
+            <strong>{formatCredits(profile.wallet.balance)}</strong>
           </article>
           <article>
             <span>Affretement</span>
             <strong>{formatCredits(ROOM_COST)}</strong>
           </article>
-          <article className={phase === "resolved" && roundReward > ROOM_COST ? "tone-positive" : ""}>
+          <article className={phase === "resolved" && lastDelta > 0 ? "tone-positive" : phase === "resolved" ? "tone-negative" : ""}>
             <span>Gain de la manche</span>
-            <strong>{formatCredits(roundReward - ROOM_COST)}</strong>
+            <strong>{phase === "resolved" ? `${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}` : "Aucun"}</strong>
           </article>
         </div>
 
@@ -147,15 +118,15 @@ export default function MiniTreasureGame({ playerName }: { playerName: string })
             </div>
 
             <div className="casino-boat-grid">
-              {board.map((tile) => {
+              {(state?.board || Array.from({ length: 9 }, (_, id) => ({ id, revealed: false, reward: null }))).map((tile) => {
                 const prizeMeta = getPrizeMeta(tile.reward);
                 return (
                   <button
                     key={tile.id}
                     type="button"
                     className={`casino-boat-tile ${tile.revealed ? "is-revealed" : ""}`}
-                    disabled={phase !== "playing" || tile.revealed}
-                    onClick={() => revealTile(tile.id)}
+                    disabled={phase !== "playing" || tile.revealed || working}
+                    onClick={() => void revealTile(tile.id)}
                   >
                     {!tile.revealed ? (
                       <img src={marineImg} alt="Navire" />
@@ -177,14 +148,14 @@ export default function MiniTreasureGame({ playerName }: { playerName: string })
 
             <div className="casino-action-row">
               <div className="casino-chip-row">
-                <span className="casino-chip">Tirs restants: {shotsLeft}</span>
+                <span className="casino-chip">Tirs restants: {state?.shotsLeft ?? 0}</span>
                 <span className="casino-chip">Pierres relevees: {revealedPrizes.length}</span>
               </div>
               <button
                 type="button"
                 className="casino-primary-button"
-                onClick={startRound}
-                disabled={phase === "playing"}
+                onClick={() => void handleStartRound()}
+                disabled={phase === "playing" || working}
               >
                 {phase === "playing" ? "Expedition en cours" : "Lancer une expedition"}
               </button>
@@ -205,7 +176,7 @@ export default function MiniTreasureGame({ playerName }: { playerName: string })
                 <img src={entry.art} alt={entry.label} />
                 <div>
                   <strong>{entry.label}</strong>
-                  <span>+{formatCredits(entry.reward)} jetons</span>
+                  <span>+{formatCredits(entry.reward)} credits</span>
                 </div>
               </article>
             ))}
@@ -218,9 +189,9 @@ export default function MiniTreasureGame({ playerName }: { playerName: string })
             <h3>Comment jouer</h3>
           </div>
           <div className="casino-rule-list">
-            <p>Chaque expedition coute {formatCredits(ROOM_COST)} jetons.</p>
+            <p>Chaque expedition coute {formatCredits(ROOM_COST)} credits.</p>
             <p>Tu as trois tirs pour reveler jusqu’a trois navires gagnants.</p>
-            <p>Les gains sont credites a la fin de la manche pour garder la lecture propre.</p>
+            <p>Le plateau et le paiement vivent maintenant cote serveur pour suivre le vrai wallet A11.</p>
           </div>
         </section>
       </aside>

@@ -4,7 +4,10 @@ import BlackjackRoom from "./BlackjackRoom";
 import CarteMiniGame from "./CarteMiniGame";
 import MiniTreasureGame from "./MiniTreasureGame";
 import PokerRoom from "./PokerRoom";
+import RouletteRoom from "./RouletteRoom";
 import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
+import rouletteArtwork from "./images/casino ats.png";
+import districtArtwork from "./images/ChatGPT Image 2 avr. 2026, 21_17_56.png";
 import { formatCredits } from "./lib/casinoRoomState";
 import {
   spinCasinoSlots,
@@ -65,15 +68,37 @@ const ROOM_DEFINITIONS = [
     label: "Blackjack",
     chip: "Table des lanternes",
     title: "Blackjack pirate",
-    body: "Une vraie table avec croupier, quatre IA autour de toi et des cartes facon qflush sur feutre noir.",
+    body: "Une vraie table avec croupier, quatre IA autour de toi et des mises qui debitent le wallet A11 en direct.",
   },
   {
     id: "poker",
     label: "Poker",
     chip: "Salon hold'em",
     title: "Texas hold'em rapide",
-    body: "Cinq joueurs a table, quatre IA et un showdown net, sans casser le rythme du casino.",
+    body: "Cinq joueurs a table, quatre IA, un showdown net et des paiements serves par le backend A11.",
   },
+  {
+    id: "roulette",
+    label: "Roulette",
+    chip: "ATS live",
+    title: "Roulette multijoueur",
+    body: "Une salle commune, un compte a rebours partage, des mises visibles par plusieurs comptes et un tir serveur unique pour toute la table.",
+  },
+] as const;
+
+const DISTRICT_CARDS = [
+  { id: "freeland", title: "Freeland Archive", subtitle: "Cartes & butins", roomId: "treasure-map", col: 0, row: 0 },
+  { id: "nezlephant", title: "Nezlephant Vault", subtitle: "Salles denses", roomId: "treasure-hunt", col: 1, row: 0 },
+  { id: "rome", title: "Rome Table", subtitle: "Coupes rapides", roomId: "roulette", col: 2, row: 0 },
+  { id: "dragon", title: "Dragon High Rollers", subtitle: "Blackjack live", roomId: "blackjack", col: 0, row: 1 },
+  { id: "qflush", title: "Qflush Arcade", subtitle: "Slots A11", roomId: "slots", col: 1, row: 1 },
+  { id: "morphing", title: "Morphing Vault", subtitle: "Butins caches", roomId: "treasure-hunt", col: 2, row: 1 },
+  { id: "scream", title: "Scream Whisper Room", subtitle: "Tables noires", roomId: "blackjack", col: 0, row: 2 },
+  { id: "bat", title: "Bat Lantern Club", subtitle: "Croupier & cartes", roomId: "blackjack", col: 1, row: 2 },
+  { id: "allmight", title: "Allmight Showdown", subtitle: "Poker propre", roomId: "poker", col: 2, row: 2 },
+  { id: "contracts", title: "Dragon Contracts", subtitle: "Port prive", roomId: "roulette", col: 0, row: 3 },
+  { id: "upstream-a", title: "Upstream Forge", subtitle: "Jeux serveurs", roomId: "slots", col: 1, row: 3 },
+  { id: "upstream-b", title: "Upstream Duel", subtitle: "Tables actives", roomId: "poker", col: 2, row: 3 },
 ] as const;
 
 type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
@@ -429,17 +454,25 @@ function SlotsRoom({
 export default function PirateSlotsGame(props: PirateSlotsGameProps) {
   const [activeRoom, setActiveRoom] = useState<RoomId>("slots");
   const currentRoom = ROOM_DEFINITIONS.find((room) => room.id === activeRoom) || ROOM_DEFINITIONS[0];
+  const currentRoomArtwork =
+    activeRoom === "roulette"
+      ? rouletteArtwork
+      : activeRoom === "treasure-map" || activeRoom === "treasure-hunt"
+        ? districtArtwork
+        : cardArtwork;
 
   function renderRoom() {
     switch (activeRoom) {
       case "treasure-map":
-        return <CarteMiniGame playerName={props.profile.user.username} />;
+        return <CarteMiniGame profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "treasure-hunt":
-        return <MiniTreasureGame playerName={props.profile.user.username} />;
+        return <MiniTreasureGame profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "blackjack":
-        return <BlackjackRoom playerName={props.profile.user.username} />;
+        return <BlackjackRoom playerName={props.profile.user.username} profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "poker":
-        return <PokerRoom playerName={props.profile.user.username} />;
+        return <PokerRoom playerName={props.profile.user.username} profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
+      case "roulette":
+        return <RouletteRoom profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
       default:
         return <SlotsRoom {...props} />;
     }
@@ -447,9 +480,34 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
 
   return (
     <section className="casino-floor">
+      <div className="casino-district-grid">
+        {DISTRICT_CARDS.map((district) => {
+          const isActive = district.roomId === activeRoom;
+          return (
+            <button
+              key={district.id}
+              type="button"
+              className={`casino-district-card ${isActive ? "is-active" : ""}`}
+              onClick={() => setActiveRoom(district.roomId)}
+              style={{
+                ["--district-art" as string]: `url("${districtArtwork}")`,
+                ["--district-x" as string]: `${district.col * 50}%`,
+                ["--district-y" as string]: `${district.row * 33.3333}%`,
+              }}
+            >
+              <div className="casino-district-card__art" />
+              <div className="casino-district-card__copy">
+                <strong>{district.title}</strong>
+                <span>{district.subtitle}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       <div
         className="casino-room-hero"
-        style={{ ["--room-art" as string]: `url("${cardArtwork}")` }}
+        style={{ ["--room-art" as string]: `url("${currentRoomArtwork}")` }}
       >
         <div className="casino-room-hero__copy">
           <span className="casino-chip">{currentRoom.chip}</span>

@@ -1,3 +1,5 @@
+import type { PiratePlayingCard, PokerScore } from "./pirateCards";
+
 export type CasinoTransaction = {
   id: string;
   kind: string;
@@ -257,4 +259,225 @@ export async function spinCasinoSlots(bet: number) {
     throw new Error(getErrorMessage(payload, 'Spin impossible'));
   }
   return payload as SpinResponse;
+}
+
+export type TreasureMapResult = {
+  selectedPoint: string;
+  winningPoint: string;
+  reward: number;
+  cost: number;
+  netChange: number;
+  playedAt: string;
+};
+
+export type TreasureHuntTile = {
+  id: number;
+  revealed: boolean;
+  reward: number | null;
+  label: string | null;
+};
+
+export type TreasureHuntState = {
+  token: string | null;
+  phase: "playing" | "resolved";
+  shotsLeft: number;
+  reward: number;
+  cost: number;
+  board: TreasureHuntTile[];
+  message: string;
+};
+
+export type BlackjackSeat = {
+  id: string;
+  name: string;
+  chips: number;
+  wager: number;
+  cards: PiratePlayingCard[];
+  mood: string;
+  result: string;
+};
+
+export type BlackjackState = {
+  token: string | null;
+  stage: "player-turn" | "resolved";
+  wager: number;
+  dealerHidden: boolean;
+  playerCards: PiratePlayingCard[];
+  dealerCards: PiratePlayingCard[];
+  aiSeats: BlackjackSeat[];
+  playerScore: {
+    total: number;
+    isSoft: boolean;
+    isBlackjack: boolean;
+    isBust: boolean;
+  };
+  dealerScore: {
+    total: number;
+    isSoft: boolean;
+    isBlackjack: boolean;
+    isBust: boolean;
+  };
+  lastDelta: number;
+  message: string;
+  payoutAmount: number;
+};
+
+export type PokerSeat = {
+  id: string;
+  name: string;
+  chips: number;
+  cards: PiratePlayingCard[];
+  hand: PokerScore | null;
+  read: string;
+  isWinner: boolean;
+};
+
+export type PokerState = {
+  token: string | null;
+  stage: "preflop" | "flop" | "turn" | "river" | "showdown";
+  stageLabel: string;
+  ante: number;
+  pot: number;
+  playerCards: PiratePlayingCard[];
+  communityCards: PiratePlayingCard[];
+  aiSeats: PokerSeat[];
+  playerFolded: boolean;
+  playerHand: PokerScore | null;
+  lastDelta: number;
+  payoutAmount: number;
+  message: string;
+};
+
+export type RouletteRoundBet = {
+  id: number;
+  betType: string;
+  betValue: string;
+  amount: number;
+  payout: number;
+  createdAt: string | null;
+};
+
+export type RouletteParticipant = {
+  userId: string;
+  username: string;
+  totalAmount: number;
+  betCount: number;
+};
+
+export type RouletteResult = {
+  id: number;
+  winningNumber: number;
+  winningColor: string;
+  resolvedAt: string | null;
+};
+
+export type RouletteRoom = {
+  id: string;
+  round: {
+    id: number;
+    opensAt: string | null;
+    closesAt: string | null;
+    remainingMs: number;
+    totalPot: number;
+    playerCount: number;
+    participants: RouletteParticipant[];
+    myBets: RouletteRoundBet[];
+  };
+  latestResolved: RouletteResult | null;
+  recentResults: RouletteResult[];
+};
+
+type TreasureMapResponse = {
+  ok: boolean;
+  result: TreasureMapResult;
+  profile: CasinoProfile;
+  error?: string;
+};
+
+type TreasureHuntResponse = {
+  ok: boolean;
+  state: TreasureHuntState;
+  profile?: CasinoProfile | null;
+  error?: string;
+};
+
+type BlackjackResponse = {
+  ok: boolean;
+  state: BlackjackState;
+  profile?: CasinoProfile | null;
+  error?: string;
+};
+
+type PokerResponse = {
+  ok: boolean;
+  state: PokerState;
+  profile?: CasinoProfile | null;
+  error?: string;
+};
+
+type RouletteResponse = {
+  ok: boolean;
+  room: RouletteRoom;
+  profile: CasinoProfile;
+  error?: string;
+};
+
+async function postCasinoAuthed<T>(path: string, body: unknown) {
+  const response = await fetch(getApiUrl(path), {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const payload = (await readJsonSafe(response)) as T | { error?: string } | null;
+  if (!response.ok || !payload || ("ok" in (payload as any) && (payload as any).ok === false)) {
+    throw new Error(getErrorMessage(payload, "Operation casino impossible"));
+  }
+  return payload as T;
+}
+
+async function getCasinoAuthed<T>(path: string) {
+  const response = await fetch(getApiUrl(path), {
+    headers: buildAuthHeaders(),
+  });
+  const payload = (await readJsonSafe(response)) as T | { error?: string } | null;
+  if (!response.ok || !payload || ("ok" in (payload as any) && (payload as any).ok === false)) {
+    throw new Error(getErrorMessage(payload, "Lecture casino impossible"));
+  }
+  return payload as T;
+}
+
+export async function playTreasureMap(pointId: string) {
+  return postCasinoAuthed<TreasureMapResponse>("/api/casino/treasure-map/play", { pointId });
+}
+
+export async function startTreasureHunt() {
+  return postCasinoAuthed<TreasureHuntResponse>("/api/casino/treasure-hunt/start", {});
+}
+
+export async function revealTreasureHuntTile(token: string, tileId: number) {
+  return postCasinoAuthed<TreasureHuntResponse>("/api/casino/treasure-hunt/reveal", { token, tileId });
+}
+
+export async function startBlackjackRound(bet: number) {
+  return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/start", { bet });
+}
+
+export async function actBlackjackRound(token: string, action: "hit" | "stand") {
+  return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/action", { token, action });
+}
+
+export async function startPokerRound(ante: number) {
+  return postCasinoAuthed<PokerResponse>("/api/casino/poker/start", { ante });
+}
+
+export async function actPokerRound(token: string, action: "reveal" | "showdown" | "fold") {
+  return postCasinoAuthed<PokerResponse>("/api/casino/poker/action", { token, action });
+}
+
+export async function fetchRouletteRoom() {
+  return getCasinoAuthed<RouletteResponse>("/api/casino/roulette/state");
+}
+
+export async function placeRouletteBet(betType: string, betValue: string, amount: number) {
+  return postCasinoAuthed<RouletteResponse>("/api/casino/roulette/bet", { betType, betValue, amount });
 }
