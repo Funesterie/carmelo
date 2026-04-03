@@ -3,13 +3,13 @@ import { buildSettledAnimation } from "../model";
 type RouletteResultPreviewProps = {
   winningNumber: number;
   winningColor: string;
-  wheelImageSrc: string;
+  previewImageSrc: string;
 };
 
 export default function RouletteResultPreview({
   winningNumber,
   winningColor,
-  wheelImageSrc,
+  previewImageSrc,
 }: RouletteResultPreviewProps) {
   const settled = buildSettledAnimation(winningNumber);
 
@@ -22,7 +22,7 @@ export default function RouletteResultPreview({
         >
           <img
             className="casino-roulette-history-preview__plateau"
-            src={wheelImageSrc}
+            src={previewImageSrc}
             alt=""
           />
         </div>

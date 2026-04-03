@@ -33,7 +33,8 @@ import {
 } from "./features/roulette/model";
 import rouletteBackdropArt from "./images/casino ats.png";
 import rouletteIdleImg from "./images/roulette.png";
-import roulettePlateauPremium from "./images/roulette-plateau-premium.png";
+import roulettePreviewImg from "./images/roulette-plateau-premium.png";
+import rouletteTurntableImg from "./images/roulette-tournante.png";
 import jetonImg from "./images/jeton.png";
 import rouletteReloadVideo from "./videos/roulette-reload.mp4";
 import rouletteTirageVideo from "./videos/roulette-tirage.mp4";
@@ -391,7 +392,8 @@ export default function RouletteRoom({
           onBetChange={setSelectedBet}
           onInfoTabChange={setInfoTab}
           onSubmitBet={() => void submitBet()}
-          wheelImageSrc={roulettePlateauPremium}
+          wheelImageSrc={rouletteTurntableImg}
+          historyPreviewImageSrc={roulettePreviewImg}
         />
       </div>
     </section>

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { RoomId } from "../catalog";
-import { ROOM_DEFINITIONS } from "../catalog";
+import { ROOM_DEFINITIONS, resolveRoomArtwork } from "../catalog";
 
 type CasinoFloorShellProps = {
   activeRoom: RoomId;
@@ -58,6 +58,9 @@ export default function CasinoFloorShell({
               onClick={() => onRoomChange(room.id)}
               role="tab"
               aria-selected={room.id === activeRoom}
+              style={{
+                ["--tab-art" as string]: `url("${resolveRoomArtwork(room.id)}")`,
+              }}
             >
               <img className="casino-topdeck__tab-icon" src={room.icon} alt="" aria-hidden="true" />
               <div>

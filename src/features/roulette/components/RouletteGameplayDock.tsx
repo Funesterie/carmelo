@@ -38,6 +38,7 @@ type RouletteGameplayDockProps = {
   onInfoTabChange: (tab: "mises" | "participants" | "historique") => void;
   onSubmitBet: () => void;
   wheelImageSrc: string;
+  historyPreviewImageSrc: string;
 };
 
 export default function RouletteGameplayDock({
@@ -54,6 +55,7 @@ export default function RouletteGameplayDock({
   onInfoTabChange,
   onSubmitBet,
   wheelImageSrc,
+  historyPreviewImageSrc,
 }: RouletteGameplayDockProps) {
   const latestResult = room?.recentResults?.[0] || null;
 
@@ -109,7 +111,7 @@ export default function RouletteGameplayDock({
               onClick={() => onAmountChange(preset)}
               disabled={working}
             >
-              <img src={tapisImg} alt="" aria-hidden="true" />
+              <img src={jetonImg} alt="" aria-hidden="true" />
               <strong>{preset}</strong>
             </button>
           ))}
@@ -129,7 +131,12 @@ export default function RouletteGameplayDock({
           ))}
         </div>
 
-        <div className="casino-roulette-board casino-roulette-board--compact">
+        <div
+          className="casino-roulette-board casino-roulette-board--compact"
+          style={{
+            ["--roulette-art" as string]: `url("${tapisImg}")`,
+          }}
+        >
           <button
             type="button"
             className={`casino-roulette-cell casino-roulette-cell--green ${selectedBet?.betType === "straight" && selectedBet?.betValue === "0" ? "is-active" : ""}`}
@@ -234,7 +241,7 @@ export default function RouletteGameplayDock({
                   <RouletteResultPreview
                     winningNumber={latestResult.winningNumber}
                     winningColor={latestResult.winningColor}
-                    wheelImageSrc={wheelImageSrc}
+                    previewImageSrc={historyPreviewImageSrc}
                   />
                 ) : null}
 

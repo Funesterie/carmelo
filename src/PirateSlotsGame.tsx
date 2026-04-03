@@ -77,9 +77,12 @@ function SlotsRoom({
   const [goldRain, setGoldRain] = useState<
     Array<{ id: string; left: string; delay: string; duration: string; scale: string; drift: string }>
   >([]);
+  const [autoSpinCount, setAutoSpinCount] = useState(0);
+  const [autoSpinPreset, setAutoSpinPreset] = useState(10);
   const intervalRef = useRef<number | null>(null);
   const featureTimeoutRef = useRef<number | null>(null);
   const goldRainTimeoutRef = useRef<number | null>(null);
+  const autoSpinTimeoutRef = useRef<number | null>(null);
   const spinRunIdRef = useRef(0);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const featureVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -98,6 +101,7 @@ function SlotsRoom({
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       if (featureTimeoutRef.current) window.clearTimeout(featureTimeoutRef.current);
       if (goldRainTimeoutRef.current) window.clearTimeout(goldRainTimeoutRef.current);
+      if (autoSpinTimeoutRef.current) window.clearTimeout(autoSpinTimeoutRef.current);
       alertAudioRef.current?.pause();
     };
   }, []);
@@ -117,6 +121,12 @@ function SlotsRoom({
   }, [lastSpin]);
 
   const recentTransactions = useMemo(() => profile.recentTransactions.slice(0, 8), [profile.recentTransactions]);
+  const reelColumns = useMemo(() => {
+    const columnCount = displayGrid[0]?.length || 0;
+    return Array.from({ length: columnCount }, (_, columnIndex) =>
+      displayGrid.map((row) => row[columnIndex]),
+    );
+  }, [displayGrid]);
   const isAlertFeatureActive = activeFeature !== "idle";
   const featureMedia = isAlertFeatureActive
     ? SLOT_FEATURE_MEDIA[activeFeature]
@@ -277,6 +287,36 @@ function SlotsRoom({
     }
   }
 
+  function startAutoSpin(count: number) {
+    if (!canSpin) return;
+    setAutoSpinCount(count);
+    
+    async function doAutoSpin(remaining: number) {
+      if (remaining <= 0) {
+        setAutoSpinCount(0);
+        return;
+      }
+      
+      await handleSpin();
+      setAutoSpinCount(remaining - 1);
+      
+      // Schedule next spin with a small delay
+      autoSpinTimeoutRef.current = window.setTimeout(() => {
+        doAutoSpin(remaining - 1);
+      }, 800);
+    }
+    
+    doAutoSpin(count);
+  }
+
+  function stopAutoSpin() {
+    setAutoSpinCount(0);
+    if (autoSpinTimeoutRef.current) {
+      window.clearTimeout(autoSpinTimeoutRef.current);
+      autoSpinTimeoutRef.current = null;
+    }
+  }
+
   function adjustBet(direction: -1 | 1) {
     const currentIndex = BET_PRESETS.findIndex((preset) => preset >= bet);
     const safeIndex = currentIndex === -1 ? BET_PRESETS.length - 1 : currentIndex;
@@ -284,14 +324,14 @@ function SlotsRoom({
     setBet(Math.max(profile.wallet.minBet, Math.min(profile.wallet.maxBet, BET_PRESETS[nextIndex])));
   }
 
-  function renderCell(symbolId: string, cellIndex: number) {
+  function renderCell(symbolId: string, cellIndex: number, key: string) {
     const meta = SYMBOL_META[symbolId] || SYMBOL_META.COIN;
     const isHighlighted = highlightedIndexes.has(cellIndex);
     const isHeldJoker = bonusHeldIndexes.includes(cellIndex) && symbolId === "JOKER";
 
     return (
       <div
-        key={`${symbolId}-${cellIndex}`}
+        key={key}
         className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${isHeldJoker ? "is-bonus-held" : ""}`}
         style={{ ["--cell-accent" as string]: meta.accent }}
       >
@@ -350,11 +390,27 @@ function SlotsRoom({
           ) : null}
 
           <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""} ${tightReels ? "is-tight" : ""}`}>
-            {displayGrid.flatMap((row, rowIndex) =>
-              row.map((symbolId, columnIndex) =>
-                renderCell(symbolId, rowIndex * displayGrid[0].length + columnIndex),
-              ),
-            )}
+            {reelColumns.map((column, columnIndex) => {
+              const strip = spinState === "spinning" ? [...column, ...column, ...column] : column;
+
+              return (
+                <div
+                  key={`reel-${columnIndex}`}
+                  className={`casino-reel-column ${spinState === "spinning" ? "is-spinning" : ""}`}
+                  style={{ ["--reel-order" as string]: `${columnIndex}` }}
+                >
+                  <div className="casino-reel-column__viewport">
+                    <div className="casino-reel-column__track">
+                      {strip.map((symbolId, rowIndex) => {
+                        const visibleRowIndex = rowIndex % column.length;
+                        const cellIndex = visibleRowIndex * reelColumns.length + columnIndex;
+                        return renderCell(symbolId, cellIndex, `${columnIndex}-${rowIndex}-${symbolId}`);
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="casino-controls">
@@ -399,14 +455,56 @@ function SlotsRoom({
               >
                 {tightReels ? "Rouleaux serres" : "Rouleaux ouverts"}
               </button>
-              <button
-                type="button"
-                className="casino-primary-button casino-primary-button--spin"
-                onClick={handleSpin}
-                disabled={!canSpin}
-              >
-                {spinState === "spinning" ? "Reels en cours..." : spinState === "bonus" ? "Bonus joker..." : "Lancer le spin"}
-              </button>
+              
+              {autoSpinCount > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    className="casino-primary-button casino-primary-button--auto-spin"
+                    onClick={() => startAutoSpin(autoSpinPreset)}
+                    disabled={!canSpin}
+                  >
+                    Auto Spin: {autoSpinCount} restants
+                  </button>
+                  <button
+                    type="button"
+                    className="casino-ghost-button"
+                    onClick={stopAutoSpin}
+                  >
+                    Arreter
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="casino-primary-button casino-primary-button--spin"
+                    onClick={handleSpin}
+                    disabled={!canSpin}
+                  >
+                    {spinState === "spinning" ? "Reels en cours..." : spinState === "bonus" ? "Bonus joker..." : "Lancer le spin"}
+                  </button>
+                  <button
+                    type="button"
+                    className="casino-ghost-button"
+                    onClick={() => startAutoSpin(autoSpinPreset)}
+                    disabled={!canSpin}
+                  >
+                    Auto Spin x{autoSpinPreset}
+                  </button>
+                  <select
+                    className="casino-auto-spin-select"
+                    value={autoSpinPreset}
+                    onChange={(e) => setAutoSpinPreset(Number(e.target.value))}
+                    disabled={spinState === "spinning" || spinState === "bonus"}
+                  >
+                    <option value={5}>5 spins</option>
+                    <option value={10}>10 spins</option>
+                    <option value={25}>25 spins</option>
+                    <option value={50}>50 spins</option>
+                  </select>
+                </>
+              )}
             </div>
           </div>
 

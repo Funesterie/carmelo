@@ -46,17 +46,25 @@ export default function CasinoGameScreen({
   return (
     <div className="casino-game-shell">
       {activeCasinoRoom !== "slots" ? (
-        <div className="casino-ambient-mount" aria-hidden="true">
-          <video
-            ref={ambientVideoRef}
-            className="casino-ambient-mount__video"
-            src={freshVideo}
-            autoPlay
-            loop
-            playsInline
-            muted
-            preload="metadata"
-          />
+        <div className="casino-ambient-corner" aria-live="polite">
+          <div className="casino-ambient-corner__frame">
+            <video
+              ref={ambientVideoRef}
+              className="casino-ambient-corner__video"
+              src={freshVideo}
+              autoPlay
+              loop
+              playsInline
+              muted={!ambientVideoAudible}
+              preload="metadata"
+            />
+            <div className="casino-ambient-corner__veil" />
+            <div className="casino-ambient-corner__copy">
+              <span className="casino-chip">Pont ATS</span>
+              <strong>Ambiance live</strong>
+              <small>{ambientVideoAudible ? "Flux ambiance actif" : "En attente d'un geste pour l'audio"}</small>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -130,7 +138,7 @@ export default function CasinoGameScreen({
           {activeCasinoRoom !== "slots" ? (
             <div className="casino-ambient-indicator" aria-live="polite">
               <span className="casino-chip">Pont ATS</span>
-              <small>{ambientVideoAudible ? "Ambiance live active" : "Ambiance en attente d'un geste"}</small>
+              <small>{ambientVideoAudible ? "Video d'ambiance en haut a droite" : "Video visible, audio en attente d'un geste"}</small>
             </div>
           ) : null}
         </div>

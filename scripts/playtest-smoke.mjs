@@ -10,15 +10,24 @@ const outDir = path.resolve(process.cwd(), process.env.PLAYTEST_OUT_DIR || "play
 const ROOM_LABELS = ["Slots", "Carte", "Chasse", "Blackjack", "Poker", "Roulette"];
 
 function getViewportOptions(currentMode) {
+  const width = Number(process.env.PLAYTEST_WIDTH || 0);
+  const height = Number(process.env.PLAYTEST_HEIGHT || 0);
+
   if (currentMode === "mobile") {
     return {
       ...devices["iPhone 13"],
-      viewport: { width: 390, height: 844 },
+      viewport: {
+        width: width > 0 ? width : 390,
+        height: height > 0 ? height : 844,
+      },
     };
   }
 
   return {
-    viewport: { width: 1366, height: 768 },
+    viewport: {
+      width: width > 0 ? width : 1366,
+      height: height > 0 ? height : 768,
+    },
     userAgent: "Codex Playtest Desktop",
   };
 }
