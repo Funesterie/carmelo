@@ -82,15 +82,21 @@
 html,
 body,
 #root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
   min-height: 100%;
 }
 
 body {
-  margin: 0;
+  overflow-x: hidden;
   font-family: "Manrope", "Segoe UI", sans-serif;
   color: var(--casino-ink);
   background: var(--casino-bg);
   background-attachment: fixed;
+  background-size: cover;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -103,11 +109,18 @@ button {
 }
 
 .casino-shell {
+  width: 100%;
   min-height: 100vh;
   padding: 24px;
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
   display: flex;
   align-items: stretch;
   justify-content: center;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .casino-shell--loading,
@@ -117,9 +130,11 @@ button {
 
 .casino-auth-layout {
   width: min(1280px, 100%);
+  max-width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 420px);
   gap: 24px;
+  box-sizing: border-box;
 }
 
 .casino-poster,
@@ -633,9 +648,13 @@ button {
 }
 
 .casino-table-layout {
+  width: min(1360px, 100%);
+  max-width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.72fr);
   gap: 18px;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .casino-stage {
@@ -7032,7 +7051,9 @@ button {
 /* MOBILE: Small (320px - 374px) */
 @media (max-width: 374px) {
   .casino-shell {
-    padding: 10px;
+    padding: 8px;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
   }
   
   .casino-reel-grid {
@@ -7063,6 +7084,12 @@ button {
 
 /* MOBILE: Default (375px - 424px) */
 @media (min-width: 375px) and (max-width: 424px) {
+  .casino-shell {
+    padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  
   .casino-reel-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -7070,6 +7097,12 @@ button {
 
 /* MOBILE: Large (425px - 767px) */
 @media (min-width: 425px) and (max-width: 767px) {
+  .casino-shell {
+    padding: 14px;
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+  
   .casino-reel-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
