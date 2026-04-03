@@ -1,5 +1,54 @@
 @import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap");
 
+/* Breakpoint variables - standard responsive sizes */
+@media (max-width: 319px) {
+  :root {
+    --breakpoint: small-mobile;
+  }
+}
+
+@media (min-width: 320px) and (max-width: 374px) {
+  :root {
+    --breakpoint: mobile-small;
+  }
+}
+
+@media (min-width: 375px) and (max-width: 424px) {
+  :root {
+    --breakpoint: mobile-default;
+  }
+}
+
+@media (min-width: 425px) and (max-width: 767px) {
+  :root {
+    --breakpoint: mobile-large;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --breakpoint: tablet;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+  :root {
+    --breakpoint: desktop-small;
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1919px) {
+  :root {
+    --breakpoint: desktop-medium;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --breakpoint: desktop-large;
+  }
+}
+
 :root {
   --casino-ink: #f6efe0;
   --casino-muted: rgba(246, 239, 224, 0.72);
@@ -6972,5 +7021,132 @@ button {
   .casino-table-layout--roulette .casino-roulette-board--compact .casino-roulette-cell {
     min-height: 36px;
     font-size: 0.78rem;
+  }
+}
+
+/* ============================================
+   STANDARD RESPONSIVE BREAKPOINTS (Conventional)
+   Mobile-First Approach
+   ============================================ */
+
+/* MOBILE: Small (320px - 374px) */
+@media (max-width: 374px) {
+  .casino-shell {
+    padding: 10px;
+  }
+  
+  .casino-reel-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  
+  .casino-bet-pills {
+    gap: 4px;
+  }
+  
+  .casino-bet-pill {
+    min-height: 36px;
+    padding: 0 8px;
+    font-size: 0.7rem;
+  }
+  
+  .casino-primary-button,
+  .casino-ghost-button {
+    min-height: 44px;
+    font-size: 0.75rem;
+    padding: 0 12px;
+  }
+  
+  .casino-primary-button--spin {
+    min-width: 140px;
+  }
+}
+
+/* MOBILE: Default (375px - 424px) */
+@media (min-width: 375px) and (max-width: 424px) {
+  .casino-reel-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* MOBILE: Large (425px - 767px) */
+@media (min-width: 425px) and (max-width: 767px) {
+  .casino-reel-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  
+  .casino-auth-layout,
+  .casino-table-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .casino-side-rail {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* TABLET (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .casino-shell {
+    padding: 16px;
+  }
+  
+  .casino-auth-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    gap: 16px;
+  }
+  
+  .casino-reel-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  
+  .casino-side-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* DESKTOP: Small (1024px - 1439px) */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .casino-shell {
+    padding: 20px;
+  }
+  
+  .casino-auth-layout {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .casino-reel-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* DESKTOP: Medium (1440px - 1919px) */
+@media (min-width: 1440px) and (max-width: 1919px) {
+  .casino-shell {
+    padding: 24px;
+  }
+  
+  .casino-auth-layout,
+  .casino-table-layout {
+    max-width: 1360px;
+    margin: 0 auto;
+  }
+}
+
+/* DESKTOP: Large (1920px+) - 4K & Ultra-wide */
+@media (min-width: 1920px) {
+  .casino-shell {
+    padding: 28px;
+  }
+  
+  .casino-auth-layout,
+  .casino-table-layout {
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  
+  .casino-poker-street-rail,
+  .casino-side-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
