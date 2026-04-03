@@ -26,7 +26,7 @@ import {
   requestCasinoPasswordReset,
   type CasinoProfile,
 } from "./lib/casinoApi";
-import type { RoomId, RouletteSoundEvent } from "./PirateSlotsGame";
+import type { RoomId, RouletteSoundEvent } from "./features/casino/catalog";
 import freshVideo from "./videos/fresh.mp4";
 
 const PirateSlotsGame = lazy(() => import("./PirateSlotsGame"));

@@ -16,3 +16,5 @@ src/audio/pirate.m4a
 
 # Local Netlify folder
 .netlify
+.allmight-report/
+src/katana/
