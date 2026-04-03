@@ -1,9 +1,10 @@
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTableAudio } from "./audio/useTableAudio";
+import PirateInspector from "./PirateInspector";
 import PiratePlayingCardView from "./PiratePlayingCard";
 import jetonImg from "./images/jeton.png";
-import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
+import pokerCaptainArt from "./images/poker-captain-art.png";
 import {
   actPokerRound,
   joinPokerRoom,
@@ -37,6 +38,7 @@ type PokerAction = "reveal" | "showdown" | "check" | "call" | "bet" | "raise" | 
 type PokerRoomProps = {
   playerName: string;
   profile: CasinoProfile;
+  mediaReady: boolean;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;
 };
@@ -119,6 +121,7 @@ function getDecisionCaption(state: PokerState | null) {
 export default function PokerRoom({
   playerName,
   profile,
+  mediaReady,
   onProfileChange,
   onError,
 }: PokerRoomProps) {
@@ -127,12 +130,13 @@ export default function PokerRoom({
   const [working, setWorking] = useState(false);
   const [roomId, setRoomId] = useState(POKER_SALONS[0].id);
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
+  const [infoTab, setInfoTab] = useState<"journal" | "lecture" | "salons" | "joueurs">("journal");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const [betTarget, setBetTarget] = useState(0);
 
   const previousCardKeysRef = useRef<string[]>([]);
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
-  const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio();
+  const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
@@ -144,6 +148,7 @@ export default function PokerRoom({
   const currentStreetIndex = stage === "idle" ? -1 : STREET_ORDER.indexOf(stage);
   const communityCards = state?.communityCards || [];
   const toCall = state?.toCall || 0;
+  const isDecisionPhase = Boolean(state && stage !== "showdown" && !state.playerFolded);
   const playerChips = state?.playerChips || 0;
   const playerCommitted = state?.playerCommitted || activeAnte;
   const playerStreetCommitted = state?.playerStreetCommitted || 0;
@@ -296,83 +301,86 @@ export default function PokerRoom({
   }
 
   return (
-    <section className="casino-table-layout">
-      <div className="casino-stage">
-        <div className="casino-status-strip casino-status-strip--poker">
-          <article>
-            <span>Solde serveur</span>
-            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(profile.wallet.balance)}</strong>
-          </article>
-          <article>
-            <span>Blindes</span>
-            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(smallBlind)} / {formatCredits(activeAnte)}</strong>
-          </article>
-          <article>
-            <span>Pot</span>
-            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(state?.pot || 0)}</strong>
-          </article>
-          <article>
-            <span>Tapis hero</span>
-            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(playerChips)}</strong>
-          </article>
-          <article className={lastDelta >= 0 ? "tone-positive" : "tone-negative"}>
-            <span>Derniere variation</span>
-            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{`${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}`}</strong>
-          </article>
-        </div>
+    <section className="casino-table-layout casino-table-layout--compact casino-table-layout--cards">
+      <div className="casino-stage casino-stage--cards">
+        <div className="casino-room-hud casino-room-hud--poker">
+          <div className="casino-room-hud__lead">
+            <img className="casino-room-hud__portrait" src={pokerCaptainArt} alt="" aria-hidden="true" />
+            <div className="casino-room-hud__identity">
+              <span className="casino-chip">Poker ATS</span>
+              <strong>Texas Hold'em NL</strong>
+              <p>
+                {state?.message || "Table pirate premium plus sobre, plus tendue, avec vraies decisions de cash game par street."}
+                {" "}
+                {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
+              </p>
+            </div>
+          </div>
 
-        <div className="casino-salon-strip" role="tablist" aria-label="Salons poker">
-          {POKER_SALONS.map((salon) => {
-            const room = rooms.find((entry) => entry.id === salon.id);
-            return (
-              <button
-                key={salon.id}
-                type="button"
-                className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
-                onClick={() => {
-                  if (roomSwitchLocked || working) return;
-                  clearQueuedAudio();
-                  previousCardKeysRef.current = [];
-                  setDealtCardDelays({});
-                  setBetTarget(0);
-                  if (clearDealAnimationTimeoutRef.current) {
-                    window.clearTimeout(clearDealAnimationTimeoutRef.current);
-                    clearDealAnimationTimeoutRef.current = null;
-                  }
-                  setState(null);
-                  setRoomId(salon.id);
-                }}
-                disabled={roomSwitchLocked || working}
-                role="tab"
-                aria-selected={salon.id === roomId}
-              >
-                <div>
-                  <strong>{salon.title}</strong>
-                  <span>{salon.chip}</span>
-                </div>
-                <b>{room?.playerCount || 0}</b>
-              </button>
-            );
-          })}
+          <div className="casino-status-strip casino-status-strip--compact casino-status-strip--poker-compact">
+            <article>
+              <span>Solde serveur</span>
+              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(profile.wallet.balance)}</strong>
+            </article>
+            <article>
+              <span>Blindes</span>
+              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(smallBlind)} / {formatCredits(activeAnte)}</strong>
+            </article>
+            <article>
+              <span>Pot</span>
+              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(state?.pot || 0)}</strong>
+            </article>
+            <article>
+              <span>Tapis hero</span>
+              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(playerChips)}</strong>
+            </article>
+            <article className={lastDelta >= 0 ? "tone-positive" : "tone-negative"}>
+              <span>Derniere variation</span>
+              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{`${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}`}</strong>
+            </article>
+          </div>
+
+          <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons poker">
+            {POKER_SALONS.map((salon) => {
+              const room = rooms.find((entry) => entry.id === salon.id);
+              return (
+                <button
+                  key={salon.id}
+                  type="button"
+                  className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
+                  onClick={() => {
+                    if (roomSwitchLocked || working) return;
+                    clearQueuedAudio();
+                    previousCardKeysRef.current = [];
+                    setDealtCardDelays({});
+                    setBetTarget(0);
+                    if (clearDealAnimationTimeoutRef.current) {
+                      window.clearTimeout(clearDealAnimationTimeoutRef.current);
+                      clearDealAnimationTimeoutRef.current = null;
+                    }
+                    setState(null);
+                    setRoomId(salon.id);
+                  }}
+                  disabled={roomSwitchLocked || working}
+                  role="tab"
+                  aria-selected={salon.id === roomId}
+                >
+                  <div>
+                    <strong>{salon.title}</strong>
+                    <span>{salon.chip}</span>
+                  </div>
+                  <b>{room?.playerCount || 0}</b>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div
-          className="casino-reel-shell casino-room-shell casino-room-shell--cards"
-          style={{ ["--room-art" as string]: `url("${cardArtwork}")` }}
+          className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--poker"
+          style={{ ["--room-art" as string]: `url("${pokerCaptainArt}")` }}
         >
-          <div className="casino-reel-shell__header">
-            <div>
-              <span className="casino-chip">Poker</span>
-              <h2>Texas Hold'em NL</h2>
-            </div>
-            <p>
-              {state?.message || "Cash game 5-max avec vraies decisions par street: check, call, bet, raise et fold sur le backend A11."}
-              {" "}
-              {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
-            </p>
-          </div>
-
-          <div className="casino-poker-street-rail" aria-label="Progression de la main">
+          <div className="casino-poker-street-rail casino-poker-street-rail--compact" aria-label="Progression de la main">
             {STREET_ORDER.map((street, index) => {
               const isCurrent = index === currentStreetIndex;
               const isComplete = currentStreetIndex > index || stage === "showdown";
@@ -389,8 +397,8 @@ export default function PokerRoom({
             })}
           </div>
 
-          <div className="casino-card-felt casino-card-felt--poker casino-card-felt--table">
-            <div className="casino-felt-table casino-felt-table--poker">
+          <div className={`casino-card-felt casino-card-felt--poker casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
+            <div className={`casino-felt-table casino-felt-table--poker ${isDecisionPhase ? "is-decision-phase" : ""}`}>
               <div className="casino-felt-table__halo" />
 
               {(state?.aiSeats || []).map((seat, index) => {
@@ -398,7 +406,7 @@ export default function PokerRoom({
                 return (
                   <article
                     key={seat.id}
-                    className={`casino-oval-seat casino-oval-seat--ai casino-oval-seat--${layout.align} ${seat.isWinner ? "is-winner" : ""} ${seat.folded ? "is-folded" : ""}`}
+                    className={`casino-oval-seat casino-oval-seat--ai casino-oval-seat--${layout.align} ${seat.isWinner ? "is-winner" : ""} ${seat.folded ? "is-folded" : ""} ${isDecisionPhase ? "is-muted" : ""}`}
                     style={{
                       ["--seat-x" as string]: layout.x,
                       ["--seat-y" as string]: layout.y,
@@ -430,7 +438,7 @@ export default function PokerRoom({
                 );
               })}
 
-              <section className="casino-table-core casino-table-core--poker">
+              <section className={`casino-table-core casino-table-core--poker ${isDecisionPhase ? "is-focus" : ""}`}>
                 <div className="casino-table-core__headline">
                   <strong>{stage === "idle" ? "Table au repos" : state?.stageLabel || "Street en cours"}</strong>
                   <span className="casino-token-inline"><img src={jetonImg} alt="" />Pot {formatCredits(state?.pot || 0)}</span>
@@ -460,7 +468,7 @@ export default function PokerRoom({
                 </div>
               </section>
 
-              <article className={`casino-oval-seat casino-oval-seat--player ${state?.playerFolded ? "is-folded" : ""}`}>
+              <article className={`casino-oval-seat casino-oval-seat--player ${state?.playerFolded ? "is-folded" : ""} ${isDecisionPhase ? "is-focus" : ""}`}>
                 <div className="casino-card-seat__meta">
                   <strong>{playerName}</strong>
                   <span>{state?.playerFolded ? "Main couchee" : state?.playerHand?.label || (stage === "showdown" ? "Showdown" : "Decision ouverte")}</span>
@@ -484,204 +492,211 @@ export default function PokerRoom({
             </div>
           </div>
 
-          <div className="casino-poker-decision-bar">
-            <div className="casino-poker-decision-bar__copy">
-              <span className="casino-chip">Tour de mise</span>
-              <strong>{getDecisionHeadline(state)}</strong>
-              <p>{getDecisionCaption(state)}</p>
-            </div>
-            <div className="casino-chip-row">
-              <span className="casino-chip">A payer {formatCredits(toCall)}</span>
-              <span className="casino-chip">Investi {formatCredits(playerCommitted)}</span>
-              <span className="casino-chip">{stage === "showdown" ? "Main closee" : state?.aggressorName ? `Ouverture ${state.aggressorName}` : "Spot checke"}</span>
-            </div>
-          </div>
+          <div className="casino-stage-sidebar">
+            <div className={`casino-command-dock casino-command-dock--poker ${isDecisionPhase ? "is-attention" : ""}`}>
+              <div className="casino-command-dock__copy">
+                <span className="casino-chip">Tour de mise</span>
+                <strong>{getDecisionHeadline(state)}</strong>
+                <p>{getDecisionCaption(state)}</p>
+              </div>
 
-          {(canBet || canRaise) ? (
-            <div className="casino-poker-betbox">
-              <div className="casino-poker-betbox__header">
-                <div>
-                  <span className="casino-chip">{canRaise ? "Relance" : "Mise"}</span>
-                  <strong>{canRaise ? "Sizing de raise" : "Sizing d'ouverture"}</strong>
+              <div className="casino-chip-row">
+                <span className="casino-chip">A payer {formatCredits(toCall)}</span>
+                <span className="casino-chip">Investi {formatCredits(playerCommitted)}</span>
+                <span className="casino-chip">{stage === "showdown" ? "Main closee" : state?.aggressorName ? `Ouverture ${state.aggressorName}` : "Spot checke"}</span>
+              </div>
+
+              {(canBet || canRaise) ? (
+                <div className="casino-poker-betbox casino-poker-betbox--dock">
+                  <div className="casino-poker-betbox__header">
+                    <div>
+                      <span className="casino-chip">{canRaise ? "Relance" : "Mise"}</span>
+                      <strong>{canRaise ? "Sizing de raise" : "Sizing d'ouverture"}</strong>
+                    </div>
+                    <b>{formatCredits(normalizedBetTarget)}</b>
+                  </div>
+                  <input
+                    className="casino-poker-betbox__slider"
+                    type="range"
+                    min={aggressionMin}
+                    max={aggressionMax}
+                    step={blindUnit}
+                    value={normalizedBetTarget}
+                    onChange={(event) => setBetTarget(Number(event.target.value))}
+                    disabled={working || !(canBet || canRaise)}
+                  />
+                  <div className="casino-bet-pills">
+                    {aggressionPresets.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={`casino-bet-pill casino-bet-pill--dubloon ${normalizedBetTarget === preset ? "is-active" : ""}`}
+                        onClick={() => setBetTarget(preset)}
+                        disabled={working}
+                      >
+                        {formatCredits(preset)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <b>{formatCredits(normalizedBetTarget)}</b>
-              </div>
-              <input
-                className="casino-poker-betbox__slider"
-                type="range"
-                min={aggressionMin}
-                max={aggressionMax}
-                step={blindUnit}
-                value={normalizedBetTarget}
-                onChange={(event) => setBetTarget(Number(event.target.value))}
-                disabled={working || !(canBet || canRaise)}
-              />
-              <div className="casino-bet-pills">
-                {aggressionPresets.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`casino-bet-pill ${normalizedBetTarget === preset ? "is-active" : ""}`}
-                    onClick={() => setBetTarget(preset)}
-                    disabled={working}
-                  >
-                    {formatCredits(preset)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
+              ) : null}
 
-          <div className="casino-action-row">
-            <div className="casino-bet-pills">
-              {ANTE_PRESETS.map((preset) => (
+              <div className="casino-command-dock__betline">
+                <div className="casino-bet-pills">
+                  {ANTE_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={`casino-bet-pill casino-bet-pill--dubloon ${ante === preset ? "is-active" : ""}`}
+                      onClick={() => setAnte(preset)}
+                      disabled={((stage !== "idle" && stage !== "showdown")) || working}
+                    >
+                      {Math.max(10, Math.round(preset / 2))}/{preset}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="casino-chip-row">
+                  <span className="casino-chip">Street {stage === "idle" ? "en attente" : STREET_LABELS[state?.stage || "preflop"].title}</span>
+                  <span className="casino-chip">Tapis hero {formatCredits(playerChips)}</span>
+                  <span className="casino-chip">Engage street {formatCredits(playerStreetCommitted)}</span>
+                </div>
+              </div>
+
+              <div className="casino-command-dock__actions">
                 <button
-                  key={preset}
                   type="button"
-                  className={`casino-bet-pill ${ante === preset ? "is-active" : ""}`}
-                  onClick={() => setAnte(preset)}
-                  disabled={((stage !== "idle" && stage !== "showdown")) || working}
+                  className="casino-ghost-button casino-ghost-button--danger"
+                  onClick={() => void act("fold")}
+                  disabled={stage === "idle" || stage === "showdown" || working}
                 >
-                  {Math.max(10, Math.round(preset / 2))}/{preset}
+                  Fold
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className="casino-ghost-button casino-ghost-button--steady"
+                  onClick={() => void handleCheckOrCall()}
+                  disabled={working || (!canCheck && !canCall)}
+                >
+                  {canCheck ? "Check" : canCall ? `Call ${formatCredits(toCall)}` : "Check / Call"}
+                </button>
+                <button
+                  type="button"
+                  className="casino-primary-button casino-primary-button--cyan"
+                  onClick={() => void handleAggression()}
+                  disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
+                >
+                  {canRaise ? `Raise a ${formatCredits(normalizedBetTarget)}` : canBet ? `Bet ${formatCredits(normalizedBetTarget)}` : "Bet / Raise"}
+                </button>
+                <button
+                  type="button"
+                  className="casino-primary-button"
+                  onClick={() => void dealHand()}
+                  disabled={working || (!(stage === "idle" || stage === "showdown")) || profile.wallet.balance < ante}
+                >
+                  {stage === "idle" || stage === "showdown" ? "Distribuer une main" : "Main en cours"}
+                </button>
+              </div>
             </div>
 
-            <div className="casino-action-row__buttons">
-              <button
-                type="button"
-                className="casino-ghost-button"
-                onClick={() => void act("fold")}
-                disabled={stage === "idle" || stage === "showdown" || working}
-              >
-                Fold
-              </button>
-              <button
-                type="button"
-                className="casino-ghost-button"
-                onClick={() => void handleCheckOrCall()}
-                disabled={working || (!canCheck && !canCall)}
-              >
-                {canCheck ? "Check" : canCall ? `Call ${formatCredits(toCall)}` : "Check / Call"}
-              </button>
-              <button
-                type="button"
-                className="casino-primary-button"
-                onClick={() => void handleAggression()}
-                disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
-              >
-                {canRaise ? `Raise a ${formatCredits(normalizedBetTarget)}` : canBet ? `Bet ${formatCredits(normalizedBetTarget)}` : "Bet / Raise"}
-              </button>
-              <button
-                type="button"
-                className="casino-primary-button"
-                onClick={() => void dealHand()}
-                disabled={working || (!(stage === "idle" || stage === "showdown")) || profile.wallet.balance < ante}
-              >
-                {stage === "idle" || stage === "showdown" ? "Distribuer une main" : "Main en cours"}
-              </button>
-            </div>
+            <PirateInspector
+              title="Capitaine de table"
+              eyebrow="Intel"
+              activeTab={infoTab}
+              onChange={(tabId) => setInfoTab(tabId as typeof infoTab)}
+              tabs={[
+                {
+                  id: "journal",
+                  label: "Journal",
+                  badge: (state?.actionLog || []).length,
+                  caption: "Historique compact des derniers mouvements.",
+                  content: (
+                    <div className="casino-rule-list">
+                      {(state?.actionLog || []).length ? (
+                        [...(state?.actionLog || [])].slice(-6).reverse().map((entry, index) => (
+                          <p key={`${entry}-${index}`}>{entry}</p>
+                        ))
+                      ) : (
+                        <p>Les actions de la main s'afficheront ici des que le coup demarre.</p>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  id: "lecture",
+                  label: "Lecture",
+                  caption: "Infos critiques sans surcharger la table.",
+                  content: (
+                    <div className="casino-metric-list">
+                      <div>
+                        <span>Street</span>
+                        <strong>{stage === "idle" ? "En attente" : STREET_LABELS[state?.stage || "preflop"].title}</strong>
+                      </div>
+                      <div>
+                        <span>Pot courant</span>
+                        <strong>{formatCredits(state?.pot || 0)}</strong>
+                      </div>
+                      <div>
+                        <span>A payer</span>
+                        <strong>{formatCredits(toCall)}</strong>
+                      </div>
+                      <div>
+                        <span>Tapis hero</span>
+                        <strong>{formatCredits(playerChips)}</strong>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  id: "salons",
+                  label: "Salons",
+                  badge: rooms.find((entry) => entry.id === roomId)?.playerCount || 0,
+                  caption: "Switch de table en gardant le layout compact.",
+                  content: (
+                    <div className="casino-salon-roster">
+                      {POKER_SALONS.map((salon) => {
+                        const room = rooms.find((entry) => entry.id === salon.id);
+                        return (
+                          <article key={salon.id} className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""}`}>
+                            <div>
+                              <strong>{salon.title}</strong>
+                              <span>{salon.blurb}</span>
+                            </div>
+                            <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ),
+                },
+                {
+                  id: "joueurs",
+                  label: "Joueurs",
+                  badge: (activeRoom?.participants || []).length,
+                  caption: "Presence du salon actif.",
+                  content: (
+                    <div className="casino-prize-stack">
+                      {(activeRoom?.participants || []).length ? (
+                        activeRoom?.participants.map((participant) => (
+                          <article key={participant.userId} className="casino-prize-card">
+                            <div className="casino-prize-card__glyph">♠</div>
+                            <div>
+                              <strong>{participant.username}</strong>
+                              <span>{participant.userId === profile.user.id ? "toi" : "connecte sur le salon"}</span>
+                            </div>
+                          </article>
+                        ))
+                      ) : (
+                        <p className="casino-history-empty">Tu es seul sur ce salon pour le moment.</p>
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </div>
         </div>
       </div>
-
-      <aside className="casino-side-rail">
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Salons</span>
-            <h3>Canaux rejoignables</h3>
-          </div>
-          <div className="casino-salon-roster">
-            {POKER_SALONS.map((salon) => {
-              const room = rooms.find((entry) => entry.id === salon.id);
-              return (
-                <article key={salon.id} className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""}`}>
-                  <div>
-                    <strong>{salon.title}</strong>
-                    <span>{salon.blurb}</span>
-                  </div>
-                  <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Structure</span>
-            <h3>Cash game short-handed</h3>
-          </div>
-          <div className="casino-rule-list">
-            <p>Le backend Railway gere maintenant un vrai cycle par street avec check, call, bet, raise et fold.</p>
-            <p>Les sizings debitent le wallet A11 au fur et a mesure de la main, puis le pot est regle au showdown.</p>
-            <p>Le front expose un slider de sizing, des presets de mise et une table 5-max beaucoup plus proche d'un site de cash game.</p>
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Lecture</span>
-            <h3>Tour courant</h3>
-          </div>
-          <div className="casino-metric-list">
-            <div>
-              <span>Street</span>
-              <strong>{stage === "idle" ? "En attente" : STREET_LABELS[state?.stage || "preflop"].title}</strong>
-            </div>
-            <div>
-              <span>Pot courant</span>
-              <strong>{formatCredits(state?.pot || 0)}</strong>
-            </div>
-            <div>
-              <span>A payer</span>
-              <strong>{formatCredits(toCall)}</strong>
-            </div>
-            <div>
-              <span>Tapis hero</span>
-              <strong>{formatCredits(playerChips)}</strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Historique</span>
-            <h3>Dernieres actions</h3>
-          </div>
-          <div className="casino-rule-list">
-            {(state?.actionLog || []).length ? (
-              [...(state?.actionLog || [])].slice(-6).reverse().map((entry, index) => (
-                <p key={`${entry}-${index}`}>{entry}</p>
-              ))
-            ) : (
-              <p>Les actions de la main s'afficheront ici des que le coup demarre.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Salon actif</span>
-            <h3>Joueurs presents</h3>
-          </div>
-          <div className="casino-prize-stack">
-            {(activeRoom?.participants || []).length ? (
-              activeRoom?.participants.map((participant) => (
-                <article key={participant.userId} className="casino-prize-card">
-                  <div className="casino-prize-card__glyph">♠</div>
-                  <div>
-                    <strong>{participant.username}</strong>
-                    <span>{participant.userId === profile.user.id ? "toi" : "connecte sur le salon"}</span>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="casino-history-empty">Tu es seul sur ce salon pour le moment.</p>
-            )}
-          </div>
-        </section>
-      </aside>
     </section>
   );
 }

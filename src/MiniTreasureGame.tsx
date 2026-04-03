@@ -26,6 +26,7 @@ const HUNT_PRIZES = [
 
 type MiniTreasureGameProps = {
   profile: CasinoProfile;
+  mediaReady?: boolean;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;
 };
@@ -36,6 +37,7 @@ function getPrizeMeta(reward: number | null) {
 
 export default function MiniTreasureGame({
   profile,
+  mediaReady = false,
   onProfileChange,
   onError,
 }: MiniTreasureGameProps) {
@@ -55,6 +57,7 @@ export default function MiniTreasureGame({
   const lastDelta = phase === "resolved" ? (state?.reward || 0) - ROOM_COST : 0;
 
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
+    if (!mediaReady) return;
     if (!ref.current) {
       ref.current = new Audio(src);
       ref.current.preload = "auto";

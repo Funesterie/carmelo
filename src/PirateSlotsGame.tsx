@@ -8,6 +8,7 @@ import PokerRoom from "./PokerRoom";
 import RouletteRoom from "./RouletteRoom";
 import amightImg from "./images/amight.png";
 import batIconImg from "./images/bat.png";
+import blackjackCaptainArt from "./images/blackjack-captain-art.png";
 import cardArtwork from "./images/Cartes de pirate au crépuscule.png";
 import chauveImg from "./images/chauve.png";
 import coffreImg from "./images/coffre.png";
@@ -20,6 +21,7 @@ import gunImg from "./images/gun.png";
 import lingotImg from "./images/lingot.png";
 import mapImg from "./images/map.png";
 import perroImg from "./images/perro.png";
+import pokerCaptainArt from "./images/poker-captain-art.png";
 import qflushImg from "./images/qflush.png";
 import romeImg from "./images/rome.png";
 import rouletteArtwork from "./images/casino ats.png";
@@ -329,6 +331,7 @@ function SlotsRoom({
   const [lastSpin, setLastSpin] = useState<CasinoSpin | null>(null);
   const [lastMessage, setLastMessage] = useState("Pret a lancer les reels.");
   const [activeFeature, setActiveFeature] = useState<SlotFeatureKey>("idle");
+  const [tightReels, setTightReels] = useState(true);
   const [slotIntroPlayed, setSlotIntroPlayed] = useState(() => {
     try {
       return sessionStorage.getItem(SLOT_VIDEO_INTRO_SESSION_KEY) === "1";
@@ -410,6 +413,7 @@ function SlotsRoom({
   }
 
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
+    if (!mediaReady) return;
     if (!ref.current) {
       ref.current = new Audio(src);
       ref.current.preload = "auto";
@@ -583,7 +587,7 @@ function SlotsRoom({
           </article>
         </div>
 
-        <div className="casino-reel-shell casino-room-shell casino-reel-shell--slots">
+        <div className={`casino-reel-shell casino-room-shell casino-reel-shell--slots ${tightReels ? "is-tight-reels" : ""}`}>
           <div className="casino-reel-shell__header">
             <div>
               <span className="casino-chip">Machine a sous</span>
@@ -611,7 +615,7 @@ function SlotsRoom({
             </div>
           ) : null}
 
-          <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""}`}>
+          <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""} ${tightReels ? "is-tight" : ""}`}>
             {displayGrid.flatMap((row, rowIndex) =>
               row.map((symbolId, columnIndex) =>
                 renderCell(symbolId, rowIndex * displayGrid[0].length + columnIndex),
@@ -652,14 +656,24 @@ function SlotsRoom({
               </button>
             </div>
 
-            <button
-              type="button"
-              className="casino-primary-button casino-primary-button--spin"
-              onClick={handleSpin}
-              disabled={!canSpin}
-            >
-              {spinState === "spinning" ? "Reels en cours..." : spinState === "bonus" ? "Bonus joker..." : "Lancer le spin"}
-            </button>
+            <div className="casino-action-row__buttons">
+              <button
+                type="button"
+                className={`casino-ghost-button ${tightReels ? "is-active" : ""}`}
+                onClick={() => setTightReels((current) => !current)}
+                disabled={spinState === "spinning" || spinState === "bonus"}
+              >
+                {tightReels ? "Rouleaux serres" : "Rouleaux ouverts"}
+              </button>
+              <button
+                type="button"
+                className="casino-primary-button casino-primary-button--spin"
+                onClick={handleSpin}
+                disabled={!canSpin}
+              >
+                {spinState === "spinning" ? "Reels en cours..." : spinState === "bonus" ? "Bonus joker..." : "Lancer le spin"}
+              </button>
+            </div>
           </div>
 
           {profile.wallet.balance < bet ? (
@@ -840,15 +854,13 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
       ? rouletteArtwork
       : activeRoom === "slots"
         ? fondImg
+      : activeRoom === "blackjack"
+        ? blackjackCaptainArt
+      : activeRoom === "poker"
+        ? pokerCaptainArt
       : activeRoom === "treasure-map" || activeRoom === "treasure-hunt"
         ? districtArtwork
         : cardArtwork;
-
-  useEffect(() => {
-    if (activeRoom === "slots") {
-      props.onRequestMediaPlayback?.();
-    }
-  }, [activeRoom, props.onRequestMediaPlayback]);
 
   useEffect(() => {
     props.onRoomChange?.(activeRoom);
@@ -857,13 +869,13 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
   function renderRoom() {
     switch (activeRoom) {
       case "treasure-map":
-        return <CarteMiniGame profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
+        return <CarteMiniGame profile={props.profile} mediaReady={props.mediaReady} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "treasure-hunt":
-        return <MiniTreasureGame profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
+        return <MiniTreasureGame profile={props.profile} mediaReady={props.mediaReady} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "blackjack":
-        return <BlackjackRoom playerName={props.profile.user.username} profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
+        return <BlackjackRoom playerName={props.profile.user.username} profile={props.profile} mediaReady={props.mediaReady} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "poker":
-        return <PokerRoom playerName={props.profile.user.username} profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} />;
+        return <PokerRoom playerName={props.profile.user.username} profile={props.profile} mediaReady={props.mediaReady} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "roulette":
         return <RouletteRoom profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} onRouletteEvent={props.onRouletteEvent} />;
       default:
@@ -874,52 +886,50 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
   return (
     <section className="casino-floor">
       <section
-        className="casino-command-deck"
+        className="casino-topdeck"
         style={{
           ["--district-art" as string]: `url("${districtArtwork}")`,
           ["--room-art" as string]: `url("${currentRoomArtwork}")`,
         }}
       >
-        <div className="casino-command-deck__hero">
-          <div className="casino-command-deck__copy">
-            <span className="casino-chip">Pont central ATS</span>
-            <h2>{currentRoom.title}</h2>
-            <p>{currentRoom.body}</p>
-            <div className="casino-command-deck__meta">
-              <span>{props.profile.user.username}</span>
-              <span>{formatCredits(props.profile.wallet.balance)} credits</span>
-              <span>{currentRoom.chip}</span>
+        <div className="casino-topdeck__summary">
+          <div className="casino-topdeck__lead">
+            <img className="casino-topdeck__icon" src={currentRoom.icon} alt="" aria-hidden="true" />
+            <div className="casino-topdeck__copy">
+              <span className="casino-chip">Pont central ATS</span>
+              <strong>{currentRoom.title}</strong>
+              <p>{currentRoom.body}</p>
             </div>
           </div>
 
-          <div className="casino-command-deck__spotlight">
-            <img className="casino-command-deck__spotlight-art" src={currentRoom.icon} alt="" aria-hidden="true" />
-            <span className="casino-chip">Salle active</span>
-            <strong>{currentRoom.label}</strong>
-            <p>Une navigation compacte, lisible, et tous les jeux a portee de main sans doubler le menu.</p>
+          <div className="casino-topdeck__meta">
+            <span>{props.profile.user.username}</span>
+            <span>{formatCredits(props.profile.wallet.balance)} credits</span>
+            <span>{currentRoom.chip}</span>
           </div>
         </div>
 
-        <div className="casino-command-grid" role="tablist" aria-label="Salles de jeu">
+        <div className="casino-topdeck__tabs" role="tablist" aria-label="Salles de jeu">
           {ROOM_DEFINITIONS.map((room) => (
             <button
               key={room.id}
               type="button"
-              className={`casino-command-card ${room.id === activeRoom ? "is-active" : ""}`}
+              className={`casino-topdeck__tab ${room.id === activeRoom ? "is-active" : ""}`}
               onClick={() => setActiveRoom(room.id)}
               role="tab"
               aria-selected={room.id === activeRoom}
             >
-              <img className="casino-command-card__icon" src={room.icon} alt="" aria-hidden="true" />
-              <span className="casino-chip">{room.chip}</span>
-              <strong>{room.label}</strong>
-              <p>{room.body}</p>
+              <img className="casino-topdeck__tab-icon" src={room.icon} alt="" aria-hidden="true" />
+              <div>
+                <strong>{room.label}</strong>
+                <span>{room.chip}</span>
+              </div>
             </button>
           ))}
         </div>
       </section>
 
-      {renderRoom()}
+      <div className="casino-floor__room">{renderRoom()}</div>
     </section>
   );
 }

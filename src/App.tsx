@@ -202,6 +202,7 @@ export default function App() {
     volume: number,
     waitUntilEnd = false,
   ) {
+    if (!mediaUnlockedRef.current) return;
     const audio = getAudio(ref, src);
     audio.pause();
     try {
@@ -287,7 +288,9 @@ export default function App() {
     setImmersionLine(`Pont prive en preparation pour ${playerName || "le capitaine"}...`);
     setShowImmersion(true);
     await syncAmbientVideo(mediaUnlockedRef.current, activeCasinoRoom !== "slots");
-    void playAudioClip(introAudioRef, funesterieAudio, 0.56);
+    if (mediaUnlockedRef.current) {
+      void playAudioClip(introAudioRef, funesterieAudio, 0.56);
+    }
 
     introHideTimeoutRef.current = window.setTimeout(() => {
       setShowImmersion(false);
@@ -307,6 +310,7 @@ export default function App() {
   }
 
   function handleRouletteEvent(event: RouletteSoundEvent) {
+    if (!mediaUnlockedRef.current) return;
     if (event.type === "enter" || event.type === "join") {
       const now = Date.now();
       if (now - lastRouletteJoinCueAtRef.current < 2600) return;
@@ -319,9 +323,11 @@ export default function App() {
 
     queueRouletteAudio(async () => {
       const introVoice = Math.random() > 0.5 ? fantomeAudio : moussaillonAudio;
-      await playAudioClip(cueAudioRef, introVoice, 0.74, true);
-      await waitForMs(120);
-      await playAudioClip(cannonAudioRef, canonAudio, 0.92, true);
+      stopMedia(cueAudioRef.current);
+      stopMedia(cannonAudioRef.current);
+      await playAudioClip(cueAudioRef, introVoice, 0.74, false);
+      await waitForMs(760);
+      await playAudioClip(cannonAudioRef, canonAudio, 0.92, false);
     });
   }
 
@@ -651,8 +657,12 @@ export default function App() {
             </div>
           </header>
 
-          {error ? <div className="casino-alert casino-alert--error">{error}</div> : null}
-          {notice ? <div className="casino-alert casino-alert--success">{notice}</div> : null}
+          {(error || notice) ? (
+            <div className="casino-toast-rail" aria-live="polite">
+              {error ? <div className="casino-alert casino-alert--error">{error}</div> : null}
+              {notice ? <div className="casino-alert casino-alert--success">{notice}</div> : null}
+            </div>
+          ) : null}
 
           <Suspense fallback={<LoadingPanel label="Chargement de la table..." />}>
             <PirateSlotsGame

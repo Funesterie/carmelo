@@ -14,10 +14,15 @@ function resetAndPlay(audio: HTMLAudioElement, volume: number) {
   void audio.play().catch(() => undefined);
 }
 
-export function useTableAudio() {
+export function useTableAudio(enabled = true) {
   const cardAudioRef = useRef<HTMLAudioElement | null>(null);
   const checkAudioRef = useRef<HTMLAudioElement | null>(null);
   const timeoutIdsRef = useRef<number[]>([]);
+  const enabledRef = useRef(enabled);
+
+  useEffect(() => {
+    enabledRef.current = enabled;
+  }, [enabled]);
 
   useEffect(() => {
     return () => {
@@ -54,6 +59,7 @@ export function useTableAudio() {
   }
 
   function playCard(volume = 0.72, delayMs = 0) {
+    if (!enabledRef.current) return;
     const audio = getAudio(cardAudioRef, cardSound);
     if (delayMs <= 0) {
       resetAndPlay(audio, volume);
@@ -74,6 +80,7 @@ export function useTableAudio() {
       volume?: number;
     },
   ) {
+    if (!enabledRef.current) return;
     const burstCount = Math.max(0, Math.floor(count));
     const startDelayMs = options?.startDelayMs ?? 0;
     const stepMs = options?.stepMs ?? 110;
@@ -85,6 +92,7 @@ export function useTableAudio() {
   }
 
   function playCheck(volume = 0.68) {
+    if (!enabledRef.current) return;
     const audio = getAudio(checkAudioRef, checkSound);
     resetAndPlay(audio, volume);
   }

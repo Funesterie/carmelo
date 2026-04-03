@@ -18,12 +18,14 @@ const TREASURE_POINTS = [
 
 type CarteMiniGameProps = {
   profile: CasinoProfile;
+  mediaReady?: boolean;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;
 };
 
 export default function CarteMiniGame({
   profile,
+  mediaReady = false,
   onProfileChange,
   onError,
 }: CarteMiniGameProps) {
@@ -45,6 +47,7 @@ export default function CarteMiniGame({
   }, [lastDelta, phase]);
 
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
+    if (!mediaReady) return;
     if (!ref.current) {
       ref.current = new Audio(src);
       ref.current.preload = "auto";
