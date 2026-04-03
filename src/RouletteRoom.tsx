@@ -1,7 +1,8 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import PirateInspector from "./PirateInspector";
 import type { RouletteSoundEvent } from "./features/casino/catalog";
+import RouletteCinematicStage from "./features/roulette/components/RouletteCinematicStage";
+import RouletteGameplayDock from "./features/roulette/components/RouletteGameplayDock";
 import {
   BALL_INNER_RADIUS,
   BALL_OUTER_RADIUS,
@@ -33,7 +34,6 @@ import rouletteBackdropArt from "./images/casino ats.png";
 import rouletteIdleImg from "./images/roulette.png";
 import roulettePlateauPremium from "./images/roulette-plateau-premium.png";
 import jetonImg from "./images/jeton.png";
-import tapisImg from "./images/tapis.png";
 import rouletteCannonIntroVideo from "./videos/roulette-cannon-intro.mp4";
 import rouletteReloadVideo from "./videos/roulette-reload.mp4";
 import {
@@ -364,242 +364,33 @@ export default function RouletteRoom({
             ["--room-art" as string]: `url("${rouletteBackdropArt}")`,
           }}
         >
-          <div className="casino-roulette-stage-view">
-            <div className={`casino-roulette-visual casino-roulette-visual--cinematic is-${sequencePhase}`}>
-              <video
-                ref={introVideoRef}
-                className={`casino-roulette-cinematic ${sequencePhase === "intro" ? "is-visible" : ""}`}
-                src={rouletteCannonIntroVideo}
-                playsInline
-                muted
-                preload="auto"
-              />
-
-              <div className={`casino-roulette-hero-layer ${(sequencePhase === "idle" || sequencePhase === "spin" || sequencePhase === "hold") ? "is-visible" : ""}`}>
-                <div className={`casino-roulette-hero-fx is-${sequencePhase}`}>
-                  <div className="casino-roulette-hero-fx__aura" />
-                  <div className="casino-roulette-hero-fx__trace" />
-                </div>
-              </div>
-
-              <video
-                ref={reloadVideoRef}
-                className={`casino-roulette-cinematic ${sequencePhase === "reload" ? "is-visible" : ""}`}
-                src={rouletteReloadVideo}
-                playsInline
-                muted
-                preload="auto"
-              />
-
-              <div className={`casino-roulette-static ${(sequencePhase === "idle" || sequencePhase === "spin" || sequencePhase === "hold") ? "is-visible" : ""}`}>
-                <img src={rouletteIdleImg} alt="Roulette Funesterie" />
-              </div>
-
-              <div className="casino-roulette-overlay">
-                <div className="casino-roulette-phase">
-                  <span>Sequence</span>
-                  <strong>{phaseLabel}</strong>
-                </div>
-                {room?.latestResolved ? (
-                  <div className={`casino-roulette-result is-${room.latestResolved.winningColor}`}>
-                    <span>Dernier tir</span>
-                    <strong>{room.latestResolved.winningNumber}</strong>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="casino-roulette-hero-copy">
-                <span className="casino-chip">Scene pirate</span>
-                <strong>{sequencePhase === "spin" ? "Le canon tonne, la roue de jeu travaille a droite." : "Hero visuel separé du plateau de jeu."}</strong>
-                <p>La scene garde l'ambiance et les videos. La lecture de la roue, des mises et du resultat passe par la console de jeu.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="casino-stage-sidebar casino-stage-sidebar--roulette">
-          <div className="casino-command-dock casino-command-dock--roulette">
-            <div className="casino-roulette-console">
-              <div className="casino-roulette-console__wheel-shell">
-                <div
-                  className="casino-roulette-console__wheel"
-                  style={{ transform: `translate(-50%, -50%) rotate(${animation.wheelRotation}deg)` }}
-                >
-                  <img className="casino-roulette-wheel__plateau" src={roulettePlateauPremium} alt="" aria-hidden="true" />
-                  {wheelPockets.map((pocket) => (
-                    <div
-                      key={`console-${pocket.number}`}
-                      className={`casino-roulette-pocket is-${pocket.color} ${animation.highlightedNumber === pocket.number ? "is-winning" : ""}`}
-                      style={{ ["--pocket-angle" as string]: `${pocket.angle}deg` }}
-                    >
-                      <span>{pocket.number}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div
-                  className="casino-roulette-orb casino-roulette-orb--console"
-                  style={{
-                    left: `${animation.ballX}%`,
-                    top: `${animation.ballY}%`,
-                    transform: `translate(-50%, -50%) scale(${0.94 + (animation.fireScale - 1) * 0.4})`,
-                  }}
-                >
-                  <span
-                    className="casino-roulette-orb__trail"
-                    style={{ transform: `translate(-50%, -50%) rotate(${animation.fireRotation}deg)` }}
-                  />
-                </div>
-              </div>
-
-              <div className="casino-roulette-console__summary">
-                <span className="casino-chip">Roulette gameplay</span>
-                <strong>{selectedBet ? `Cible: ${selectedBet.label}` : "Choisis une poche ou une mise rapide"}</strong>
-                <p>Le decor reste a gauche. La roue lisible, la bille, les mises et le resultat vivent ici.</p>
-              </div>
-            </div>
-
-            <div className="casino-bet-pills casino-bet-pills--roulette">
-              {ROULETTE_AMOUNT_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={`casino-bet-pill casino-bet-pill--dubloon casino-bet-pill--roulette ${amount === preset ? "is-active" : ""}`}
-                  onClick={() => setAmount(preset)}
-                  disabled={working}
-                >
-                  <img src={tapisImg} alt="" aria-hidden="true" />
-                  <strong>{preset}</strong>
-                </button>
-              ))}
-            </div>
-
-            <div className="casino-roulette-quickbets casino-roulette-quickbets--compact">
-              {QUICK_BETS.map((bet) => (
-                <button
-                  key={`${bet.betType}-${bet.betValue}`}
-                  type="button"
-                  className={`casino-floor-nav__button ${selectedBet?.betType === bet.betType && selectedBet?.betValue === bet.betValue ? "is-active" : ""}`}
-                  onClick={() => setSelectedBet({ ...bet })}
-                >
-                  <strong>{bet.label}</strong>
-                  <span>Mise rapide</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="casino-roulette-board casino-roulette-board--compact">
-              <button
-                type="button"
-                className={`casino-roulette-cell casino-roulette-cell--green ${selectedBet?.betType === "straight" && selectedBet?.betValue === "0" ? "is-active" : ""}`}
-                onClick={() => setSelectedBet({ betType: "straight", betValue: "0", label: "Numero 0" })}
-              >
-                0
-              </button>
-              <div className="casino-roulette-board__numbers">
-                {Array.from({ length: 36 }, (_, index) => index + 1).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`casino-roulette-cell casino-roulette-cell--${getNumberColor(value)} ${selectedBet?.betType === "straight" && selectedBet?.betValue === String(value) ? "is-active" : ""}`}
-                    onClick={() => setSelectedBet({ betType: "straight", betValue: String(value), label: `Numero ${value}` })}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="casino-chip-row">
-              <span className="casino-chip casino-chip--token"><img src={jetonImg} alt="" />Pot {formatCredits(room?.round.totalPot || 0)}</span>
-              <span className="casino-chip">Joueurs {room?.round.playerCount || 0}</span>
-              <span className="casino-chip">{selectedBet ? selectedBet.label : "Aucune cible"}</span>
-            </div>
-
-            <div className="casino-command-dock__actions casino-command-dock__actions--roulette">
-              <button
-                type="button"
-                className="casino-primary-button casino-primary-button--cyan"
-                onClick={() => void submitBet()}
-                disabled={!selectedBet || working || profile.wallet.balance < amount}
-              >
-                Miser {selectedBet ? `sur ${selectedBet.label}` : ""}
-              </button>
-            </div>
-          </div>
-
-          <PirateInspector
-            title="Carnet de tir"
-            eyebrow="Roulette"
-            activeTab={infoTab}
-            onChange={(tabId) => setInfoTab(tabId as typeof infoTab)}
-            tabs={[
-              {
-                id: "mises",
-                label: "Mes mises",
-                badge: room?.round.myBets?.length || 0,
-                caption: "Lecture compacte du tour courant.",
-                content: (
-                  <div className="casino-history-list">
-                    {(room?.round.myBets || []).length ? (
-                      room?.round.myBets.map((bet) => (
-                        <article key={bet.id} className="casino-history-entry">
-                          <div>
-                            <span>{getBetLabel(bet.betType, bet.betValue)}</span>
-                            <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(bet.amount)}</strong>
-                          </div>
-                          <div className={bet.payout > 0 ? "is-positive" : ""}>
-                            {bet.payout > 0 ? `+${formatCredits(bet.payout)}` : "en attente"}
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <p className="casino-history-empty">Aucune mise active sur le tour courant.</p>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                id: "participants",
-                label: "Participants",
-                badge: room?.round.participants?.length || 0,
-                caption: "Marins presents sur le tir.",
-                content: (
-                  <div className="casino-prize-stack">
-                    {(room?.round.participants || []).length ? (
-                      room?.round.participants.map((entry) => (
-                        <article key={entry.userId} className="casino-prize-card">
-                          <div className="casino-prize-card__glyph"><img src={jetonImg} alt="" /></div>
-                          <div>
-                            <strong>{entry.username}</strong>
-                            <span>{formatCredits(entry.totalAmount)} sur {entry.betCount} mise{entry.betCount > 1 ? "s" : ""}</span>
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <p className="casino-history-empty">Aucun joueur n'a encore verrouille de mise sur ce tour.</p>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                id: "historique",
-                label: "Historique",
-                badge: room?.recentResults?.length || 0,
-                caption: "Derniers numeros tombes.",
-                content: (
-                  <div className="casino-chip-row">
-                    {(room?.recentResults || []).map((entry) => (
-                      <span key={entry.id} className={`casino-roulette-history-chip is-${entry.winningColor}`}>
-                        {entry.winningNumber}
-                      </span>
-                    ))}
-                  </div>
-                ),
-              },
-            ]}
+          <RouletteCinematicStage
+            sequencePhase={sequencePhase}
+            phaseLabel={phaseLabel}
+            latestResolved={room?.latestResolved || null}
+            introVideoRef={introVideoRef}
+            reloadVideoRef={reloadVideoRef}
+            introVideoSrc={rouletteCannonIntroVideo}
+            reloadVideoSrc={rouletteReloadVideo}
+            idleImageSrc={rouletteIdleImg}
           />
         </div>
+
+        <RouletteGameplayDock
+          room={room}
+          amount={amount}
+          selectedBet={selectedBet}
+          working={working}
+          canSubmitBet={Boolean(selectedBet) && !working && profile.wallet.balance >= amount}
+          infoTab={infoTab}
+          animation={animation}
+          wheelPockets={wheelPockets}
+          onAmountChange={setAmount}
+          onBetChange={setSelectedBet}
+          onInfoTabChange={setInfoTab}
+          onSubmitBet={() => void submitBet()}
+          wheelImageSrc={roulettePlateauPremium}
+        />
       </div>
     </section>
   );
