@@ -12,7 +12,6 @@ import {
   CASINO_DISTRICT_ARTWORK,
   SPIN_ANIMATION_INTERVAL_MS,
   SPIN_ANIMATION_STEPS,
-  PAYOUT_TABLE,
   ROOM_DEFINITIONS,
   SLOT_AMBIENT_MEDIA,
   SLOT_FEATURE_MEDIA,
@@ -32,12 +31,13 @@ import {
   type RouletteSoundEvent,
   type SlotFeatureKey,
 } from "./features/casino/catalog";
+import CasinoFloorShell from "./features/casino/components/CasinoFloorShell";
+import SlotsSideRail from "./features/casino/components/SlotsSideRail";
 import { formatCredits } from "./lib/casinoRoomState";
 import {
   spinCasinoSlots,
   type CasinoProfile,
   type CasinoSpin,
-  type CasinoTransaction,
 } from "./lib/casinoApi";
 
 type PirateSlotsGameProps = {
@@ -418,171 +418,28 @@ function SlotsRoom({
         </div>
       </div>
 
-      <aside className="casino-side-rail">
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Projecteur</span>
-            <h3>Coup du tour</h3>
-          </div>
-
-          <div className={`casino-slot-feature ${featureMedia.video ? "has-video" : ""}`}>
-            <div className="casino-slot-feature__media">
-              {featureMedia.video ? (
-                <video
-                  ref={featureVideoRef}
-                  key={featureMedia.video}
-                  className="casino-slot-feature__video"
-                  src={featureMedia.video}
-                  autoPlay
-                  loop={slotIntroPlayed || isAlertFeatureActive}
-                  muted={!mediaReady}
-                  playsInline
-                  poster={featureMedia.image}
-                  controls={false}
-                  onEnded={() => {
-                    if (!slotIntroPlayed && !isAlertFeatureActive) {
-                      markSlotsIntroPlayed();
-                    }
-                  }}
-                  onPlay={() => {
-                    onRequestMediaPlayback?.();
-                  }}
-                  onClick={() => {
-                    onRequestMediaPlayback?.();
-                  }}
-                />
-              ) : (
-                <img src={featureMedia.image} alt={featureMedia.title} className="casino-slot-feature__poster" />
-              )}
-            </div>
-
-            <div className="casino-slot-feature__copy">
-              <strong>{featureMedia.title}</strong>
-              <p>{featureMedia.body}</p>
-              <span className="casino-chip">
-                {isAlertFeatureActive
-                  ? "Alerte video prioritaire"
-                  : slotIntroPlayed
-                    ? "Ambiance machine a sous active"
-                    : "Intro unique avant ambiance"}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Session</span>
-            <h3>Tableau de bord</h3>
-          </div>
-          <div className="casino-metric-list">
-            <div>
-              <span>Spins joues</span>
-              <strong>{formatCredits(profile.wallet.gamesPlayed)}</strong>
-            </div>
-            <div>
-              <span>Total mise</span>
-              <strong>{formatCredits(profile.wallet.lifetimeWagered)}</strong>
-            </div>
-            <div>
-              <span>Total gains</span>
-              <strong>{formatCredits(profile.wallet.lifetimeWon)}</strong>
-            </div>
-            <div>
-              <span>Bonus journalier</span>
-              <strong>{profile.wallet.canClaimDailyBonus ? `Disponible (+${profile.wallet.dailyBonusAmount})` : "Deja reclame"}</strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Paiements</span>
-            <h3>Table rapide</h3>
-          </div>
-          <div className="casino-paytable">
-            {PAYOUT_TABLE.map((entry) => {
-              const meta = SYMBOL_META[entry.symbol];
-              return (
-                <div key={entry.symbol} className="casino-paytable__row">
-                  <div className="casino-paytable__symbol">
-                    <img className="casino-paytable__symbol-art" src={meta.image} alt="" aria-hidden="true" />
-                    <strong>{meta.label}</strong>
-                  </div>
-                  <span>{entry.three}</span>
-                  <span>{entry.four}</span>
-                  <span>{entry.five}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Historique</span>
-            <h3>Dernieres operations</h3>
-          </div>
-
-          <div className="casino-history-list">
-            {recentTransactions.length ? (
-              recentTransactions.map((entry: CasinoTransaction) => (
-                <article key={entry.id} className="casino-history-entry">
-                  <div>
-                    <span>{formatTransactionLabel(entry.kind)}</span>
-                    <strong>{formatTransactionTime(entry.createdAt)}</strong>
-                  </div>
-                  <div className={entry.amount >= 0 ? "is-positive" : "is-negative"}>
-                    {entry.amount >= 0 ? "+" : ""}
-                    {formatCredits(entry.amount)}
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="casino-history-empty">Aucune operation enregistree pour le moment.</p>
-            )}
-          </div>
-        </section>
-
-        {lastSpin ? (
-          <section className="casino-panel">
-            <div className="casino-panel__header">
-              <span className="casino-chip">Dernier spin</span>
-              <h3>Alignements</h3>
-            </div>
-            <div className="casino-win-list">
-              {lastSpin.wins.length ? (
-                lastSpin.wins.map((win) => {
-                  const meta = SYMBOL_META[win.symbol] || SYMBOL_META.COIN;
-                  return (
-                    <article key={`${win.lineIndex}-${win.symbol}`} className="casino-win-entry">
-                      <div>
-                        <img className="casino-paytable__symbol-art" src={meta.image} alt="" aria-hidden="true" />
-                        <div>
-                          <strong>{win.label}</strong>
-                          <span>
-                            Ligne {win.lineIndex + 1} · {win.matchCount} symboles
-                          </span>
-                        </div>
-                      </div>
-                      <b>+{formatCredits(win.payout)}</b>
-                    </article>
-                  );
-                })
-              ) : (
-                <p className="casino-history-empty">Le dernier spin n’a valide aucune ligne payante.</p>
-              )}
-            </div>
-          </section>
-        ) : null}
-      </aside>
+      <SlotsSideRail
+        profile={profile}
+        mediaReady={mediaReady}
+        featureMedia={featureMedia}
+        slotIntroPlayed={slotIntroPlayed}
+        isAlertFeatureActive={isAlertFeatureActive}
+        featureVideoRef={featureVideoRef}
+        recentTransactions={recentTransactions}
+        lastSpin={lastSpin}
+        onMarkSlotsIntroPlayed={markSlotsIntroPlayed}
+        onRequestMediaPlayback={onRequestMediaPlayback}
+      />
     </section>
   );
 }
 
 export default function PirateSlotsGame(props: PirateSlotsGameProps) {
   const [activeRoom, setActiveRoom] = useState<RoomId>("slots");
-  const currentRoom = ROOM_DEFINITIONS.find((room) => room.id === activeRoom) || ROOM_DEFINITIONS[0];
+  const currentRoom = useMemo(
+    () => ROOM_DEFINITIONS.find((room) => room.id === activeRoom) || ROOM_DEFINITIONS[0],
+    [activeRoom],
+  );
   const currentRoomArtwork = resolveRoomArtwork(activeRoom);
 
   useEffect(() => {
@@ -607,52 +464,16 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
   }
 
   return (
-    <section className="casino-floor">
-      <section
-        className="casino-topdeck"
-        style={{
-          ["--district-art" as string]: `url("${CASINO_DISTRICT_ARTWORK}")`,
-          ["--room-art" as string]: `url("${currentRoomArtwork}")`,
-        }}
-      >
-        <div className="casino-topdeck__summary">
-          <div className="casino-topdeck__lead">
-            <img className="casino-topdeck__icon" src={currentRoom.icon} alt="" aria-hidden="true" />
-            <div className="casino-topdeck__copy">
-              <span className="casino-chip">Pont central ATS</span>
-              <strong>{currentRoom.title}</strong>
-              <p>{currentRoom.body}</p>
-            </div>
-          </div>
-
-          <div className="casino-topdeck__meta">
-            <span>{props.profile.user.username}</span>
-            <span>{formatCredits(props.profile.wallet.balance)} credits</span>
-            <span>{currentRoom.chip}</span>
-          </div>
-        </div>
-
-        <div className="casino-topdeck__tabs" role="tablist" aria-label="Salles de jeu">
-          {ROOM_DEFINITIONS.map((room) => (
-            <button
-              key={room.id}
-              type="button"
-              className={`casino-topdeck__tab ${room.id === activeRoom ? "is-active" : ""}`}
-              onClick={() => setActiveRoom(room.id)}
-              role="tab"
-              aria-selected={room.id === activeRoom}
-            >
-              <img className="casino-topdeck__tab-icon" src={room.icon} alt="" aria-hidden="true" />
-              <div>
-                <strong>{room.label}</strong>
-                <span>{room.chip}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <div className="casino-floor__room">{renderRoom()}</div>
-    </section>
+    <CasinoFloorShell
+      activeRoom={activeRoom}
+      currentRoom={currentRoom}
+      districtArtwork={CASINO_DISTRICT_ARTWORK}
+      currentRoomArtwork={currentRoomArtwork}
+      playerName={props.profile.user.username}
+      balanceLabel={formatCredits(props.profile.wallet.balance)}
+      onRoomChange={setActiveRoom}
+    >
+      {renderRoom()}
+    </CasinoFloorShell>
   );
 }
