@@ -138,6 +138,8 @@ export async function playVideoForward(video: HTMLVideoElement, fallbackMs = 220
     // ignore reset failures
   }
   video.playbackRate = 1;
+  video.muted = true;
+  video.volume = 0;
 
   try {
     await video.play();

@@ -66,9 +66,6 @@ export default function SlotsSideRail({
                     onMarkSlotsIntroPlayed();
                   }
                 }}
-                onPlay={() => {
-                  onRequestMediaPlayback?.();
-                }}
                 onClick={() => {
                   onRequestMediaPlayback?.();
                 }}

@@ -5325,3 +5325,94 @@ button {
     justify-content: space-between;
   }
 }
+
+@media (max-width: 1480px) {
+  .casino-topdeck {
+    grid-template-columns: 1fr;
+  }
+
+  .casino-topdeck__summary {
+    min-height: 0;
+  }
+
+  .casino-topdeck__tabs {
+    grid-auto-columns: minmax(96px, 1fr);
+  }
+
+  .casino-floor__room > .casino-table-layout {
+    height: auto;
+    min-height: 0;
+  }
+
+  .casino-table-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    overflow: visible;
+  }
+
+  .casino-stage--cards {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .casino-stage--cards > .casino-room-hud,
+  .casino-stage--cards > .casino-reel-shell--table-compact,
+  .casino-stage-sidebar {
+    grid-column: 1;
+  }
+
+  .casino-stage--cards > .casino-room-hud {
+    grid-row: 1;
+  }
+
+  .casino-stage--cards > .casino-reel-shell--table-compact {
+    grid-row: 2;
+    height: auto;
+    min-height: clamp(320px, 44svh, 460px);
+  }
+
+  .casino-stage-sidebar {
+    grid-row: 3;
+    grid-template-rows: auto auto;
+    height: auto;
+    max-height: min(36svh, 360px);
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .casino-stage-sidebar > .casino-command-dock,
+  .casino-stage-sidebar > .casino-inspector {
+    height: auto;
+    min-height: 0;
+  }
+
+  .casino-side-rail {
+    max-height: min(36svh, 360px);
+  }
+
+  .casino-room-hud--roulette .casino-status-strip--compact,
+  .casino-status-strip--compact,
+  .casino-status-strip--poker-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .casino-roulette-console {
+    grid-template-columns: minmax(124px, 0.82fr) minmax(0, 1fr);
+  }
+
+  .casino-roulette-console__wheel-shell {
+    max-width: 164px;
+  }
+
+  .casino-roulette-console__summary p,
+  .casino-roulette-hero-copy p,
+  .casino-room-hud__identity p,
+  .casino-reel-shell__header p,
+  .casino-command-dock__copy p,
+  .casino-inspector__caption {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+}

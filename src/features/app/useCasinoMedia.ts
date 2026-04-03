@@ -63,7 +63,18 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
 
   useEffect(() => {
     if (!profileLoaded) return;
-    void syncAmbientVideo(mediaUnlockedRef.current, activeCasinoRoom !== "slots");
+    if (mediaUnlockedRef.current) {
+      void syncAmbientVideo(true, activeCasinoRoom !== "slots");
+    } else {
+      const video = ambientVideoRef.current;
+      if (activeCasinoRoom === "slots") {
+        stopMedia(video);
+      } else if (video) {
+        video.muted = true;
+        video.volume = 0;
+      }
+      setAmbientVideoAudible(false);
+    }
 
     const unlockOnFirstGesture = () => {
       void requestMediaPlayback();
@@ -155,18 +166,17 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       await video.play();
       setAmbientVideoAudible(withSound);
     } catch {
-      video.muted = true;
-      video.volume = 0;
       setAmbientVideoAudible(false);
-      try {
-        await video.play();
-      } catch {
-        // ignore autoplay failures
-      }
     }
   }
 
   async function requestMediaPlayback() {
+    if (mediaUnlockedRef.current) {
+      setMediaReady(true);
+      await syncAmbientVideo(true, activeCasinoRoom !== "slots");
+      return;
+    }
+
     const intro = getAudio(introAudioRef, funesterieAudio);
     intro.volume = 0.01;
     intro.muted = false;
