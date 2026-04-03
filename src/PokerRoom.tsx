@@ -1,8 +1,8 @@
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTableAudio } from "./audio/useTableAudio";
-import PirateInspector from "./PirateInspector";
-import PiratePlayingCardView from "./PiratePlayingCard";
+import PokerSidebar from "./features/poker/components/PokerSidebar";
+import PokerTableScene from "./features/poker/components/PokerTableScene";
 import jetonImg from "./images/jeton.png";
 import pokerCaptainArt from "./images/poker-captain-art.png";
 import {
@@ -17,20 +17,7 @@ import { formatCredits } from "./lib/casinoRoomState";
 import { POKER_SALONS } from "./lib/tableSalons";
 
 const ANTE_PRESETS = [60, 120, 200, 320];
-const POKER_SEAT_LAYOUT = [
-  { x: "15%", y: "34%", align: "start", tag: "UTG" },
-  { x: "35%", y: "18%", align: "center", tag: "HJ" },
-  { x: "65%", y: "18%", align: "center", tag: "CO" },
-  { x: "85%", y: "34%", align: "end", tag: "BTN" },
-] as const;
 const STREET_ORDER = ["preflop", "flop", "turn", "river", "showdown"] as const;
-const STREET_LABELS: Record<(typeof STREET_ORDER)[number], { title: string; caption: string }> = {
-  preflop: { title: "Preflop", caption: "Ouverture de ranges et premiere pression." },
-  flop: { title: "Flop", caption: "Trois cartes au centre, le spot se precise." },
-  turn: { title: "Turn", caption: "La quatrieme street durcit les sizings." },
-  river: { title: "River", caption: "Derniere decision avant l'abattage." },
-  showdown: { title: "Showdown", caption: "Les mains sont retournees et le pot est pousse." },
-};
 const TABLE_DEAL_STEP_MS = 92;
 
 type PokerAction = "reveal" | "showdown" | "check" | "call" | "bet" | "raise" | "fold";
@@ -89,33 +76,6 @@ function buildAggressionPresets(state: PokerState | null, blindUnit: number) {
     .map((value) => normalizeAggressionTarget(value, minValue, maxValue, blindUnit))
     .filter((value, index, array) => value >= minValue && value <= maxValue && array.indexOf(value) === index)
     .slice(0, 5);
-}
-
-function getDecisionHeadline(state: PokerState | null) {
-  if (!state) return "Selectionne une structure puis distribue.";
-  if (state.playerFolded) return "Main couchee";
-  if (state.stage === "showdown") return "Pot resolu";
-  if (state.legalActions.includes("call")) return `Defense a ${formatCredits(state.toCall)}`;
-  if (state.legalActions.includes("raise")) return "Spot de re-raise ouvert";
-  if (state.legalActions.includes("bet")) return "Spot checke, initiative disponible";
-  if (state.legalActions.includes("check")) return "Check disponible";
-  return "Decision en cours";
-}
-
-function getDecisionCaption(state: PokerState | null) {
-  if (!state) {
-    return "Le backend gere maintenant les vrais spots par street: check, call, bet, raise et fold avec sizing.";
-  }
-  if (state.stage === "showdown") {
-    return state.message;
-  }
-  if (state.legalActions.includes("call")) {
-    return `${state.aggressorName || "La table"} ouvre l'action. Tu peux payer ${formatCredits(state.toCall)}, relancer ou jeter.`;
-  }
-  if (state.legalActions.includes("bet")) {
-    return "La table t'a checke la parole. Tu peux controler le pot ou attaquer avec un sizing reel.";
-  }
-  return state.message;
 }
 
 export default function PokerRoom({
@@ -300,6 +260,17 @@ export default function PokerRoom({
     await act(canRaise ? "raise" : "bet", normalizedBetTarget);
   }
 
+  function resetTableVisualState() {
+    clearQueuedAudio();
+    previousCardKeysRef.current = [];
+    setDealtCardDelays({});
+    setBetTarget(0);
+    if (clearDealAnimationTimeoutRef.current) {
+      window.clearTimeout(clearDealAnimationTimeoutRef.current);
+      clearDealAnimationTimeoutRef.current = null;
+    }
+  }
+
   return (
     <section className="casino-table-layout casino-table-layout--compact casino-table-layout--cards">
       <div className="casino-stage casino-stage--cards">
@@ -350,14 +321,7 @@ export default function PokerRoom({
                   className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
                   onClick={() => {
                     if (roomSwitchLocked || working) return;
-                    clearQueuedAudio();
-                    previousCardKeysRef.current = [];
-                    setDealtCardDelays({});
-                    setBetTarget(0);
-                    if (clearDealAnimationTimeoutRef.current) {
-                      window.clearTimeout(clearDealAnimationTimeoutRef.current);
-                      clearDealAnimationTimeoutRef.current = null;
-                    }
+                    resetTableVisualState();
                     setState(null);
                     setRoomId(salon.id);
                   }}
@@ -380,321 +344,49 @@ export default function PokerRoom({
           className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--poker"
           style={{ ["--room-art" as string]: `url("${pokerCaptainArt}")` }}
         >
-          <div className="casino-poker-street-rail casino-poker-street-rail--compact" aria-label="Progression de la main">
-            {STREET_ORDER.map((street, index) => {
-              const isCurrent = index === currentStreetIndex;
-              const isComplete = currentStreetIndex > index || stage === "showdown";
-              return (
-                <article
-                  key={street}
-                  className={`casino-poker-street-step ${isCurrent ? "is-current" : ""} ${isComplete ? "is-complete" : ""}`}
-                >
-                  <span>{index + 1}</span>
-                  <strong>{STREET_LABELS[street].title}</strong>
-                  <small>{STREET_LABELS[street].caption}</small>
-                </article>
-              );
-            })}
-          </div>
+          <PokerTableScene
+            state={state}
+            stage={stage}
+            playerName={playerName}
+            activeAnte={activeAnte}
+            smallBlind={smallBlind}
+            isDecisionPhase={isDecisionPhase}
+            currentStreetIndex={currentStreetIndex}
+            dealtCardDelays={dealtCardDelays}
+          />
 
-          <div className={`casino-card-felt casino-card-felt--poker casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
-            <div className={`casino-felt-table casino-felt-table--poker ${isDecisionPhase ? "is-decision-phase" : ""}`}>
-              <div className="casino-felt-table__halo" />
-
-              {(state?.aiSeats || []).map((seat, index) => {
-                const layout = POKER_SEAT_LAYOUT[index] || POKER_SEAT_LAYOUT[POKER_SEAT_LAYOUT.length - 1];
-                return (
-                  <article
-                    key={seat.id}
-                    className={`casino-oval-seat casino-oval-seat--ai casino-oval-seat--${layout.align} ${seat.isWinner ? "is-winner" : ""} ${seat.folded ? "is-folded" : ""} ${isDecisionPhase ? "is-muted" : ""}`}
-                    style={{
-                      ["--seat-x" as string]: layout.x,
-                      ["--seat-y" as string]: layout.y,
-                    }}
-                  >
-                    <span className="casino-oval-seat__tag">{layout.tag}</span>
-                    <header>
-                      <strong>{seat.name}</strong>
-                      <span className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(seat.chips)}</span>
-                    </header>
-                    <div className="casino-card-row casino-card-row--compact casino-card-row--tight">
-                      {seat.cards.length ? (
-                        seat.cards.map((card, cardIndex) => (
-                          <PiratePlayingCardView
-                            key={`${seat.id}-${card.id}-${cardIndex}`}
-                            card={card}
-                            hidden={stage !== "showdown"}
-                            dealt={Boolean(dealtCardDelays[`${seat.id}-${card.id}-${cardIndex}`] !== undefined)}
-                            dealDelayMs={dealtCardDelays[`${seat.id}-${card.id}-${cardIndex}`] || 0}
-                          />
-                        ))
-                      ) : (
-                        <div className="casino-empty-seat">En attente</div>
-                      )}
-                    </div>
-                    <p>{seat.read}</p>
-                    <small>{seat.folded ? "Seat couche" : seat.lastAction || (stage === "showdown" ? seat.hand?.label || "Lecture cachee" : "Observe le coup")}</small>
-                  </article>
-                );
-              })}
-
-              <section className={`casino-table-core casino-table-core--poker ${isDecisionPhase ? "is-focus" : ""}`}>
-                <div className="casino-table-core__headline">
-                  <strong>{stage === "idle" ? "Table au repos" : state?.stageLabel || "Street en cours"}</strong>
-                  <span className="casino-token-inline"><img src={jetonImg} alt="" />Pot {formatCredits(state?.pot || 0)}</span>
-                </div>
-                <div className="casino-chip-row">
-                  <span className="casino-chip">5-max NL</span>
-                  <span className="casino-chip">SB / BB {formatCredits(smallBlind)} / {formatCredits(activeAnte)}</span>
-                  <span className="casino-chip">{state?.playerFolded ? "Hero couche" : state?.aggressorName ? `Action de ${state.aggressorName}` : "Action checkee"}</span>
-                </div>
-                <div className="casino-poker-board">
-                  {Array.from({ length: 5 }, (_, index) => {
-                    const card = communityCards[index] || null;
-                    const cardKey = card ? `community-${card.id}-${index}` : `community-slot-${index}`;
-                    return card ? (
-                      <PiratePlayingCardView
-                        key={cardKey}
-                        card={card}
-                        dealt={Boolean(dealtCardDelays[cardKey] !== undefined)}
-                        dealDelayMs={dealtCardDelays[cardKey] || 0}
-                      />
-                    ) : (
-                      <div key={cardKey} className="pirate-card pirate-card--ghost" aria-hidden="true">
-                        <span>{index + 1}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <article className={`casino-oval-seat casino-oval-seat--player ${state?.playerFolded ? "is-folded" : ""} ${isDecisionPhase ? "is-focus" : ""}`}>
-                <div className="casino-card-seat__meta">
-                  <strong>{playerName}</strong>
-                  <span>{state?.playerFolded ? "Main couchee" : state?.playerHand?.label || (stage === "showdown" ? "Showdown" : "Decision ouverte")}</span>
-                </div>
-                <div className="casino-card-row casino-card-row--player">
-                  {state?.playerCards.length ? (
-                    state.playerCards.map((card, index) => (
-                      <PiratePlayingCardView
-                        key={`poker-player-${card.id}-${index}`}
-                        card={card}
-                        emphasis="strong"
-                        dealt={Boolean(dealtCardDelays[`poker-player-${card.id}-${index}`] !== undefined)}
-                        dealDelayMs={dealtCardDelays[`poker-player-${card.id}-${index}`] || 0}
-                      />
-                    ))
-                  ) : (
-                    <div className="casino-empty-seat">Le joueur n'a pas encore touche ses cartes.</div>
-                  )}
-                </div>
-              </article>
-            </div>
-          </div>
-
-          <div className="casino-stage-sidebar">
-            <div className={`casino-command-dock casino-command-dock--poker ${isDecisionPhase ? "is-attention" : ""}`}>
-              <div className="casino-command-dock__copy">
-                <span className="casino-chip">Tour de mise</span>
-                <strong>{getDecisionHeadline(state)}</strong>
-                <p>{getDecisionCaption(state)}</p>
-              </div>
-
-              <div className="casino-chip-row">
-                <span className="casino-chip">A payer {formatCredits(toCall)}</span>
-                <span className="casino-chip">Investi {formatCredits(playerCommitted)}</span>
-                <span className="casino-chip">{stage === "showdown" ? "Main closee" : state?.aggressorName ? `Ouverture ${state.aggressorName}` : "Spot checke"}</span>
-              </div>
-
-              {(canBet || canRaise) ? (
-                <div className="casino-poker-betbox casino-poker-betbox--dock">
-                  <div className="casino-poker-betbox__header">
-                    <div>
-                      <span className="casino-chip">{canRaise ? "Relance" : "Mise"}</span>
-                      <strong>{canRaise ? "Sizing de raise" : "Sizing d'ouverture"}</strong>
-                    </div>
-                    <b>{formatCredits(normalizedBetTarget)}</b>
-                  </div>
-                  <input
-                    className="casino-poker-betbox__slider"
-                    type="range"
-                    min={aggressionMin}
-                    max={aggressionMax}
-                    step={blindUnit}
-                    value={normalizedBetTarget}
-                    onChange={(event) => setBetTarget(Number(event.target.value))}
-                    disabled={working || !(canBet || canRaise)}
-                  />
-                  <div className="casino-bet-pills">
-                    {aggressionPresets.map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        className={`casino-bet-pill casino-bet-pill--dubloon ${normalizedBetTarget === preset ? "is-active" : ""}`}
-                        onClick={() => setBetTarget(preset)}
-                        disabled={working}
-                      >
-                        {formatCredits(preset)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="casino-command-dock__betline">
-                <div className="casino-bet-pills">
-                  {ANTE_PRESETS.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      className={`casino-bet-pill casino-bet-pill--dubloon ${ante === preset ? "is-active" : ""}`}
-                      onClick={() => setAnte(preset)}
-                      disabled={((stage !== "idle" && stage !== "showdown")) || working}
-                    >
-                      {Math.max(10, Math.round(preset / 2))}/{preset}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="casino-chip-row">
-                  <span className="casino-chip">Street {stage === "idle" ? "en attente" : STREET_LABELS[state?.stage || "preflop"].title}</span>
-                  <span className="casino-chip">Tapis hero {formatCredits(playerChips)}</span>
-                  <span className="casino-chip">Engage street {formatCredits(playerStreetCommitted)}</span>
-                </div>
-              </div>
-
-              <div className="casino-command-dock__actions">
-                <button
-                  type="button"
-                  className="casino-ghost-button casino-ghost-button--danger"
-                  onClick={() => void act("fold")}
-                  disabled={stage === "idle" || stage === "showdown" || working}
-                >
-                  Fold
-                </button>
-                <button
-                  type="button"
-                  className="casino-ghost-button casino-ghost-button--steady"
-                  onClick={() => void handleCheckOrCall()}
-                  disabled={working || (!canCheck && !canCall)}
-                >
-                  {canCheck ? "Check" : canCall ? `Call ${formatCredits(toCall)}` : "Check / Call"}
-                </button>
-                <button
-                  type="button"
-                  className="casino-primary-button casino-primary-button--cyan"
-                  onClick={() => void handleAggression()}
-                  disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
-                >
-                  {canRaise ? `Raise a ${formatCredits(normalizedBetTarget)}` : canBet ? `Bet ${formatCredits(normalizedBetTarget)}` : "Bet / Raise"}
-                </button>
-                <button
-                  type="button"
-                  className="casino-primary-button"
-                  onClick={() => void dealHand()}
-                  disabled={working || (!(stage === "idle" || stage === "showdown")) || profile.wallet.balance < ante}
-                >
-                  {stage === "idle" || stage === "showdown" ? "Distribuer une main" : "Main en cours"}
-                </button>
-              </div>
-            </div>
-
-            <PirateInspector
-              title="Capitaine de table"
-              eyebrow="Intel"
-              activeTab={infoTab}
-              onChange={(tabId) => setInfoTab(tabId as typeof infoTab)}
-              tabs={[
-                {
-                  id: "journal",
-                  label: "Journal",
-                  badge: (state?.actionLog || []).length,
-                  caption: "Historique compact des derniers mouvements.",
-                  content: (
-                    <div className="casino-rule-list">
-                      {(state?.actionLog || []).length ? (
-                        [...(state?.actionLog || [])].slice(-6).reverse().map((entry, index) => (
-                          <p key={`${entry}-${index}`}>{entry}</p>
-                        ))
-                      ) : (
-                        <p>Les actions de la main s'afficheront ici des que le coup demarre.</p>
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  id: "lecture",
-                  label: "Lecture",
-                  caption: "Infos critiques sans surcharger la table.",
-                  content: (
-                    <div className="casino-metric-list">
-                      <div>
-                        <span>Street</span>
-                        <strong>{stage === "idle" ? "En attente" : STREET_LABELS[state?.stage || "preflop"].title}</strong>
-                      </div>
-                      <div>
-                        <span>Pot courant</span>
-                        <strong>{formatCredits(state?.pot || 0)}</strong>
-                      </div>
-                      <div>
-                        <span>A payer</span>
-                        <strong>{formatCredits(toCall)}</strong>
-                      </div>
-                      <div>
-                        <span>Tapis hero</span>
-                        <strong>{formatCredits(playerChips)}</strong>
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  id: "salons",
-                  label: "Salons",
-                  badge: rooms.find((entry) => entry.id === roomId)?.playerCount || 0,
-                  caption: "Switch de table en gardant le layout compact.",
-                  content: (
-                    <div className="casino-salon-roster">
-                      {POKER_SALONS.map((salon) => {
-                        const room = rooms.find((entry) => entry.id === salon.id);
-                        return (
-                          <article key={salon.id} className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""}`}>
-                            <div>
-                              <strong>{salon.title}</strong>
-                              <span>{salon.blurb}</span>
-                            </div>
-                            <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  ),
-                },
-                {
-                  id: "joueurs",
-                  label: "Joueurs",
-                  badge: (activeRoom?.participants || []).length,
-                  caption: "Presence du salon actif.",
-                  content: (
-                    <div className="casino-prize-stack">
-                      {(activeRoom?.participants || []).length ? (
-                        activeRoom?.participants.map((participant) => (
-                          <article key={participant.userId} className="casino-prize-card">
-                            <div className="casino-prize-card__glyph">♠</div>
-                            <div>
-                              <strong>{participant.username}</strong>
-                              <span>{participant.userId === profile.user.id ? "toi" : "connecte sur le salon"}</span>
-                            </div>
-                          </article>
-                        ))
-                      ) : (
-                        <p className="casino-history-empty">Tu es seul sur ce salon pour le moment.</p>
-                      )}
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </div>
+          <PokerSidebar
+            profile={profile}
+            state={state}
+            stage={stage}
+            working={working}
+            roomId={roomId}
+            rooms={rooms}
+            infoTab={infoTab}
+            isDecisionPhase={isDecisionPhase}
+            roomSwitchLocked={roomSwitchLocked}
+            ante={ante}
+            playerChips={playerChips}
+            playerCommitted={playerCommitted}
+            playerStreetCommitted={playerStreetCommitted}
+            toCall={toCall}
+            canCheck={canCheck}
+            canCall={canCall}
+            canBet={canBet}
+            canRaise={canRaise}
+            normalizedBetTarget={normalizedBetTarget}
+            aggressionMin={aggressionMin}
+            aggressionMax={aggressionMax}
+            blindUnit={blindUnit}
+            aggressionPresets={aggressionPresets}
+            onAnteChange={setAnte}
+            onInfoTabChange={setInfoTab}
+            onBetTargetChange={setBetTarget}
+            onFold={() => void act("fold")}
+            onCheckOrCall={() => void handleCheckOrCall()}
+            onAggression={() => void handleAggression()}
+            onDeal={() => void dealHand()}
+          />
         </div>
       </div>
     </section>
