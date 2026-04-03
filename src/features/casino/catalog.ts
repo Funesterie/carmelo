@@ -124,7 +124,7 @@ export type SlotFeatureKey =
 
 export type RouletteSoundEvent =
   | { type: "enter" | "join"; roundId: number; participants: number }
-  | { type: "spin"; roundId: number; resultId: number; winningNumber: number | null };
+  | { type: "spin"; roundId: number; resultId: number; winningNumber: number | null; canonDelayMs?: number };
 
 export const SLOT_INTRO_MEDIA = {
   title: "Introduction du salon",

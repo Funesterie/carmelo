@@ -3,6 +3,7 @@ import jetonImg from "../../../images/jeton.png";
 import tapisImg from "../../../images/tapis.png";
 import { formatCredits } from "../../../lib/casinoRoomState";
 import type { RouletteRoom } from "../../../lib/casinoApi";
+import RouletteResultPreview from "./RouletteResultPreview";
 import {
   QUICK_BETS,
   ROULETTE_AMOUNT_PRESETS,
@@ -54,6 +55,8 @@ export default function RouletteGameplayDock({
   onSubmitBet,
   wheelImageSrc,
 }: RouletteGameplayDockProps) {
+  const latestResult = room?.recentResults?.[0] || null;
+
   return (
     <div className="casino-stage-sidebar casino-stage-sidebar--roulette">
       <div className="casino-command-dock casino-command-dock--roulette">
@@ -226,12 +229,22 @@ export default function RouletteGameplayDock({
             badge: room?.recentResults?.length || 0,
             caption: "Derniers numeros tombes.",
             content: (
-              <div className="casino-chip-row">
-                {(room?.recentResults || []).map((entry) => (
-                  <span key={entry.id} className={`casino-roulette-history-chip is-${entry.winningColor}`}>
-                    {entry.winningNumber}
-                  </span>
-                ))}
+              <div className="casino-roulette-history-panel">
+                {latestResult ? (
+                  <RouletteResultPreview
+                    winningNumber={latestResult.winningNumber}
+                    winningColor={latestResult.winningColor}
+                    wheelImageSrc={wheelImageSrc}
+                  />
+                ) : null}
+
+                <div className="casino-chip-row">
+                  {(room?.recentResults || []).map((entry) => (
+                    <span key={entry.id} className={`casino-roulette-history-chip is-${entry.winningColor}`}>
+                      {entry.winningNumber}
+                    </span>
+                  ))}
+                </div>
               </div>
             ),
           },

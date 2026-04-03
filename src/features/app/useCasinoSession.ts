@@ -65,6 +65,17 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timeoutId = window.setTimeout(() => {
+      setNotice((current) => (current === notice ? "" : current));
+    }, 3600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [notice]);
+
   const displayName = useMemo(() => {
     return profile?.user?.username || getCasinoDisplayName() || "Capitaine";
   }, [profile]);

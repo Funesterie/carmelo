@@ -108,7 +108,18 @@ type SpinResponse = {
   error?: string;
 };
 
-const API_BASE = String(import.meta.env.VITE_A11_API_BASE_URL || 'https://api.funesterie.pro').trim().replace(/\/$/, '');
+function getDefaultApiBase() {
+  if (typeof window !== "undefined") {
+    const host = String(window.location.hostname || "").trim().toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") {
+      return window.location.origin;
+    }
+  }
+
+  return "https://api.funesterie.pro";
+}
+
+const API_BASE = String(import.meta.env.VITE_A11_API_BASE_URL || getDefaultApiBase()).trim().replace(/\/$/, "");
 const TOKEN_KEY = 'funesterie-casino-token';
 const DISPLAY_NAME_KEY = 'funesterie-casino-display-name';
 

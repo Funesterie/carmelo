@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "playtest:smoke": "node scripts/playtest-smoke.mjs"
   },
   "dependencies": {
     "concurrently": "^9.2.1",
@@ -16,6 +17,7 @@
     "wait-on": "^9.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^25.0.9",
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",

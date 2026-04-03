@@ -17,6 +17,7 @@ type BlackjackSidebarProps = {
   roomSwitchLocked: boolean;
   onBetChange: (bet: number) => void;
   onInfoTabChange: (tab: "salons" | "regles" | "joueurs") => void;
+  onRoomChange: (roomId: string) => void;
   onHit: () => void;
   onStand: () => void;
   onDeal: () => void;
@@ -34,6 +35,7 @@ export default function BlackjackSidebar({
   roomSwitchLocked,
   onBetChange,
   onInfoTabChange,
+  onRoomChange,
   onHit,
   onStand,
   onDeal,
@@ -120,13 +122,19 @@ export default function BlackjackSidebar({
                 {BLACKJACK_SALONS.map((salon) => {
                   const room = rooms.find((entry) => entry.id === salon.id);
                   return (
-                    <article key={salon.id} className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}>
+                    <button
+                      key={salon.id}
+                      type="button"
+                      className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}
+                      onClick={() => onRoomChange(salon.id)}
+                      disabled={roomSwitchLocked || working}
+                    >
                       <div>
                         <strong>{salon.title}</strong>
                         <span>{salon.blurb}</span>
                       </div>
                       <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
-                    </article>
+                    </button>
                   );
                 })}
               </div>

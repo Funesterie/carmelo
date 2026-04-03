@@ -187,6 +187,13 @@ export default function BlackjackRoom({
     }
   }
 
+  function handleRoomChange(nextRoomId: string) {
+    if (roomSwitchLocked || working || nextRoomId === roomId) return;
+    resetTableVisualState();
+    setState(null);
+    setRoomId(nextRoomId);
+  }
+
   return (
     <section className="casino-table-layout casino-table-layout--compact casino-table-layout--cards">
       <div className="casino-stage casino-stage--cards">
@@ -226,12 +233,7 @@ export default function BlackjackRoom({
                   key={salon.id}
                   type="button"
                   className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
-                  onClick={() => {
-                    if (roomSwitchLocked || working) return;
-                    resetTableVisualState();
-                    setState(null);
-                    setRoomId(salon.id);
-                  }}
+                  onClick={() => handleRoomChange(salon.id)}
                   disabled={roomSwitchLocked || working}
                   role="tab"
                   aria-selected={salon.id === roomId}
@@ -271,6 +273,7 @@ export default function BlackjackRoom({
             roomSwitchLocked={roomSwitchLocked}
             onBetChange={setBet}
             onInfoTabChange={setInfoTab}
+            onRoomChange={handleRoomChange}
             onHit={() => void act("hit")}
             onStand={() => void act("stand")}
             onDeal={() => void startRound()}

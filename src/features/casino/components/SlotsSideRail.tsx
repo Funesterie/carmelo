@@ -59,6 +59,7 @@ export default function SlotsSideRail({
                 loop={slotIntroPlayed || isAlertFeatureActive}
                 muted={!mediaReady}
                 playsInline
+                preload="metadata"
                 poster={featureMedia.image}
                 controls={false}
                 onEnded={() => {

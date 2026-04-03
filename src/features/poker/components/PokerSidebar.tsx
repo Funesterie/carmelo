@@ -39,6 +39,7 @@ type PokerSidebarProps = {
   aggressionPresets: number[];
   onAnteChange: (ante: number) => void;
   onInfoTabChange: (tab: "journal" | "lecture" | "salons" | "joueurs") => void;
+  onRoomChange: (roomId: string) => void;
   onBetTargetChange: (value: number) => void;
   onFold: () => void;
   onCheckOrCall: () => void;
@@ -99,6 +100,7 @@ export default function PokerSidebar({
   aggressionPresets,
   onAnteChange,
   onInfoTabChange,
+  onRoomChange,
   onBetTargetChange,
   onFold,
   onCheckOrCall,
@@ -273,13 +275,19 @@ export default function PokerSidebar({
                 {POKER_SALONS.map((salon) => {
                   const room = rooms.find((entry) => entry.id === salon.id);
                   return (
-                    <article key={salon.id} className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}>
+                    <button
+                      key={salon.id}
+                      type="button"
+                      className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}
+                      onClick={() => onRoomChange(salon.id)}
+                      disabled={roomSwitchLocked || working}
+                    >
                       <div>
                         <strong>{salon.title}</strong>
                         <span>{salon.blurb}</span>
                       </div>
                       <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
-                    </article>
+                    </button>
                   );
                 })}
               </div>

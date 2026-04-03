@@ -55,14 +55,8 @@ export default function App() {
           onRegisterPasswordChange={session.setRegisterPassword}
           onRegisterPasswordConfirmChange={session.setRegisterPasswordConfirm}
           onForgotEmailChange={session.setForgotEmail}
-          onLoginSubmit={(event) => {
-            void media.requestMediaPlayback();
-            void session.handleLogin(event);
-          }}
-          onRegisterSubmit={(event) => {
-            void media.requestMediaPlayback();
-            void session.handleRegister(event);
-          }}
+          onLoginSubmit={(event) => void session.handleLogin(event)}
+          onRegisterSubmit={(event) => void session.handleRegister(event)}
           onForgotSubmit={session.handleForgot}
         />
       ) : (

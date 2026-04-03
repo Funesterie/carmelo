@@ -24,6 +24,7 @@ export const BALL_OUTER_RADIUS = 43.5;
 export const BALL_INNER_RADIUS = 33;
 export const SPIN_DURATION_MS = 4100;
 export const HOLD_DURATION_MS = 5000;
+export const ROULETTE_TIRAGE_CANNON_DELAY_MS = 1180;
 
 export type RouletteSequencePhase = "idle" | "intro" | "spin" | "hold" | "reload";
 
@@ -175,7 +176,8 @@ export async function playVideoReverse(
 
   const safeDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1.6;
   try {
-    video.currentTime = safeDuration;
+    // Start from the tail of the clip so the reload really runs end -> start.
+    video.currentTime = Math.max(0, safeDuration - 0.01);
   } catch {
     // ignore reset failures
   }

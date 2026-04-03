@@ -12,6 +12,7 @@ import {
   QUICK_BETS,
   ROULETTE_AMOUNT_PRESETS,
   ROULETTE_ORDER,
+  ROULETTE_TIRAGE_CANNON_DELAY_MS,
   SPIN_DURATION_MS,
   WHEEL_POCKET_ANGLE,
   buildSettledAnimation,
@@ -34,8 +35,8 @@ import rouletteBackdropArt from "./images/casino ats.png";
 import rouletteIdleImg from "./images/roulette.png";
 import roulettePlateauPremium from "./images/roulette-plateau-premium.png";
 import jetonImg from "./images/jeton.png";
-import rouletteCannonIntroVideo from "./videos/roulette-cannon-intro.mp4";
 import rouletteReloadVideo from "./videos/roulette-reload.mp4";
+import rouletteTirageVideo from "./videos/roulette-tirage.mp4";
 import {
   fetchRouletteRoom,
   placeRouletteBet,
@@ -306,6 +307,7 @@ export default function RouletteRoom({
         roundId: room.round.id,
         resultId: resolvedId,
         winningNumber: resolved?.winningNumber ?? null,
+        canonDelayMs: ROULETTE_TIRAGE_CANNON_DELAY_MS,
       });
       if (typeof resolved?.winningNumber === "number") {
         void runSpinSequence(resolved.winningNumber);
@@ -329,7 +331,7 @@ export default function RouletteRoom({
   }
 
   return (
-    <section className="casino-table-layout casino-table-layout--compact casino-table-layout--cards">
+    <section className="casino-table-layout casino-table-layout--compact casino-table-layout--cards casino-table-layout--roulette">
       <div className="casino-stage casino-stage--cards">
         <div className="casino-room-hud casino-room-hud--roulette">
           <div className="casino-room-hud__lead">
@@ -337,7 +339,7 @@ export default function RouletteRoom({
             <div>
               <strong>Funesterie Roulette</strong>
               <p>
-                Sequence cinematographique compacte: voix, canon, plateau pirate, bille laiton, verrouillage 5 secondes puis recharge.
+                Sequence cinematographique compacte: voix aleatoire, tir de canon synchronise, plateau pirate, bille laiton, verrouillage 5 secondes puis recharge.
               </p>
             </div>
           </div>
@@ -370,7 +372,7 @@ export default function RouletteRoom({
             latestResolved={room?.latestResolved || null}
             introVideoRef={introVideoRef}
             reloadVideoRef={reloadVideoRef}
-            introVideoSrc={rouletteCannonIntroVideo}
+            introVideoSrc={rouletteTirageVideo}
             reloadVideoSrc={rouletteReloadVideo}
             idleImageSrc={rouletteIdleImg}
           />

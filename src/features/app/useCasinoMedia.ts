@@ -5,6 +5,7 @@ import fantomeAudio from "../../audio/fantome.mp3";
 import funesterieAudio from "../../audio/funesterie.mp3";
 import moussaillonAudio from "../../audio/moussaillon.mp3";
 import type { RoomId, RouletteSoundEvent } from "../casino/catalog";
+import { ROULETTE_TIRAGE_CANNON_DELAY_MS } from "../roulette/model";
 
 function waitForMs(durationMs: number) {
   return new Promise<void>((resolve) => {
@@ -62,7 +63,17 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
   }, []);
 
   useEffect(() => {
-    if (!profileLoaded) return;
+    const unlockOnFirstGesture = () => {
+      void requestMediaPlayback();
+    };
+
+    window.addEventListener("pointerdown", unlockOnFirstGesture, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockOnFirstGesture);
+    };
+  }, []);
+
+  useEffect(() => {
     if (mediaUnlockedRef.current) {
       void syncAmbientVideo(true, activeCasinoRoom !== "slots");
     } else {
@@ -75,15 +86,6 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       }
       setAmbientVideoAudible(false);
     }
-
-    const unlockOnFirstGesture = () => {
-      void requestMediaPlayback();
-    };
-
-    window.addEventListener("pointerdown", unlockOnFirstGesture, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlockOnFirstGesture);
-    };
   }, [activeCasinoRoom, profileLoaded]);
 
   function getAudio(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string) {
@@ -234,10 +236,11 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
 
     queueRouletteAudio(async () => {
       const introVoice = Math.random() > 0.5 ? fantomeAudio : moussaillonAudio;
+      const cannonDelayMs = event.type === "spin" ? event.canonDelayMs || ROULETTE_TIRAGE_CANNON_DELAY_MS : ROULETTE_TIRAGE_CANNON_DELAY_MS;
       stopMedia(cueAudioRef.current);
       stopMedia(cannonAudioRef.current);
       await playAudioClip(cueAudioRef, introVoice, 0.74, false);
-      await waitForMs(760);
+      await waitForMs(cannonDelayMs);
       await playAudioClip(cannonAudioRef, canonAudio, 0.92, false);
     });
   }

@@ -55,6 +55,7 @@ export default function CasinoGameScreen({
             loop
             playsInline
             muted
+            preload="metadata"
           />
         </div>
       ) : null}
@@ -91,6 +92,7 @@ export default function CasinoGameScreen({
                 loop
                 playsInline
                 muted
+                preload="metadata"
               />
             </div>
           </div>
@@ -109,14 +111,21 @@ export default function CasinoGameScreen({
             className="casino-ghost-button"
             disabled={busy || !profile.wallet.canClaimDailyBonus}
             onClick={onClaimBonus}
+            title={profile.wallet.canClaimDailyBonus ? "Recuperer le bonus journalier" : "Bonus journalier deja recupere"}
           >
-            {profile.wallet.canClaimDailyBonus ? `Bonus +${profile.wallet.dailyBonusAmount}` : "Bonus deja recupere"}
+            {profile.wallet.canClaimDailyBonus ? `Bonus +${profile.wallet.dailyBonusAmount}` : "Bonus pris"}
           </button>
-          <button type="button" className="casino-ghost-button" disabled={busy} onClick={onRefreshProfile}>
-            Synchroniser
+          <button
+            type="button"
+            className="casino-ghost-button"
+            disabled={busy}
+            onClick={onRefreshProfile}
+            title="Synchroniser le compte"
+          >
+            Sync
           </button>
-          <button type="button" className="casino-ghost-button" onClick={onLogout}>
-            Deconnexion
+          <button type="button" className="casino-ghost-button" onClick={onLogout} title="Fermer la session">
+            Quitter
           </button>
           {activeCasinoRoom !== "slots" ? (
             <div className="casino-ambient-indicator" aria-live="polite">

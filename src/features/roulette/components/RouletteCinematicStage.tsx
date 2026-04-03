@@ -34,7 +34,8 @@ export default function RouletteCinematicStage({
           src={introVideoSrc}
           playsInline
           muted
-          preload="auto"
+          preload="metadata"
+          poster={idleImageSrc}
         />
 
         <div className={`casino-roulette-hero-layer ${showHero ? "is-visible" : ""}`}>
@@ -50,7 +51,8 @@ export default function RouletteCinematicStage({
           src={reloadVideoSrc}
           playsInline
           muted
-          preload="auto"
+          preload="metadata"
+          poster={idleImageSrc}
         />
 
         <div className={`casino-roulette-static ${showHero ? "is-visible" : ""}`}>
