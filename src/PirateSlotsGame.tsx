@@ -342,7 +342,7 @@ function SlotsRoom({
   }
 
   return (
-    <section className="casino-table-layout">
+    <section className="casino-table-layout casino-table-layout--slots">
       <div className="casino-stage">
         <div className="casino-status-strip">
           <article>

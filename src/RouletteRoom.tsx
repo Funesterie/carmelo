@@ -36,6 +36,7 @@ import rouletteIdleImg from "./images/roulette.png";
 import roulettePreviewImg from "./images/roulette-plateau-premium.png";
 import rouletteTurntableImg from "./images/roulette-tournante.png";
 import jetonImg from "./images/jeton.png";
+import tapisImg from "./images/tapis.png";
 import rouletteReloadVideo from "./videos/roulette-reload.mp4";
 import rouletteTirageVideo from "./videos/roulette-tirage.mp4";
 import {
@@ -173,6 +174,16 @@ export default function RouletteRoom({
         return "Veille";
     }
   }, [sequencePhase]);
+
+  const rouletteVisualAssets = useMemo(
+    () => ({
+      chip: jetonImg,
+      felt: tapisImg,
+      wheelBase: roulettePreviewImg,
+      turntable: rouletteTurntableImg,
+    }),
+    [],
+  );
 
   function cancelSpinAnimation() {
     if (animationFrameRef.current) {
@@ -392,8 +403,11 @@ export default function RouletteRoom({
           onBetChange={setSelectedBet}
           onInfoTabChange={setInfoTab}
           onSubmitBet={() => void submitBet()}
-          wheelImageSrc={rouletteTurntableImg}
-          historyPreviewImageSrc={roulettePreviewImg}
+          chipImageSrc={rouletteVisualAssets.chip}
+          feltImageSrc={rouletteVisualAssets.felt}
+          wheelBaseImageSrc={rouletteVisualAssets.wheelBase}
+          wheelTurntableImageSrc={rouletteVisualAssets.turntable}
+          historyPreviewImageSrc={rouletteVisualAssets.wheelBase}
         />
       </div>
     </section>

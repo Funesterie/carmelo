@@ -34,7 +34,9 @@ export default function CasinoFloorShell({
       >
         <div className="casino-topdeck__summary">
           <div className="casino-topdeck__lead">
-            <img className="casino-topdeck__icon" src={currentRoom.icon} alt="" aria-hidden="true" />
+            <div className="casino-topdeck__icon-wrap" aria-hidden="true">
+              <img className="casino-topdeck__icon" src={currentRoom.icon} alt="" />
+            </div>
             <div className="casino-topdeck__copy">
               <span className="casino-chip">Pont central ATS</span>
               <strong>{currentRoom.title}</strong>
@@ -55,6 +57,7 @@ export default function CasinoFloorShell({
               key={room.id}
               type="button"
               className={`casino-topdeck__tab ${room.id === activeRoom ? "is-active" : ""}`}
+              data-room-id={room.id}
               onClick={() => onRoomChange(room.id)}
               role="tab"
               aria-selected={room.id === activeRoom}
@@ -62,8 +65,10 @@ export default function CasinoFloorShell({
                 ["--tab-art" as string]: `url("${resolveRoomArtwork(room.id)}")`,
               }}
             >
-              <img className="casino-topdeck__tab-icon" src={room.icon} alt="" aria-hidden="true" />
-              <div>
+              <span className="casino-topdeck__tab-badge" aria-hidden="true">
+                <img className="casino-topdeck__tab-icon" src={room.icon} alt="" />
+              </span>
+              <div className="casino-topdeck__tab-copy">
                 <strong>{room.label}</strong>
                 <span>{room.chip}</span>
               </div>

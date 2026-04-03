@@ -40,8 +40,8 @@ export default function SlotsSideRail({
   onRequestMediaPlayback,
 }: SlotsSideRailProps) {
   return (
-    <aside className="casino-side-rail">
-      <section className="casino-panel">
+    <aside className="casino-side-rail casino-side-rail--slots">
+      <section className="casino-panel casino-panel--projector">
         <div className="casino-panel__header">
           <span className="casino-chip">Projecteur</span>
           <h3>Coup du tour</h3>
