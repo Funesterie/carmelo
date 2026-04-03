@@ -8627,3 +8627,172 @@ button {
     padding: 6px;
   }
 }
+
+/* Mobile verification pass: remove clipped content, restore readable room tabs, keep the layout scrollable. */
+@media (max-width: 780px) {
+  .casino-shell--game {
+    height: auto;
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .casino-game-shell {
+    height: auto !important;
+    max-height: none !important;
+    min-height: calc(100svh - 16px);
+    grid-template-rows: auto;
+    overflow: visible !important;
+  }
+
+  .casino-floor,
+  .casino-floor__room,
+  .casino-table-layout,
+  .casino-stage,
+  .casino-stage--cards,
+  .casino-side-rail {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0;
+    overflow: visible !important;
+  }
+
+  .casino-floor__room {
+    flex: 0 0 auto;
+  }
+
+  .casino-stage > .casino-reel-shell,
+  .casino-stage--cards > .casino-reel-shell--table-compact,
+  .casino-stage-sidebar,
+  .casino-table-layout--roulette .casino-stage-sidebar--roulette {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .casino-stage-sidebar,
+  .casino-table-layout--roulette .casino-stage-sidebar--roulette {
+    padding-right: 0;
+  }
+
+  .casino-topdeck {
+    gap: 10px;
+  }
+
+  .casino-topdeck__summary {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .casino-topdeck__tabs {
+    grid-auto-columns: minmax(124px, 74vw) !important;
+    gap: 8px;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .casino-game-shell--with-ambient .casino-topdeck__tabs {
+    display: grid !important;
+    grid-template-columns: none !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(124px, 74vw) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .casino-topdeck__tab {
+    min-height: 64px;
+    padding: 10px 12px;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    gap: 10px;
+    scroll-snap-align: start;
+  }
+
+  .casino-topdeck__tab-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .casino-topdeck__tab-copy {
+    gap: 3px;
+  }
+
+  .casino-topdeck__tab-copy strong {
+    font-size: 0.9rem;
+    line-height: 1.08;
+  }
+
+  .casino-topdeck__tab-copy span {
+    display: block;
+    font-size: 0.64rem;
+  }
+
+  .casino-topdeck__tab-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .casino-topdeck__tab[data-room-id="treasure-map"] .casino-topdeck__tab-badge {
+    width: 30px;
+    height: 30px;
+  }
+
+  .casino-topdeck__tab[data-room-id="treasure-map"] .casino-topdeck__tab-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .casino-topdeck__tab[data-room-id="slots"] .casino-topdeck__tab-badge,
+  .casino-topdeck__tab[data-room-id="treasure-hunt"] .casino-topdeck__tab-badge {
+    width: 40px;
+    height: 40px;
+  }
+
+  .casino-topdeck__tab[data-room-id="slots"] .casino-topdeck__tab-icon,
+  .casino-topdeck__tab[data-room-id="treasure-hunt"] .casino-topdeck__tab-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .casino-table-layout {
+    grid-template-rows: auto;
+    gap: 10px;
+  }
+
+  .casino-table-layout--slots {
+    gap: 10px;
+  }
+
+  .casino-table-layout--slots .casino-stage,
+  .casino-table-layout--slots .casino-side-rail--slots,
+  .casino-table-layout--roulette .casino-stage--cards {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .casino-topdeck__tabs {
+    grid-auto-columns: minmax(112px, 78vw) !important;
+  }
+
+  .casino-game-shell--with-ambient .casino-topdeck__tabs {
+    grid-template-columns: none !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(112px, 78vw) !important;
+  }
+
+  .casino-topdeck__tab {
+    min-height: 60px;
+    padding: 9px 10px;
+  }
+
+  .casino-topdeck__tab-copy strong {
+    font-size: 0.86rem;
+  }
+
+  .casino-topdeck__tab-copy span {
+    font-size: 0.6rem;
+  }
+}
