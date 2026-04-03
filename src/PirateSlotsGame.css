@@ -464,9 +464,9 @@ button {
 }
 
 .casino-game-shell {
-  width: min(1360px, 100%);
+  width: 100%;
   display: grid;
-  gap: 18px;
+  gap: 12px;
   position: relative;
 }
 
@@ -623,15 +623,15 @@ button {
   width: 100%;
   border-radius: 28px;
   background: var(--casino-panel);
-  padding: 24px 28px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 14px;
 }
 
 .casino-account-bar h1 {
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
 }
 
 .casino-account-bar__actions {
@@ -648,11 +648,11 @@ button {
 }
 
 .casino-table-layout {
-  width: min(1360px, 100%);
+  width: 100%;
   max-width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.72fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 14px;
   box-sizing: border-box;
   overflow-x: hidden;
 }
@@ -3320,7 +3320,7 @@ button {
 
 .casino-game-shell {
   min-height: calc(100svh - 32px);
-  gap: 14px;
+  gap: 10px;
 }
 
 .casino-ambient-corner {
@@ -3337,7 +3337,7 @@ button {
 }
 
 .casino-account-bar {
-  padding: 16px 18px;
+  padding: 10px 14px;
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(7, 10, 14, 0.92), rgba(17, 11, 8, 0.94)),
@@ -4536,12 +4536,12 @@ button {
 }
 
 .casino-account-bar {
-  padding: 12px 14px;
+  padding: 10px 14px;
   min-height: 0;
 }
 
 .casino-account-bar h1 {
-  font-size: clamp(1.25rem, 2.4vw, 2rem);
+  font-size: clamp(1.25rem, 2.2vw, 1.8rem);
 }
 
 .casino-floor,
@@ -4574,13 +4574,13 @@ button {
 
 .casino-topdeck {
   grid-template-columns: minmax(280px, 0.88fr) minmax(0, 1.12fr);
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 8px 10px;
 }
 
 .casino-topdeck__summary {
-  min-height: 86px;
-  padding: 10px 12px;
+  min-height: 64px;
+  padding: 8px 10px;
 }
 
 .casino-topdeck__lead {
@@ -5353,7 +5353,7 @@ button {
 }
 
 .casino-table-layout {
-  grid-template-columns: minmax(0, 1.18fr) minmax(280px, 0.82fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
   align-items: stretch;
 }
 
@@ -5516,13 +5516,13 @@ button {
 }
 
 .casino-topdeck {
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 8px 10px;
 }
 
 .casino-topdeck__summary {
-  min-height: 88px;
-  padding: 10px 12px;
+  min-height: 64px;
+  padding: 8px 10px;
 }
 
 .casino-topdeck__copy strong {
@@ -5539,13 +5539,13 @@ button {
 }
 
 .casino-topdeck__tab {
-  min-height: 70px;
-  padding: 10px 12px;
+  min-height: 52px;
+  padding: 8px 10px;
 }
 
 .casino-topdeck__tab-icon {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
 }
 
 @media (max-width: 1280px) {
@@ -5558,13 +5558,12 @@ button {
   }
 
   .casino-table-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
   }
 
   .casino-side-rail,
   .casino-stage-sidebar {
-    max-height: min(30svh, 280px);
+    max-height: none;
   }
 }
 
@@ -5589,7 +5588,7 @@ button {
 
 @media (min-width: 981px) and (max-width: 1480px) {
   .casino-topdeck {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(200px, 0.7fr) minmax(0, 1.3fr);
   }
 
   .casino-topdeck__summary {
@@ -5601,7 +5600,7 @@ button {
   }
 
   .casino-table-layout:not(.casino-table-layout--compact) {
-    grid-template-columns: minmax(0, 1.12fr) minmax(292px, 0.88fr);
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
     overflow: hidden;
   }
 
@@ -5611,7 +5610,7 @@ button {
   }
 
   .casino-stage--cards {
-    grid-template-columns: minmax(0, 1.42fr) minmax(292px, 0.78fr);
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
     grid-template-rows: auto minmax(0, 1fr);
   }
 
@@ -6136,27 +6135,27 @@ button {
 
 @media (min-width: 981px) {
   .casino-account-bar {
-    padding: 14px 18px;
-    gap: 14px;
+    padding: 10px 16px;
+    gap: 10px;
   }
 
   .casino-account-bar h1 {
-    font-size: clamp(1.65rem, 2.7vw, 2.2rem);
+    font-size: clamp(1.4rem, 2.2vw, 1.8rem);
   }
 
   .casino-topdeck {
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 6px 10px;
+    gap: 6px;
   }
 
   .casino-topdeck__summary {
-    min-height: 74px;
-    padding: 10px 12px;
+    min-height: 56px;
+    padding: 8px 10px;
   }
 
   .casino-topdeck__tab {
-    min-height: 58px;
-    padding: 8px 10px;
+    min-height: 46px;
+    padding: 6px 10px;
   }
 
   .casino-topdeck__tab-icon {
@@ -6165,7 +6164,7 @@ button {
   }
 
   .casino-room-shell--cards {
-    grid-template-columns: minmax(0, 1.52fr) minmax(320px, 0.88fr);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
   }
 
   .casino-room-hud--blackjack,
@@ -6373,12 +6372,12 @@ button {
 
 /* Roulette final pass: keep the scene and the gameplay dock clearly separated. */
 .casino-game-shell {
-  width: min(1980px, calc(100vw - 28px));
+  width: 100%;
   max-width: 100%;
 }
 
 .casino-table-layout--roulette .casino-stage--cards {
-  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
   grid-template-rows: auto minmax(0, 1fr);
 }
 
@@ -6695,7 +6694,7 @@ button {
 
 @media (min-width: 1700px) {
   .casino-game-shell {
-    width: min(2240px, calc(100vw - 34px));
+    width: 100%;
   }
 
   .casino-topdeck {
@@ -6703,11 +6702,11 @@ button {
   }
 
   .casino-table-layout {
-    grid-template-columns: minmax(0, 1.34fr) minmax(360px, 0.66fr);
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 440px);
   }
 
   .casino-table-layout--roulette .casino-stage--cards {
-    grid-template-columns: minmax(0, 1.18fr) minmax(380px, 0.82fr);
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 480px);
   }
 }
 
@@ -6886,7 +6885,7 @@ button {
 }
 
 .casino-table-layout--roulette .casino-stage--cards {
-  grid-template-columns: minmax(0, 1.15fr) minmax(350px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) minmax(350px, 440px);
 }
 
 .casino-table-layout--roulette .casino-stage-sidebar--roulette {
@@ -6986,7 +6985,7 @@ button {
   }
 
   .casino-table-layout--roulette .casino-stage--cards {
-    grid-template-columns: minmax(0, 1.04fr) minmax(308px, 0.78fr);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
     gap: 10px;
   }
 
@@ -7159,8 +7158,7 @@ button {
     padding: 24px;
   }
   
-  .casino-auth-layout,
-  .casino-table-layout {
+  .casino-auth-layout {
     max-width: 1360px;
     margin: 0 auto;
   }
@@ -7172,8 +7170,7 @@ button {
     padding: 28px;
   }
   
-  .casino-auth-layout,
-  .casino-table-layout {
+  .casino-auth-layout {
     max-width: 1600px;
     margin: 0 auto;
   }
