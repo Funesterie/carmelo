@@ -111,7 +111,14 @@ type SpinResponse = {
 function getDefaultApiBase() {
   if (typeof window !== "undefined") {
     const host = String(window.location.hostname || "").trim().toLowerCase();
-    if (host === "funesterie.pro" || host === "www.funesterie.pro") return "https://api.funesterie.pro";
+    if (
+      host === "funesterie.pro"
+      || host === "www.funesterie.pro"
+      || host === "casino.funesterie.pro"
+      || host.endsWith(".funesterie.pro")
+    ) {
+      return "https://api.funesterie.pro";
+    }
     return window.location.origin;
   }
 
