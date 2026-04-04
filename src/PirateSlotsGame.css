@@ -2138,14 +2138,20 @@ button {
 }
 
 .casino-map-marker.is-winning {
+  z-index: 2;
+  width: clamp(88px, 10vw, 128px);
+  height: clamp(88px, 10vw, 128px);
   background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    0 0 0 6px rgba(255, 200, 87, 0.16),
+    0 0 24px rgba(255, 200, 87, 0.34);
 }
 
 .casino-map-marker.is-winning img {
-  width: 64%;
-  height: 64%;
+  width: 84%;
+  height: 84%;
   object-fit: contain;
-  filter: drop-shadow(0 0 10px rgba(255, 200, 87, 0.62));
+  filter: drop-shadow(0 0 16px rgba(255, 200, 87, 0.72));
 }
 
 .casino-table-layout--map-compact .casino-map-board__frame {
@@ -2157,6 +2163,11 @@ button {
 .casino-table-layout--map-compact .casino-map-marker {
   width: clamp(34px, 4vw, 46px);
   height: clamp(34px, 4vw, 46px);
+}
+
+.casino-table-layout--map-compact .casino-map-marker.is-winning {
+  width: clamp(74px, 8vw, 108px);
+  height: clamp(74px, 8vw, 108px);
 }
 
 .casino-table-layout--map-compact .casino-map-marker span {
@@ -13831,6 +13842,34 @@ button {
   .casino-stage-sidebar--cards-sheet .casino-bet-pills {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
+}
+
+/* Final slots controls centering pass */
+.casino-table-layout--slots .casino-controls {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.casino-table-layout--slots .casino-bet-controls,
+.casino-table-layout--slots .casino-action-row__buttons {
+  width: min(100%, 340px);
+  margin-inline: auto;
+}
+
+.casino-table-layout--slots .casino-bet-controls {
+  display: grid;
+  justify-items: center;
+}
+
+.casino-table-layout--slots .casino-bet-pills {
+  width: 100%;
+  justify-content: center;
+  margin-inline: auto;
+}
+
+.casino-table-layout--slots .casino-action-row__buttons {
+  justify-content: center;
 }
 
 /* ===== Phone landscape fit pass: keep everything on screen without touching portrait ===== */

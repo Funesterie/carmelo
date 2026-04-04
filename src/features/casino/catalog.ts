@@ -36,7 +36,7 @@ import spartaVideo from "../../videos/sparta.mp4";
 import type { CasinoSpin } from "../../lib/casinoApi";
 import { formatCredits } from "../../lib/casinoRoomState";
 
-export const BET_PRESETS = [20, 50, 100, 200, 500];
+export const BET_PRESETS = [20, 50, 100, 200];
 export const SPIN_ANIMATION_STEPS = 11;
 export const SPIN_ANIMATION_INTERVAL_MS = 95;
 export const SLOT_VIDEO_INTRO_SESSION_KEY = "funesterie-slots-intro-played";

@@ -795,8 +795,6 @@ export default function RouletteRoom({
               </div>
             </div>
 
-            <strong>{rouletteRoomMeta?.title || "Roulette multijoueur"}</strong>
-
             {showRoomInfo ? (
               <article className="casino-topdeck__info-panel" aria-label="Informations roulette">
                 <div className="casino-topdeck__info-buttons" role="tablist" aria-label="Sections roulette">
