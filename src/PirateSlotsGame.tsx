@@ -37,6 +37,8 @@ import { formatCredits } from "./lib/casinoRoomState";
 import {
   spinCasinoSlots,
   type CasinoProfile,
+  type CasinoSpinBonus,
+  type CasinoSpinBonusStage,
   type CasinoSpin,
 } from "./lib/casinoApi";
 
@@ -59,6 +61,14 @@ function SlotsRoom({
   onError,
   onRequestMediaPlayback,
 }: PirateSlotsGameProps) {
+  type PendingBonusFlow = {
+    feature: SlotFeatureKey;
+    holdDurationMs: number;
+    stageDurationMs: number;
+    stages: CasinoSpinBonusStage[];
+    totalStages: number;
+  };
+
   const [bet, setBet] = useState(() => Math.max(profile.wallet.minBet, BET_PRESETS[1]));
   const [displayGrid, setDisplayGrid] = useState<string[][]>(() => buildPlaceholderGrid());
   const [spinState, setSpinState] = useState<"idle" | "spinning" | "bonus">("idle");
@@ -77,6 +87,7 @@ function SlotsRoom({
   const [goldRain, setGoldRain] = useState<
     Array<{ id: string; left: string; delay: string; duration: string; scale: string; drift: string }>
   >([]);
+  const [pendingBonusFlow, setPendingBonusFlow] = useState<PendingBonusFlow | null>(null);
   const [autoSpinCount, setAutoSpinCount] = useState(0);
   const [autoSpinPreset, setAutoSpinPreset] = useState(10);
   const intervalRef = useRef<number | null>(null);
@@ -111,7 +122,7 @@ function SlotsRoom({
     return new Set(lastSpin.wins.flatMap((entry) => entry.indexes));
   }, [lastSpin]);
 
-  const canSpin = spinState === "idle" && !busy && profile.wallet.balance >= bet;
+  const canSpin = spinState !== "spinning" && !busy && profile.wallet.balance >= bet;
 
   const netChangeTone = useMemo(() => {
     if (!lastSpin) return "neutral";
@@ -127,6 +138,7 @@ function SlotsRoom({
       displayGrid.map((row) => row[columnIndex]),
     );
   }, [displayGrid]);
+  const autoSpinActive = autoSpinCount > 0;
   const isAlertFeatureActive = activeFeature !== "idle";
   const featureMedia = isAlertFeatureActive
     ? SLOT_FEATURE_MEDIA[activeFeature]
@@ -143,6 +155,26 @@ function SlotsRoom({
     video.volume = shouldUseAudio ? volume : 0;
     void video.play().catch(() => undefined);
   }, [featureMedia.video, isAlertFeatureActive, mediaReady, slotIntroPlayed]);
+
+  useEffect(() => {
+    if (!autoSpinActive || spinState !== "idle" || busy) return;
+    if (profile.wallet.balance < bet) {
+      setAutoSpinCount(0);
+      return;
+    }
+
+    autoSpinTimeoutRef.current = window.setTimeout(() => {
+      setAutoSpinCount((current) => Math.max(0, current - 1));
+      void handleSpin();
+    }, 680);
+
+    return () => {
+      if (autoSpinTimeoutRef.current) {
+        window.clearTimeout(autoSpinTimeoutRef.current);
+        autoSpinTimeoutRef.current = null;
+      }
+    };
+  }, [autoSpinActive, bet, busy, profile.wallet.balance, spinState]);
 
   function markSlotsIntroPlayed() {
     setSlotIntroPlayed((current) => {
@@ -211,44 +243,116 @@ function SlotsRoom({
     }
   }
 
+  function getBonusFeatureKey(feature: CasinoSpinBonus["feature"]): SlotFeatureKey {
+    switch (feature) {
+      case "joker_cross":
+        return "joker-cross";
+      case "joker_full":
+        return "joker-full";
+      default:
+        return "joker-line";
+    }
+  }
+
   async function animateResolvedSpin(result: Awaited<ReturnType<typeof spinCasinoSlots>>, runId: number) {
     const bonus = result.spin.bonus;
 
     if (bonus?.triggered) {
-      setSpinState("bonus");
       setDisplayGrid(bonus.openingGrid);
       setBonusHeldIndexes(getJokerIndexes(bonus.openingGrid));
-      setLastMessage(getBonusNarration(result.spin));
-      await waitForMs(bonus.holdDurationMs);
-
-      if (spinRunIdRef.current !== runId) return;
-
-      for (const stage of bonus.stages) {
-        setDisplayGrid(stage.grid);
-        setBonusHeldIndexes(stage.heldIndexes);
-        setLastMessage(
-          bonus.fullJoker && stage === bonus.stages[bonus.stages.length - 1]
-            ? "Full joker en approche. Les jokers tiennent toute la grille."
-            : `Phase bonus joker ${stage.step}/${bonus.stages.length} · ${stage.jokerCount} jokers figes.`,
-        );
-        await waitForMs(bonus.stageDurationMs);
-        if (spinRunIdRef.current !== runId) return;
+      setLastSpin(result.spin);
+      triggerSlotFeedback(result.spin);
+      triggerGoldRain(result.spin);
+      setPendingBonusFlow({
+        feature: getBonusFeatureKey(bonus.feature),
+        holdDurationMs: bonus.holdDurationMs,
+        stageDurationMs: bonus.stageDurationMs,
+        stages: bonus.stages,
+        totalStages: bonus.stages.length,
+      });
+      setAutoSpinCount(0);
+      if (autoSpinTimeoutRef.current) {
+        window.clearTimeout(autoSpinTimeoutRef.current);
+        autoSpinTimeoutRef.current = null;
       }
-    } else {
-      setBonusHeldIndexes([]);
-      setDisplayGrid(result.spin.grid);
+      const bonusMessage =
+        bonus.trigger === "joker_count"
+          ? "Bonus joker arme. Relance la machine pour declencher chaque coup bonus."
+          : "Alignement joker detecte. Relance manuellement pour derouler le bonus.";
+      setLastMessage(bonusMessage);
+      onProfileChange(result.profile, bonusMessage);
+      await waitForMs(Math.min(1800, Math.max(480, bonus.holdDurationMs || 0)));
+      if (spinRunIdRef.current !== runId) return;
+      setSpinState(bonus.stages.length ? "bonus" : "idle");
+      return;
     }
 
     if (spinRunIdRef.current !== runId) return;
 
     setDisplayGrid(result.spin.grid);
-    setBonusHeldIndexes(result.spin.bonus ? getJokerIndexes(result.spin.grid) : []);
+    setBonusHeldIndexes([]);
     setLastSpin(result.spin);
     triggerSlotFeedback(result.spin);
     triggerGoldRain(result.spin);
     setSpinState("idle");
     setLastMessage(getBonusNarration(result.spin));
     onProfileChange(result.profile);
+  }
+
+  async function playPendingBonusStage(runId: number) {
+    const bonusFlow = pendingBonusFlow;
+    if (!bonusFlow?.stages.length) {
+      setPendingBonusFlow(null);
+      setSpinState("idle");
+      return;
+    }
+
+    const [stage, ...restStages] = bonusFlow.stages;
+    let step = 0;
+    intervalRef.current = window.setInterval(() => {
+      step += 1;
+      setDisplayGrid(buildPlaceholderGrid(lastSpin?.rowCount || 3, lastSpin?.reelCount || 5));
+      if (step >= SPIN_ANIMATION_STEPS && intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }, SPIN_ANIMATION_INTERVAL_MS);
+
+    await waitForMs(Math.max(SPIN_ANIMATION_INTERVAL_MS * (SPIN_ANIMATION_STEPS + 1), bonusFlow.stageDurationMs || 0));
+    if (spinRunIdRef.current !== runId) return;
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    setDisplayGrid(stage.grid);
+    setBonusHeldIndexes(stage.heldIndexes.length ? stage.heldIndexes : getJokerIndexes(stage.grid));
+    setActiveFeature(bonusFlow.feature);
+
+    if (featureTimeoutRef.current) {
+      window.clearTimeout(featureTimeoutRef.current);
+      featureTimeoutRef.current = null;
+    }
+    featureTimeoutRef.current = window.setTimeout(() => {
+      setActiveFeature("idle");
+      featureTimeoutRef.current = null;
+    }, 5200);
+
+    const nextStageNumber = bonusFlow.totalStages - restStages.length;
+    setPendingBonusFlow(
+      restStages.length
+        ? {
+            ...bonusFlow,
+            stages: restStages,
+          }
+        : null,
+    );
+    setSpinState(restStages.length ? "bonus" : "idle");
+    setLastMessage(
+      restStages.length
+        ? `Bonus joker ${nextStageNumber}/${bonusFlow.totalStages}. Relance pour la prochaine vollee.`
+        : "Bonus joker resolu. Les gains sont verrouilles sur ton coffre.",
+    );
   }
 
   async function handleSpin() {
@@ -258,11 +362,17 @@ function SlotsRoom({
     const runId = spinRunIdRef.current;
     setSpinState("spinning");
     setGoldRain([]);
-    setBonusHeldIndexes([]);
     setActiveFeature("idle");
-    setLastMessage("Les tambours roulent...");
+    setLastMessage(pendingBonusFlow ? "La vollee bonus se prepare..." : "Les tambours roulent...");
 
     try {
+      if (pendingBonusFlow?.stages.length) {
+        await playPendingBonusStage(runId);
+        return;
+      }
+
+      setPendingBonusFlow(null);
+      setBonusHeldIndexes([]);
       const result = await spinCasinoSlots(bet);
       let step = 0;
       intervalRef.current = window.setInterval(() => {
@@ -283,30 +393,15 @@ function SlotsRoom({
       await animateResolvedSpin(result, runId);
     } catch (error_) {
       setSpinState("idle");
+      setAutoSpinCount(0);
       onError(error_ instanceof Error ? error_.message : "Le spin a echoue.");
     }
   }
 
   function startAutoSpin(count: number) {
-    if (!canSpin) return;
+    if (!canSpin || spinState !== "idle" || pendingBonusFlow) return;
     setAutoSpinCount(count);
-    
-    async function doAutoSpin(remaining: number) {
-      if (remaining <= 0) {
-        setAutoSpinCount(0);
-        return;
-      }
-      
-      await handleSpin();
-      setAutoSpinCount(remaining - 1);
-      
-      // Schedule next spin with a small delay
-      autoSpinTimeoutRef.current = window.setTimeout(() => {
-        doAutoSpin(remaining - 1);
-      }, 800);
-    }
-    
-    doAutoSpin(count);
+    setLastMessage(`Auto spin arme: ${count} tours en attente.`);
   }
 
   function stopAutoSpin() {
@@ -419,7 +514,7 @@ function SlotsRoom({
                 type="button"
                 className="casino-ghost-button"
                 onClick={() => adjustBet(-1)}
-                disabled={spinState === "spinning"}
+                disabled={spinState === "spinning" || Boolean(pendingBonusFlow)}
               >
                 - Miser
               </button>
@@ -429,7 +524,7 @@ function SlotsRoom({
                     key={preset}
                     type="button"
                     className={`casino-bet-pill ${bet === preset ? "is-active" : ""}`}
-                    disabled={spinState === "spinning" || preset < profile.wallet.minBet || preset > profile.wallet.maxBet}
+                    disabled={spinState === "spinning" || Boolean(pendingBonusFlow) || preset < profile.wallet.minBet || preset > profile.wallet.maxBet}
                     onClick={() => setBet(preset)}
                   >
                     {preset}
@@ -440,7 +535,7 @@ function SlotsRoom({
                 type="button"
                 className="casino-ghost-button"
                 onClick={() => adjustBet(1)}
-                disabled={spinState === "spinning"}
+                disabled={spinState === "spinning" || Boolean(pendingBonusFlow)}
               >
                 Miser +
               </button>
@@ -451,18 +546,17 @@ function SlotsRoom({
                 type="button"
                 className={`casino-ghost-button ${tightReels ? "is-active" : ""}`}
                 onClick={() => setTightReels((current) => !current)}
-                disabled={spinState === "spinning" || spinState === "bonus"}
+                disabled={spinState === "spinning" || Boolean(pendingBonusFlow)}
               >
                 {tightReels ? "Rouleaux serres" : "Rouleaux ouverts"}
               </button>
               
-              {autoSpinCount > 0 ? (
+              {autoSpinActive ? (
                 <>
                   <button
                     type="button"
                     className="casino-primary-button casino-primary-button--auto-spin"
-                    onClick={() => startAutoSpin(autoSpinPreset)}
-                    disabled={!canSpin}
+                    disabled
                   >
                     Auto Spin: {autoSpinCount} restants
                   </button>
@@ -482,13 +576,13 @@ function SlotsRoom({
                     onClick={handleSpin}
                     disabled={!canSpin}
                   >
-                    {spinState === "spinning" ? "Reels en cours..." : spinState === "bonus" ? "Bonus joker..." : "Lancer le spin"}
+                    {spinState === "spinning" ? "Reels en cours..." : "Lancer le spin"}
                   </button>
                   <button
                     type="button"
                     className="casino-ghost-button"
                     onClick={() => startAutoSpin(autoSpinPreset)}
-                    disabled={!canSpin}
+                    disabled={!canSpin || spinState !== "idle" || Boolean(pendingBonusFlow)}
                   >
                     Auto Spin x{autoSpinPreset}
                   </button>
@@ -496,7 +590,7 @@ function SlotsRoom({
                     className="casino-auto-spin-select"
                     value={autoSpinPreset}
                     onChange={(e) => setAutoSpinPreset(Number(e.target.value))}
-                    disabled={spinState === "spinning" || spinState === "bonus"}
+                    disabled={spinState !== "idle" || Boolean(pendingBonusFlow)}
                   >
                     <option value={5}>5 spins</option>
                     <option value={10}>10 spins</option>
