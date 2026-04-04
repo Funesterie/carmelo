@@ -14,6 +14,7 @@ type BlackjackTableSceneProps = {
   bet: number;
   isDecisionPhase: boolean;
   dealtCardDelays: Record<string, number>;
+  resultFlash: { label: string; tone: "win" | "lose" } | null;
 };
 
 export default function BlackjackTableScene({
@@ -22,12 +23,19 @@ export default function BlackjackTableScene({
   bet,
   isDecisionPhase,
   dealtCardDelays,
+  resultFlash,
 }: BlackjackTableSceneProps) {
   void playerName;
   void bet;
   return (
     <div className={`casino-card-felt casino-card-felt--blackjack casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
       <div className={`casino-felt-table casino-felt-table--blackjack ${isDecisionPhase ? "is-decision-phase" : ""}`}>
+        {resultFlash ? (
+          <div className={`casino-blackjack-result-flash is-${resultFlash.tone}`} aria-live="polite">
+            <strong>{resultFlash.label}</strong>
+          </div>
+        ) : null}
+
         <section className="casino-blackjack-dealer-rail">
           <div className="casino-card-row casino-card-row--dealer casino-card-row--fan casino-card-row--fan-dealer">
             {(state?.dealerCards || []).length ? (

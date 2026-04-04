@@ -194,6 +194,10 @@ function SlotsRoom({
     }
 
     const handleEnded = () => {
+      if (isAlertFeatureActive) {
+        setActiveFeature("idle");
+        return;
+      }
       if (!isAlertFeatureActive && !slotIntroPlayed) {
         markSlotsIntroPlayed();
       }

@@ -4030,6 +4030,62 @@ button {
     0 0 32px rgba(25, 215, 230, 0.06);
 }
 
+.casino-blackjack-result-flash {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  min-width: 160px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: casinoBlackjackResultFlash 1.8s ease forwards;
+}
+
+.casino-blackjack-result-flash strong {
+  display: block;
+  font-family: "Cinzel", serif;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  letter-spacing: 0.06em;
+}
+
+.casino-blackjack-result-flash.is-win {
+  border: 1px solid rgba(121, 213, 142, 0.42);
+  background:
+    linear-gradient(180deg, rgba(16, 46, 34, 0.9), rgba(8, 24, 18, 0.94));
+  color: #bff5ca;
+}
+
+.casino-blackjack-result-flash.is-lose {
+  border: 1px solid rgba(255, 124, 112, 0.38);
+  background:
+    linear-gradient(180deg, rgba(56, 18, 18, 0.9), rgba(24, 10, 10, 0.94));
+  color: #ffd0ca;
+}
+
+@keyframes casinoBlackjackResultFlash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.86);
+  }
+
+  12%,
+  72% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+
 .casino-felt-table--poker {
   background:
     radial-gradient(circle at 50% 48%, rgba(25, 215, 230, 0.06), transparent 30%),

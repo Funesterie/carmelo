@@ -19,6 +19,7 @@ import { BLACKJACK_SALONS } from "./lib/tableSalons";
 const PLAYER_BETS = [50, 100, 200, 400];
 const TABLE_DEAL_STEP_MS = 96;
 const LIVE_MIN_PLAYERS = 2;
+const BLACKJACK_RESULT_FLASH_MS = 1800;
 type BlackjackPlayMode = "solo" | "live";
 
 function getBlackjackCardKeys(state: BlackjackState | null) {
@@ -67,8 +68,11 @@ export default function BlackjackRoom({
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [activeHeaderInfo, setActiveHeaderInfo] = useState<"table" | "mise" | "live">("table");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
+  const [resultFlash, setResultFlash] = useState<{ label: string; tone: "win" | "lose" } | null>(null);
   const previousCardKeysRef = useRef<string[]>([]);
+  const previousStageRef = useRef<string>("idle");
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
+  const clearResultFlashTimeoutRef = useRef<number | null>(null);
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
 
   const displayState = useMemo<BlackjackState | null>(() => {
@@ -120,8 +124,41 @@ export default function BlackjackRoom({
       if (clearDealAnimationTimeoutRef.current) {
         window.clearTimeout(clearDealAnimationTimeoutRef.current);
       }
+      if (clearResultFlashTimeoutRef.current) {
+        window.clearTimeout(clearResultFlashTimeoutRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    const previousStage = previousStageRef.current;
+    previousStageRef.current = stage;
+
+    if (stage !== "resolved" || previousStage === "resolved") {
+      return;
+    }
+
+    const nextFlash =
+      lastDelta > 0
+        ? { label: `+${formatCredits(lastDelta)}`, tone: "win" as const }
+        : lastDelta < 0
+          ? { label: "LOSE", tone: "lose" as const }
+          : null;
+
+    if (!nextFlash) {
+      setResultFlash(null);
+      return;
+    }
+
+    setResultFlash(nextFlash);
+    if (clearResultFlashTimeoutRef.current) {
+      window.clearTimeout(clearResultFlashTimeoutRef.current);
+    }
+    clearResultFlashTimeoutRef.current = window.setTimeout(() => {
+      setResultFlash(null);
+      clearResultFlashTimeoutRef.current = null;
+    }, BLACKJACK_RESULT_FLASH_MS);
+  }, [lastDelta, stage]);
 
   useEffect(() => {
     const currentCardKeys = getBlackjackCardKeys(displayState);
@@ -206,9 +243,14 @@ export default function BlackjackRoom({
     clearQueuedAudio();
     previousCardKeysRef.current = [];
     setDealtCardDelays({});
+    setResultFlash(null);
     if (clearDealAnimationTimeoutRef.current) {
       window.clearTimeout(clearDealAnimationTimeoutRef.current);
       clearDealAnimationTimeoutRef.current = null;
+    }
+    if (clearResultFlashTimeoutRef.current) {
+      window.clearTimeout(clearResultFlashTimeoutRef.current);
+      clearResultFlashTimeoutRef.current = null;
     }
   }
 
@@ -370,6 +412,7 @@ export default function BlackjackRoom({
               bet={bet}
               isDecisionPhase={isDecisionPhase}
               dealtCardDelays={dealtCardDelays}
+              resultFlash={resultFlash}
             />
 
             <BlackjackSidebar

@@ -265,7 +265,7 @@ export default function MiniTreasureGame({
                         ) : (
                           <div className="casino-boat-tile__miss">
                             <span>💥</span>
-                            <strong>Eau vide</strong>
+                            <strong>Rate</strong>
                           </div>
                         )}
                       </button>
