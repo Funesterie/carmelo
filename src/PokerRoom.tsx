@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTableAudio } from "./audio/useTableAudio";
 import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import PokerSidebar from "./features/poker/components/PokerSidebar";
@@ -96,6 +96,13 @@ export default function PokerRoom({
   const [activeHeaderInfo, setActiveHeaderInfo] = useState<"structure" | "mises" | "live">("structure");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const [betTarget, setBetTarget] = useState(0);
+  const displayState = useMemo<PokerState | null>(() => {
+    if (!state) return null;
+    return {
+      ...state,
+      aiSeats: [],
+    };
+  }, [state]);
 
   const previousCardKeysRef = useRef<string[]>([]);
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
@@ -158,7 +165,7 @@ export default function PokerRoom({
   }, []);
 
   useEffect(() => {
-    const currentCardKeys = getPokerCardKeys(state);
+    const currentCardKeys = getPokerCardKeys(displayState);
     const previousCardKeys = new Set(previousCardKeysRef.current);
     const nextFreshKeys = currentCardKeys.filter((key) => !previousCardKeys.has(key));
     previousCardKeysRef.current = currentCardKeys;
@@ -187,7 +194,7 @@ export default function PokerRoom({
       });
       clearDealAnimationTimeoutRef.current = null;
     }, 1100 + nextFreshKeys.length * TABLE_DEAL_STEP_MS);
-  }, [playCardBurst, state]);
+  }, [displayState, playCardBurst]);
 
   useEffect(() => {
     if (!(canBet || canRaise)) {
@@ -317,7 +324,7 @@ export default function PokerRoom({
                 </div>
                 <strong>{pokerRoomMeta?.title || "Texas hold'em rapide"}</strong>
                 <p>
-                  {state?.message || "Table pirate premium plus sobre, plus tendue, avec vraies decisions de cash game par street."}
+                  {state?.message || "Table live plus sobre, plus tendue, sans bots ajoutes cote front sur le tapis."}
                   {" "}
                   {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
                 </p>
@@ -360,7 +367,7 @@ export default function PokerRoom({
                     <div className="casino-rule-list">
                       <p>Texas hold'em rapide avec preflop, flop, turn, river et showdown.</p>
                       <p>Le backend gere les vraies decisions de check, call, bet, raise et fold.</p>
-                      <p>Le journal detaille et la lecture du spot restent disponibles dans le dock de table.</p>
+                      <p>Le journal detaille et la lecture du spot restent disponibles dans le dock de table, sans rajout visuel de bots cote front.</p>
                     </div>
                   ) : null}
                   {activeHeaderInfo === "mises" ? (
@@ -420,7 +427,7 @@ export default function PokerRoom({
 
           <div className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--poker">
             <PokerTableScene
-              state={state}
+              state={displayState}
               stage={stage}
               playerName={playerName}
               activeAnte={activeAnte}

@@ -115,6 +115,8 @@ export default function App() {
                   busy={session.busy}
                   mediaReady={media.mediaReady}
                   immersionActive={media.showImmersion}
+                  connectionImmersionPending={Boolean(session.pendingImmersionName) || media.showImmersion}
+                  slotsIntroDelayActive={media.slotsIntroDelayActive}
                   ambientVideoAudible={media.ambientVideoAudible}
                   ambientVideoRef={media.ambientVideoRef}
                   freshVideo={freshVideo}

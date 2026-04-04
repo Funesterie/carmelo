@@ -37,12 +37,14 @@ type UseCasinoMediaOptions = {
 };
 
 const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
+const SLOT_ONE_START_DELAY_MS = 15_000;
 
 export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMediaOptions) {
   const [showImmersion, setShowImmersion] = useState(false);
   const [immersionLine, setImmersionLine] = useState("Ouverture du pont prive...");
   const [ambientVideoAudible, setAmbientVideoAudible] = useState(false);
   const [mediaReady, setMediaReady] = useState(false);
+  const [slotsIntroDelayActive, setSlotsIntroDelayActive] = useState(false);
 
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
   const cueAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -50,7 +52,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
   const rouletteAmbientAudioRef = useRef<HTMLAudioElement | null>(null);
   const ambientVideoRef = useRef<HTMLVideoElement | null>(null);
   const introHideTimeoutRef = useRef<number | null>(null);
-  const introStopTimeoutRef = useRef<number | null>(null);
+  const slotsIntroDelayTimeoutRef = useRef<number | null>(null);
   const mediaUnlockedRef = useRef(false);
   const rouletteQueueRef = useRef(Promise.resolve());
   const rouletteEntryPlayedRef = useRef(false);
@@ -69,8 +71,9 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     immersionLine,
     ambientVideoAudible,
     mediaReady,
+    slotsIntroDelayActive,
     ambientVideoRef,
-  }), [ambientVideoAudible, immersionLine, mediaReady, showImmersion]);
+  }), [ambientVideoAudible, immersionLine, mediaReady, showImmersion, slotsIntroDelayActive]);
 
   const shouldPlayHeaderVideo = profileLoaded && activeCasinoRoom !== "slots";
 
@@ -157,10 +160,28 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       window.clearTimeout(introHideTimeoutRef.current);
       introHideTimeoutRef.current = null;
     }
-    if (introStopTimeoutRef.current) {
-      window.clearTimeout(introStopTimeoutRef.current);
-      introStopTimeoutRef.current = null;
+    if (slotsIntroDelayTimeoutRef.current) {
+      window.clearTimeout(slotsIntroDelayTimeoutRef.current);
+      slotsIntroDelayTimeoutRef.current = null;
     }
+  }
+
+  function scheduleSlotsIntroDelay() {
+    if (!mediaUnlockedRef.current) {
+      setSlotsIntroDelayActive(false);
+      return;
+    }
+
+    if (slotsIntroDelayTimeoutRef.current) {
+      window.clearTimeout(slotsIntroDelayTimeoutRef.current);
+      slotsIntroDelayTimeoutRef.current = null;
+    }
+
+    setSlotsIntroDelayActive(true);
+    slotsIntroDelayTimeoutRef.current = window.setTimeout(() => {
+      setSlotsIntroDelayActive(false);
+      slotsIntroDelayTimeoutRef.current = null;
+    }, SLOT_ONE_START_DELAY_MS);
   }
 
   async function playAudioClip(
@@ -261,12 +282,14 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
 
   async function startConnectionImmersion(playerName: string) {
     clearImmersionTimers();
+    setSlotsIntroDelayActive(false);
     setImmersionLine(`Pont prive en preparation pour ${playerName || "le capitaine"}...`);
     setShowImmersion(true);
     await syncAmbientVideo(mediaUnlockedRef.current, shouldPlayHeaderVideo);
     if (mediaUnlockedRef.current && !immersionAudioPlayedRef.current) {
       const didPlay = await playAudioClip(introAudioRef, funesterieAudio, 0.56);
       if (didPlay) {
+        scheduleSlotsIntroDelay();
         immersionAudioPlayedRef.current = true;
         try {
           sessionStorage.setItem(CASINO_IMMERSION_AUDIO_SESSION_KEY, "1");
@@ -280,13 +303,6 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       setShowImmersion(false);
       introHideTimeoutRef.current = null;
     }, 5200);
-
-    introStopTimeoutRef.current = window.setTimeout(() => {
-      if (introAudioRef.current) {
-        introAudioRef.current.pause();
-      }
-      introStopTimeoutRef.current = null;
-    }, 7600);
   }
 
   function queueRouletteAudio(task: () => Promise<void>) {
@@ -329,6 +345,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     setShowImmersion(false);
     setAmbientVideoAudible(false);
     setMediaReady(false);
+    setSlotsIntroDelayActive(false);
     mediaUnlockedRef.current = false;
     stopMedia(introAudioRef.current);
     stopMedia(cueAudioRef.current);

@@ -25,6 +25,7 @@ import {
   formatTransactionTime,
   getBonusNarration,
   getJokerIndexes,
+  getSlotGridSymbolAtIndex,
   resolveRoomArtwork,
   waitForMs,
   type RoomId,
@@ -49,6 +50,8 @@ type PirateSlotsGameProps = {
   busy: boolean;
   mediaReady: boolean;
   immersionActive: boolean;
+  connectionImmersionPending?: boolean;
+  slotsIntroDelayActive?: boolean;
   ambientVideoAudible: boolean;
   ambientVideoRef: MutableRefObject<HTMLVideoElement | null>;
   freshVideo: string;
@@ -69,6 +72,8 @@ function SlotsRoom({
   busy,
   mediaReady,
   immersionActive,
+  connectionImmersionPending,
+  slotsIntroDelayActive,
   ambientVideoRef,
   onProfileChange,
   onError,
@@ -135,6 +140,21 @@ function SlotsRoom({
     }, []);
     return new Set(flattenedIndexes);
   }, [lastSpin]);
+  const highlightedWildIndexes = useMemo(() => {
+    const wildIndexes = new Set<number>();
+    if (!lastSpin?.wins?.length) return wildIndexes;
+
+    lastSpin.wins.forEach((entry) => {
+      if (entry.symbol === "JOKER") return;
+      entry.indexes.forEach((index) => {
+        if (getSlotGridSymbolAtIndex(lastSpin.grid, lastSpin.reelCount, index) === "JOKER") {
+          wildIndexes.add(index);
+        }
+      });
+    });
+
+    return wildIndexes;
+  }, [lastSpin]);
 
   const canSpin = spinState !== "spinning" && !busy && profile.wallet.balance >= bet;
 
@@ -180,7 +200,7 @@ function SlotsRoom({
     };
     video.addEventListener("ended", handleEnded);
 
-    if (immersionActive) {
+    if (connectionImmersionPending || slotsIntroDelayActive || immersionActive) {
       video.pause();
       if (!slotIntroPlayed) {
         try {
@@ -202,7 +222,7 @@ function SlotsRoom({
     return () => {
       video.removeEventListener("ended", handleEnded);
     };
-  }, [featureMedia.image, featureMedia.video, immersionActive, isAlertFeatureActive, mediaReady, slotIntroPlayed]);
+  }, [connectionImmersionPending, featureMedia.image, featureMedia.video, immersionActive, isAlertFeatureActive, mediaReady, slotIntroPlayed, slotsIntroDelayActive]);
 
   useEffect(() => {
     if (!autoSpinActive || spinState !== "idle" || busy) return;
@@ -442,14 +462,16 @@ function SlotsRoom({
     const meta = SYMBOL_META[symbolId] || SYMBOL_META.COIN;
     const isHighlighted = highlightedIndexes.has(cellIndex);
     const isHeldJoker = bonusHeldIndexes.indexOf(cellIndex) !== -1 && symbolId === "JOKER";
+    const isWildHighlight = highlightedWildIndexes.has(cellIndex) && symbolId === "JOKER";
 
     return (
       <div
         key={key}
-        className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${isHeldJoker ? "is-bonus-held" : ""}`}
+        className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${isHeldJoker ? "is-bonus-held" : ""} ${isWildHighlight ? "is-wild-highlight" : ""}`}
         style={{ ["--cell-accent" as string]: meta.accent }}
       >
         <img className="casino-reel-cell__art" src={meta.image} alt="" aria-hidden="true" />
+        {isWildHighlight ? <span className="casino-reel-cell__badge">Wild</span> : null}
         <span className="casino-reel-cell__label">{meta.label}</span>
       </div>
     );

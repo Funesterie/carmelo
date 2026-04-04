@@ -897,6 +897,7 @@ button {
 }
 
 .casino-reel-cell {
+  position: relative;
   min-height: var(--reel-cell-height);
   border-radius: 22px;
   padding: 16px 10px 12px;
@@ -935,6 +936,13 @@ button {
     rgba(7, 12, 18, 0.94);
 }
 
+.casino-reel-cell.is-wild-highlight {
+  box-shadow:
+    0 0 0 1px rgba(255, 223, 107, 0.72),
+    0 0 0 6px rgba(255, 223, 107, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 .casino-reel-cell__art {
   width: clamp(54px, 8vw, 78px);
   height: clamp(54px, 8vw, 78px);
@@ -948,6 +956,21 @@ button {
   color: rgba(246, 239, 224, 0.84);
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.casino-reel-cell__badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 223, 107, 0.18);
+  border: 1px solid rgba(255, 223, 107, 0.34);
+  color: #fff1b7;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .casino-controls,
@@ -1053,6 +1076,73 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.casino-win-entry {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 14px;
+  align-items: start;
+}
+
+.casino-win-entry__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.casino-win-entry__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.casino-win-entry__note {
+  color: rgba(255, 223, 107, 0.92);
+}
+
+.casino-win-entry__trail {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.casino-win-entry__tile {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.casino-win-entry__tile span,
+.casino-win-entry__tile small {
+  color: rgba(246, 239, 224, 0.84);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.casino-win-entry__tile span {
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.casino-win-entry__tile small {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff1b7;
+}
+
+.casino-win-entry__tile.is-wild {
+  border-color: rgba(255, 223, 107, 0.3);
+  background:
+    linear-gradient(180deg, rgba(255, 223, 107, 0.12), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
 }
 
 .casino-paytable__symbol-art {

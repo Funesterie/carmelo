@@ -224,9 +224,9 @@ export default function CasinoFloorShell({
             label: "Table",
             content: (
               <div className="casino-rule-list">
-                <p>Table pirate premium avec croupier et plusieurs joueurs autour de la meme salle.</p>
+                <p>Table pirate premium avec croupier, jouable en solo ou via un salon live humain.</p>
                 <p>Le blackjack naturel paie plus fort, sans jetons locaux hors wallet.</p>
-                <p>Le salon doit compter au moins 2 joueurs pour lancer une distribution live.</p>
+                <p>Le mode solo ne rajoute pas de bots sur le tapis; le live attend 2 joueurs humains.</p>
               </div>
             ),
           },
@@ -241,7 +241,7 @@ export default function CasinoFloorShell({
                 </div>
                 <div>
                   <span>Mode</span>
-                  <strong>Multijoueur live</strong>
+                  <strong>Solo ou live humain</strong>
                 </div>
                 <div>
                   <span>Paiement</span>
@@ -259,7 +259,7 @@ export default function CasinoFloorShell({
             label: "Live",
             content: (
               <div className="casino-rule-list">
-                <p>La table reste synchronisee sur le salon courant pour tous les participants.</p>
+                <p>La table reste synchronisee sur le salon courant pour tous les participants humains.</p>
                 <p>Le croupier joue apres les joueurs et la lecture de la table reste compacte sur mobile.</p>
                 <p>Les participants actifs sont visibles dans le panneau de jeu a droite.</p>
               </div>
@@ -275,7 +275,7 @@ export default function CasinoFloorShell({
               <div className="casino-rule-list">
                 <p>Format Texas hold'em rapide avec preflop, flop, turn, river et showdown.</p>
                 <p>Le backend gere check, call, bet, raise et fold avec sizing reel.</p>
-                <p>Le salon doit compter au moins 2 joueurs pour distribuer une main live.</p>
+                <p>Le salon doit compter au moins 2 joueurs humains pour distribuer une main live.</p>
               </div>
             ),
           },
@@ -290,7 +290,7 @@ export default function CasinoFloorShell({
                 </div>
                 <div>
                   <span>Table</span>
-                  <strong>5 joueurs</strong>
+                  <strong>Live humain</strong>
                 </div>
                 <div>
                   <span>Paiement</span>

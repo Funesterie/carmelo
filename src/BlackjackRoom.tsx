@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTableAudio } from "./audio/useTableAudio";
 import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import BlackjackSidebar from "./features/blackjack/components/BlackjackSidebar";
@@ -19,6 +19,7 @@ import { BLACKJACK_SALONS } from "./lib/tableSalons";
 const PLAYER_BETS = [50, 100, 200, 400];
 const TABLE_DEAL_STEP_MS = 96;
 const LIVE_MIN_PLAYERS = 2;
+type BlackjackPlayMode = "solo" | "live";
 
 function getBlackjackCardKeys(state: BlackjackState | null) {
   const keys: string[] = [];
@@ -59,6 +60,7 @@ export default function BlackjackRoom({
   const [bet, setBet] = useState(PLAYER_BETS[1]);
   const [state, setState] = useState<BlackjackState | null>(null);
   const [working, setWorking] = useState(false);
+  const [playMode, setPlayMode] = useState<BlackjackPlayMode>("solo");
   const [roomId, setRoomId] = useState(BLACKJACK_SALONS[0].id);
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
   const [infoTab, setInfoTab] = useState<"salons" | "regles" | "joueurs">("salons");
@@ -69,6 +71,14 @@ export default function BlackjackRoom({
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
 
+  const displayState = useMemo<BlackjackState | null>(() => {
+    if (!state) return null;
+    return {
+      ...state,
+      aiSeats: [],
+    };
+  }, [state]);
+
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
   const roomSwitchLocked = stage === "player-turn";
@@ -78,6 +88,11 @@ export default function BlackjackRoom({
   const isDecisionPhase = stage === "player-turn";
 
   useEffect(() => {
+    if (playMode !== "live") {
+      setRooms([]);
+      return;
+    }
+
     let cancelled = false;
 
     async function syncRoom() {
@@ -98,7 +113,7 @@ export default function BlackjackRoom({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [onError, roomId]);
+  }, [onError, playMode, roomId]);
 
   useEffect(() => {
     return () => {
@@ -109,7 +124,7 @@ export default function BlackjackRoom({
   }, []);
 
   useEffect(() => {
-    const currentCardKeys = getBlackjackCardKeys(state);
+    const currentCardKeys = getBlackjackCardKeys(displayState);
     const previousCardKeys = new Set(previousCardKeysRef.current);
     const nextFreshKeys = currentCardKeys.filter((key) => !previousCardKeys.has(key));
     previousCardKeysRef.current = currentCardKeys;
@@ -138,10 +153,10 @@ export default function BlackjackRoom({
       });
       clearDealAnimationTimeoutRef.current = null;
     }, 1100 + nextFreshKeys.length * TABLE_DEAL_STEP_MS);
-  }, [state]);
+  }, [displayState]);
 
   async function startRound() {
-    if (!isLiveMultiplayerReady) {
+    if (playMode === "live" && !isLiveMultiplayerReady) {
       onError("Mode multijoueur: en attente d'au moins un autre joueur sur ce salon.");
       return;
     }
@@ -155,7 +170,7 @@ export default function BlackjackRoom({
     }
     setWorking(true);
     try {
-      const result = await startBlackjackRound(bet, roomId);
+      const result = await startBlackjackRound(bet, playMode === "live" ? roomId : undefined);
       setState(result.state);
       if (result.profile) {
         onProfileChange(result.profile);
@@ -198,10 +213,19 @@ export default function BlackjackRoom({
   }
 
   function handleRoomChange(nextRoomId: string) {
+    if (playMode !== "live") return;
     if (roomSwitchLocked || working || nextRoomId === roomId) return;
     resetTableVisualState();
     setState(null);
     setRoomId(nextRoomId);
+  }
+
+  function handlePlayModeChange(nextMode: BlackjackPlayMode) {
+    if (nextMode === playMode || working || roomSwitchLocked) return;
+    onError("");
+    resetTableVisualState();
+    setState(null);
+    setPlayMode(nextMode);
   }
 
   return (
@@ -235,8 +259,10 @@ export default function BlackjackRoom({
                 </div>
                 <strong>{blackjackRoomMeta?.title || "Blackjack pirate"}</strong>
                 <p>
-                  {state?.message || "Table pirate premium, croupier en face, pression nette sur la prise de decision."}
-                  {activeRoom ? ` Salon actif: ${BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
+                  {state?.message || (playMode === "solo"
+                    ? "Mode solo face au croupier, sans bots ajoutes sur la table."
+                    : "Salon live humain avec croupier en face et lecture compacte de la table.")}
+                  {playMode === "live" && activeRoom ? ` Salon actif: ${BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
                 </p>
               </div>
             </div>
@@ -275,9 +301,9 @@ export default function BlackjackRoom({
                 <div className="casino-topdeck__info-body" role="tabpanel">
                   {activeHeaderInfo === "table" ? (
                     <div className="casino-rule-list">
-                      <p>Blackjack pirate en table partagee avec croupier et joueurs autour du meme salon.</p>
+                      <p>{playMode === "solo" ? "Mode solo face au croupier, sans bots visibles sur le tapis." : "Mode live lie a un salon humain avec croupier partage."}</p>
                       <p>Le blackjack naturel paie plus fort et le reglement passe par le wallet A11.</p>
-                      <p>Les infos de joueurs et de salons restent aussi accessibles dans le dock de droite.</p>
+                      <p>Les reglages de mode et les infos de salon restent accessibles dans le dock de droite.</p>
                     </div>
                   ) : null}
                   {activeHeaderInfo === "mise" ? (
@@ -296,48 +322,50 @@ export default function BlackjackRoom({
                       </div>
                       <div>
                         <span>Mode</span>
-                        <strong>Wallet A11</strong>
+                        <strong>{playMode === "solo" ? "Solo croupier" : "Salon live"}</strong>
                       </div>
                     </div>
                   ) : null}
                   {activeHeaderInfo === "live" ? (
                     <div className="casino-rule-list">
-                      <p>Le salon doit compter au moins 2 joueurs pour lancer une distribution.</p>
-                      <p>Table en cours: {activeRoom ? BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
-                      <p>Joueurs presents: {activePlayerCount}</p>
+                      <p>{playMode === "solo" ? "Le mode solo distribue immediatement face au croupier, sans remplir la table avec des bots." : "Le salon doit compter au moins 2 joueurs humains pour lancer une distribution live."}</p>
+                      <p>Table en cours: {playMode === "live" ? (activeRoom ? BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune") : "Solo croupier"}</p>
+                      <p>Joueurs presents: {playMode === "live" ? activePlayerCount : 1}</p>
                     </div>
                   ) : null}
                 </div>
               </article>
             ) : null}
 
-            <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons blackjack">
-              {BLACKJACK_SALONS.map((salon) => {
-                const room = rooms.find((entry) => entry.id === salon.id);
-                return (
-                  <button
-                    key={salon.id}
-                    type="button"
-                    className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
-                    onClick={() => handleRoomChange(salon.id)}
-                    disabled={roomSwitchLocked || working}
-                    role="tab"
-                    aria-selected={salon.id === roomId}
-                  >
-                    <div>
-                      <strong>{salon.title}</strong>
-                      <span>{salon.chip}</span>
-                    </div>
-                    <b>{room?.playerCount || 0}</b>
-                  </button>
-                );
-              })}
-            </div>
+            {playMode === "live" ? (
+              <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons blackjack">
+                {BLACKJACK_SALONS.map((salon) => {
+                  const room = rooms.find((entry) => entry.id === salon.id);
+                  return (
+                    <button
+                      key={salon.id}
+                      type="button"
+                      className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
+                      onClick={() => handleRoomChange(salon.id)}
+                      disabled={roomSwitchLocked || working}
+                      role="tab"
+                      aria-selected={salon.id === roomId}
+                    >
+                      <div>
+                        <strong>{salon.title}</strong>
+                        <span>{salon.chip}</span>
+                      </div>
+                      <b>{room?.playerCount || 0}</b>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
 
           <div className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--blackjack">
             <BlackjackTableScene
-              state={state}
+              state={displayState}
               playerName={playerName}
               bet={bet}
               isDecisionPhase={isDecisionPhase}
@@ -346,15 +374,17 @@ export default function BlackjackRoom({
 
             <BlackjackSidebar
               profile={profile}
-              state={state}
+              state={displayState}
               bet={bet}
               working={working}
+              playMode={playMode}
               roomId={roomId}
               rooms={rooms}
               infoTab={infoTab}
               isDecisionPhase={isDecisionPhase}
               roomSwitchLocked={roomSwitchLocked}
               onBetChange={setBet}
+              onPlayModeChange={handlePlayModeChange}
               onInfoTabChange={setInfoTab}
               onRoomChange={handleRoomChange}
               onHit={() => void act("hit")}

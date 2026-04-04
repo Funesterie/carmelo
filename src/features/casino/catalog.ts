@@ -99,7 +99,7 @@ export const ROOM_DEFINITIONS = [
     label: "Blackjack",
     chip: "Table des lanternes",
     title: "Blackjack pirate",
-    body: "Une vraie table avec croupier, quatre IA autour de toi et des mises qui debitent le wallet A11 en direct.",
+    body: "Une vraie table avec croupier, un mode solo disponible et des mises qui debitent le wallet A11 en direct.",
     icon: icoBlackjackImg,
     costLabel: "Mise variable",
     layoutTemplate: "template-c",
@@ -109,7 +109,7 @@ export const ROOM_DEFINITIONS = [
     label: "Poker",
     chip: "Salon hold'em",
     title: "Texas hold'em rapide",
-    body: "Cinq joueurs a table, quatre IA, un showdown net et des paiements serves par le backend A11.",
+    body: "Texas hold'em live, decisions nettes par street et paiements serves par le backend A11.",
     icon: icoPokerImg,
     costLabel: "Mise variable",
     layoutTemplate: "template-c",
@@ -334,6 +334,13 @@ export function getJokerIndexes(grid: string[][]) {
   return grid.flatMap((row, rowIndex) =>
     row.flatMap((symbolId, columnIndex) => (symbolId === "JOKER" ? [rowIndex * row.length + columnIndex] : [])),
   );
+}
+
+export function getSlotGridSymbolAtIndex(grid: string[][], reelCount: number, index: number) {
+  if (!Number.isFinite(index) || index < 0 || reelCount <= 0) return null;
+  const rowIndex = Math.floor(index / reelCount);
+  const columnIndex = index % reelCount;
+  return grid[rowIndex]?.[columnIndex] || null;
 }
 
 export function buildGoldRainDrops(totalPayout: number, bet: number) {
