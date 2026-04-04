@@ -108,121 +108,122 @@ export default function PokerSidebar({
   onDeal,
 }: PokerSidebarProps) {
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const potBetTarget = Math.max(0, (state?.pot || 0) + toCall);
+  const canDeal = stage === "idle" || stage === "showdown";
 
   return (
     <div className="casino-stage-sidebar">
       <div className={`casino-command-dock casino-command-dock--poker ${isDecisionPhase ? "is-attention" : ""}`}>
-        <div className="casino-command-dock__copy">
-          <span className="casino-chip">Tour de mise</span>
-          <strong>{getDecisionHeadline(state)}</strong>
-          <p>{getDecisionCaption(state)}</p>
-        </div>
 
-        <div className="casino-chip-row">
-          <span className="casino-chip">A payer {formatCredits(toCall)}</span>
-          <span className="casino-chip">Investi {formatCredits(playerCommitted)}</span>
-          <span className="casino-chip">{stage === "showdown" ? "Main closee" : state?.aggressorName ? `Ouverture ${state.aggressorName}` : "Spot checke"}</span>
-        </div>
-
-        {(canBet || canRaise) ? (
-          <div className="casino-poker-betbox casino-poker-betbox--dock">
-            <div className="casino-poker-betbox__header">
-              <div>
-                <span className="casino-chip">{canRaise ? "Relance" : "Mise"}</span>
-                <strong>{canRaise ? "Sizing de raise" : "Sizing d'ouverture"}</strong>
+          {(canBet || canRaise) ? (
+            <div className="casino-poker-betbox casino-poker-betbox--dock">
+              <div className="casino-poker-betbox__header">
+                <div>
+                  <span className="casino-chip">{canRaise ? "Relance" : "Mise"}</span>
+                  <strong>{canRaise ? "Sizing de raise" : "Sizing d'ouverture"}</strong>
+                </div>
+                <b>{formatCredits(normalizedBetTarget)}</b>
               </div>
-              <b>{formatCredits(normalizedBetTarget)}</b>
-            </div>
-            <input
-              className="casino-poker-betbox__slider"
-              type="range"
-              min={aggressionMin}
-              max={aggressionMax}
-              step={blindUnit}
-              value={normalizedBetTarget}
-              onChange={(event) => onBetTargetChange(Number(event.target.value))}
-              disabled={working || !(canBet || canRaise)}
-            />
-            <div className="casino-bet-pills">
-              {aggressionPresets.map((preset) => (
+              <input
+                className="casino-poker-betbox__slider"
+                type="range"
+                min={aggressionMin}
+                max={aggressionMax}
+                step={blindUnit}
+                value={normalizedBetTarget}
+                onChange={(event) => onBetTargetChange(Number(event.target.value))}
+                disabled={working || !(canBet || canRaise)}
+              />
+              <div className="casino-bet-pills">
                 <button
-                  key={preset}
                   type="button"
-                  className={`casino-bet-pill casino-bet-pill--dubloon ${normalizedBetTarget === preset ? "is-active" : ""}`}
-                  onClick={() => onBetTargetChange(preset)}
-                  disabled={working}
+                  className={`casino-bet-pill casino-bet-pill--dubloon ${normalizedBetTarget === potBetTarget ? "is-active" : ""}`}
+                  onClick={() => onBetTargetChange(potBetTarget)}
+                  disabled={working || !(canBet || canRaise) || !potBetTarget}
                 >
-                  {formatCredits(preset)}
+                  Pot
                 </button>
-              ))}
+                {aggressionPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`casino-bet-pill casino-bet-pill--dubloon ${normalizedBetTarget === preset ? "is-active" : ""}`}
+                    onClick={() => onBetTargetChange(preset)}
+                    disabled={working}
+                  >
+                    {formatCredits(preset)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        <div className="casino-command-dock__betline">
-          <div className="casino-bet-pills">
-            {ANTE_PRESETS.map((preset) => (
+          {canDeal ? (
+            <div className="casino-command-dock__betline">
+              <div className="casino-bet-pills">
+                {ANTE_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`casino-bet-pill casino-bet-pill--dubloon ${ante === preset ? "is-active" : ""}`}
+                    onClick={() => onAnteChange(preset)}
+                    disabled={working}
+                  >
+                    {Math.max(10, Math.round(preset / 2))}/{preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="casino-command-dock__actions">
+            <button
+              type="button"
+              className="casino-ghost-button casino-ghost-button--danger"
+              onClick={onFold}
+              disabled={stage === "idle" || stage === "showdown" || working}
+            >
+              Fold
+            </button>
+            <button
+              type="button"
+              className="casino-ghost-button casino-ghost-button--steady"
+              onClick={onCheckOrCall}
+              disabled={working || (!canCheck && !canCall)}
+            >
+              {canCheck ? "Check" : canCall ? `Call ${formatCredits(toCall)}` : "Check / Call"}
+            </button>
+            <button
+              type="button"
+              className="casino-primary-button casino-primary-button--cyan"
+              onClick={onAggression}
+              disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
+            >
+              {canRaise
+                ? `Raise a ${formatCredits(normalizedBetTarget)}`
+                : canBet
+                  ? `Bet ${formatCredits(normalizedBetTarget)}`
+                  : "Bet / Raise"}
+            </button>
+            {canDeal ? (
               <button
-                key={preset}
                 type="button"
-                className={`casino-bet-pill casino-bet-pill--dubloon ${ante === preset ? "is-active" : ""}`}
-                onClick={() => onAnteChange(preset)}
-                disabled={((stage !== "idle" && stage !== "showdown")) || working}
+                className="casino-primary-button"
+                onClick={onDeal}
+                disabled={working || profile.wallet.balance < ante}
               >
-                {Math.max(10, Math.round(preset / 2))}/{preset}
+                Distribuer une main
               </button>
-            ))}
-          </div>
-
-          <div className="casino-chip-row">
-            <span className="casino-chip">Street {stage === "idle" ? "en attente" : STREET_LABELS[state?.stage || "preflop"].title}</span>
-            <span className="casino-chip">Tapis hero {formatCredits(playerChips)}</span>
-            <span className="casino-chip">Engage street {formatCredits(playerStreetCommitted)}</span>
+            ) : null}
           </div>
         </div>
-
-        <div className="casino-command-dock__actions">
-          <button
-            type="button"
-            className="casino-ghost-button casino-ghost-button--danger"
-            onClick={onFold}
-            disabled={stage === "idle" || stage === "showdown" || working}
-          >
-            Fold
-          </button>
-          <button
-            type="button"
-            className="casino-ghost-button casino-ghost-button--steady"
-            onClick={onCheckOrCall}
-            disabled={working || (!canCheck && !canCall)}
-          >
-            {canCheck ? "Check" : canCall ? `Call ${formatCredits(toCall)}` : "Check / Call"}
-          </button>
-          <button
-            type="button"
-            className="casino-primary-button casino-primary-button--cyan"
-            onClick={onAggression}
-            disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
-          >
-            {canRaise ? `Raise a ${formatCredits(normalizedBetTarget)}` : canBet ? `Bet ${formatCredits(normalizedBetTarget)}` : "Bet / Raise"}
-          </button>
-          <button
-            type="button"
-            className="casino-primary-button"
-            onClick={onDeal}
-            disabled={working || (!(stage === "idle" || stage === "showdown")) || profile.wallet.balance < ante}
-          >
-            {stage === "idle" || stage === "showdown" ? "Distribuer une main" : "Main en cours"}
-          </button>
-        </div>
-      </div>
 
       <PirateInspector
-        title="Capitaine de table"
-        eyebrow="Intel"
-        activeTab={infoTab}
-        onChange={(tabId) => onInfoTabChange(tabId as typeof infoTab)}
-        tabs={[
+          title="Capitaine de table"
+          eyebrow="Intel"
+          activeTab={infoTab}
+          onChange={(tabId) => onInfoTabChange(tabId as typeof infoTab)}
+          tabs={[
           {
             id: "journal",
             label: "Journal",
@@ -316,7 +317,7 @@ export default function PokerSidebar({
               </div>
             ),
           },
-        ]}
+          ]}
       />
     </div>
   );

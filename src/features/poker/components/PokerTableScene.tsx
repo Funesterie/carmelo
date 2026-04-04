@@ -10,16 +10,6 @@ const POKER_SEAT_LAYOUT = [
   { x: "85%", y: "34%", align: "end", tag: "BTN" },
 ] as const;
 
-const STREET_ORDER = ["preflop", "flop", "turn", "river", "showdown"] as const;
-
-const STREET_LABELS: Record<(typeof STREET_ORDER)[number], { title: string; caption: string }> = {
-  preflop: { title: "Preflop", caption: "Ouverture de ranges et premiere pression." },
-  flop: { title: "Flop", caption: "Trois cartes au centre, le spot se precise." },
-  turn: { title: "Turn", caption: "La quatrieme street durcit les sizings." },
-  river: { title: "River", caption: "Derniere decision avant l'abattage." },
-  showdown: { title: "Showdown", caption: "Les mains sont retournees et le pot est pousse." },
-};
-
 type PokerTableSceneProps = {
   state: PokerState | null;
   stage: "idle" | PokerState["stage"];
@@ -27,7 +17,6 @@ type PokerTableSceneProps = {
   activeAnte: number;
   smallBlind: number;
   isDecisionPhase: boolean;
-  currentStreetIndex: number;
   dealtCardDelays: Record<string, number>;
 };
 
@@ -38,30 +27,12 @@ export default function PokerTableScene({
   activeAnte,
   smallBlind,
   isDecisionPhase,
-  currentStreetIndex,
   dealtCardDelays,
 }: PokerTableSceneProps) {
   const communityCards = state?.communityCards || [];
 
   return (
     <>
-      <div className="casino-poker-street-rail casino-poker-street-rail--compact" aria-label="Progression de la main">
-        {STREET_ORDER.map((street, index) => {
-          const isCurrent = index === currentStreetIndex;
-          const isComplete = currentStreetIndex > index || stage === "showdown";
-          return (
-            <article
-              key={street}
-              className={`casino-poker-street-step ${isCurrent ? "is-current" : ""} ${isComplete ? "is-complete" : ""}`}
-            >
-              <span>{index + 1}</span>
-              <strong>{STREET_LABELS[street].title}</strong>
-              <small>{STREET_LABELS[street].caption}</small>
-            </article>
-          );
-        })}
-      </div>
-
       <div className={`casino-card-felt casino-card-felt--poker casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
         <div className={`casino-felt-table casino-felt-table--poker ${isDecisionPhase ? "is-decision-phase" : ""}`}>
           <div className="casino-felt-table__halo" />
@@ -82,7 +53,7 @@ export default function PokerTableScene({
                   <strong>{seat.name}</strong>
                   <span className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(seat.chips)}</span>
                 </header>
-                <div className="casino-card-row casino-card-row--compact casino-card-row--tight">
+                <div className="casino-card-row casino-card-row--compact casino-card-row--tight casino-card-row--fan casino-card-row--fan-tight">
                   {seat.cards.length ? (
                     seat.cards.map((card, cardIndex) => (
                       <PiratePlayingCardView
@@ -107,11 +78,6 @@ export default function PokerTableScene({
             <div className="casino-table-core__headline">
               <strong>{stage === "idle" ? "Table au repos" : state?.stageLabel || "Street en cours"}</strong>
               <span className="casino-token-inline"><img src={jetonImg} alt="" />Pot {formatCredits(state?.pot || 0)}</span>
-            </div>
-            <div className="casino-chip-row">
-              <span className="casino-chip">5-max NL</span>
-              <span className="casino-chip">SB / BB {formatCredits(smallBlind)} / {formatCredits(activeAnte)}</span>
-              <span className="casino-chip">{state?.playerFolded ? "Hero couche" : state?.aggressorName ? `Action de ${state.aggressorName}` : "Action checkee"}</span>
             </div>
             <div className="casino-poker-board">
               {Array.from({ length: 5 }, (_, index) => {
@@ -138,7 +104,7 @@ export default function PokerTableScene({
               <strong>{playerName}</strong>
               <span>{state?.playerFolded ? "Main couchee" : state?.playerHand?.label || (stage === "showdown" ? "Showdown" : "Decision ouverte")}</span>
             </div>
-            <div className="casino-card-row casino-card-row--player">
+            <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
               {state?.playerCards.length ? (
                 state.playerCards.map((card, index) => (
                   <PiratePlayingCardView

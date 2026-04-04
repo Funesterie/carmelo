@@ -1,9 +1,9 @@
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTableAudio } from "./audio/useTableAudio";
+import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import BlackjackSidebar from "./features/blackjack/components/BlackjackSidebar";
 import BlackjackTableScene from "./features/blackjack/components/BlackjackTableScene";
-import jetonImg from "./images/jeton.png";
 import blackjackCaptainArt from "./images/blackjack-captain-art.png";
 import {
   actBlackjackRound,
@@ -18,6 +18,7 @@ import { BLACKJACK_SALONS } from "./lib/tableSalons";
 
 const PLAYER_BETS = [50, 100, 200, 400];
 const TABLE_DEAL_STEP_MS = 96;
+const LIVE_MIN_PLAYERS = 2;
 
 function getBlackjackCardKeys(state: BlackjackState | null) {
   const keys: string[] = [];
@@ -54,12 +55,15 @@ export default function BlackjackRoom({
   onProfileChange,
   onError,
 }: BlackjackRoomProps) {
+  const blackjackRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "blackjack");
   const [bet, setBet] = useState(PLAYER_BETS[1]);
   const [state, setState] = useState<BlackjackState | null>(null);
   const [working, setWorking] = useState(false);
   const [roomId, setRoomId] = useState(BLACKJACK_SALONS[0].id);
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
   const [infoTab, setInfoTab] = useState<"salons" | "regles" | "joueurs">("salons");
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [activeHeaderInfo, setActiveHeaderInfo] = useState<"table" | "mise" | "live">("table");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const previousCardKeysRef = useRef<string[]>([]);
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
@@ -69,6 +73,8 @@ export default function BlackjackRoom({
   const lastDelta = state?.lastDelta || 0;
   const roomSwitchLocked = stage === "player-turn";
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const activePlayerCount = activeRoom?.playerCount || 0;
+  const isLiveMultiplayerReady = activePlayerCount >= LIVE_MIN_PLAYERS;
   const isDecisionPhase = stage === "player-turn";
 
   useEffect(() => {
@@ -135,6 +141,10 @@ export default function BlackjackRoom({
   }, [state]);
 
   async function startRound() {
+    if (!isLiveMultiplayerReady) {
+      onError("Mode multijoueur: en attente d'au moins un autre joueur sur ce salon.");
+      return;
+    }
     onError("");
     clearQueuedAudio();
     previousCardKeysRef.current = [];
@@ -196,89 +206,162 @@ export default function BlackjackRoom({
 
   return (
     <section className="casino-table-layout casino-table-layout--compact casino-table-layout--cards">
-      <div className="casino-stage casino-stage--cards">
-        <div className="casino-room-hud casino-room-hud--blackjack">
-          <div className="casino-room-hud__lead">
-            <img className="casino-room-hud__portrait" src={blackjackCaptainArt} alt="" aria-hidden="true" />
-            <div className="casino-room-hud__identity">
-              <span className="casino-chip">Blackjack ATS</span>
-              <strong>Table des lanternes</strong>
-              <p>
-                {state?.message || "Table pirate premium, croupier en face, pression nette sur la prise de decision."}
-                {activeRoom ? ` Salon actif: ${BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
-              </p>
+      <div className="casino-stage casino-stage--cards casino-stage--cards--blackjack">
+        <div
+          className="casino-card-fused-stage casino-card-fused-stage--blackjack"
+          style={{ ["--room-art" as string]: `url("${blackjackCaptainArt}")` }}
+        >
+          <div className="casino-room-hud casino-room-hud--blackjack">
+            <div className="casino-room-hud__lead">
+              <img className="casino-room-hud__portrait" src={blackjackCaptainArt} alt="" aria-hidden="true" />
+              <div className="casino-room-hud__identity">
+                <div className="casino-topdeck__chip-row">
+                  <span className="casino-chip">{blackjackRoomMeta?.chip || "Table des lanternes"}</span>
+                  <button
+                    type="button"
+                    className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
+                    onClick={() => setShowRoomInfo((value) => !value)}
+                    aria-label="Informations blackjack"
+                    aria-expanded={showRoomInfo}
+                  >
+                    <span className="casino-button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path d="M4 7h16" />
+                        <path d="M4 12h16" />
+                        <path d="M4 17h16" />
+                      </svg>
+                    </span>
+                  </button>
+                </div>
+                <strong>{blackjackRoomMeta?.title || "Blackjack pirate"}</strong>
+                <p>
+                  {state?.message || "Table pirate premium, croupier en face, pression nette sur la prise de decision."}
+                  {activeRoom ? ` Salon actif: ${BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
+                </p>
+              </div>
+            </div>
+
+            {showRoomInfo ? (
+              <article className="casino-topdeck__info-panel" aria-label="Informations blackjack">
+                <div className="casino-topdeck__info-buttons" role="tablist" aria-label="Sections blackjack">
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "table" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "table"}
+                    onClick={() => setActiveHeaderInfo("table")}
+                  >
+                    Table
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "mise" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "mise"}
+                    onClick={() => setActiveHeaderInfo("mise")}
+                  >
+                    Mises
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "live" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "live"}
+                    onClick={() => setActiveHeaderInfo("live")}
+                  >
+                    Live
+                  </button>
+                </div>
+                <div className="casino-topdeck__info-body" role="tabpanel">
+                  {activeHeaderInfo === "table" ? (
+                    <div className="casino-rule-list">
+                      <p>Blackjack pirate en table partagee avec croupier et joueurs autour du meme salon.</p>
+                      <p>Le blackjack naturel paie plus fort et le reglement passe par le wallet A11.</p>
+                      <p>Les infos de joueurs et de salons restent aussi accessibles dans le dock de droite.</p>
+                    </div>
+                  ) : null}
+                  {activeHeaderInfo === "mise" ? (
+                    <div className="casino-metric-list">
+                      <div>
+                        <span>Presets</span>
+                        <strong>50 / 100 / 200 / 400</strong>
+                      </div>
+                      <div>
+                        <span>Mise active</span>
+                        <strong>{formatCredits(state?.wager || bet)}</strong>
+                      </div>
+                      <div>
+                        <span>Payout</span>
+                        <strong>{formatCredits(state?.payoutAmount || 0)}</strong>
+                      </div>
+                      <div>
+                        <span>Mode</span>
+                        <strong>Wallet A11</strong>
+                      </div>
+                    </div>
+                  ) : null}
+                  {activeHeaderInfo === "live" ? (
+                    <div className="casino-rule-list">
+                      <p>Le salon doit compter au moins 2 joueurs pour lancer une distribution.</p>
+                      <p>Table en cours: {activeRoom ? BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
+                      <p>Joueurs presents: {activePlayerCount}</p>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            ) : null}
+
+            <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons blackjack">
+              {BLACKJACK_SALONS.map((salon) => {
+                const room = rooms.find((entry) => entry.id === salon.id);
+                return (
+                  <button
+                    key={salon.id}
+                    type="button"
+                    className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
+                    onClick={() => handleRoomChange(salon.id)}
+                    disabled={roomSwitchLocked || working}
+                    role="tab"
+                    aria-selected={salon.id === roomId}
+                  >
+                    <div>
+                      <strong>{salon.title}</strong>
+                      <span>{salon.chip}</span>
+                    </div>
+                    <b>{room?.playerCount || 0}</b>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="casino-status-strip casino-status-strip--compact">
-            <article>
-              <span>Solde serveur</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(profile.wallet.balance)}</strong>
-            </article>
-            <article>
-              <span>Mise en cours</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(state?.wager || bet)}</strong>
-            </article>
-            <article className={lastDelta >= 0 ? "tone-positive" : "tone-negative"}>
-              <span>Derniere variation</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{`${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}`}</strong>
-            </article>
+          <div className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--blackjack">
+            <BlackjackTableScene
+              state={state}
+              playerName={playerName}
+              bet={bet}
+              isDecisionPhase={isDecisionPhase}
+              dealtCardDelays={dealtCardDelays}
+            />
+
+            <BlackjackSidebar
+              profile={profile}
+              state={state}
+              bet={bet}
+              working={working}
+              roomId={roomId}
+              rooms={rooms}
+              infoTab={infoTab}
+              isDecisionPhase={isDecisionPhase}
+              roomSwitchLocked={roomSwitchLocked}
+              onBetChange={setBet}
+              onInfoTabChange={setInfoTab}
+              onRoomChange={handleRoomChange}
+              onHit={() => void act("hit")}
+              onStand={() => void act("stand")}
+              onDeal={() => void startRound()}
+            />
           </div>
-
-          <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons blackjack">
-            {BLACKJACK_SALONS.map((salon) => {
-              const room = rooms.find((entry) => entry.id === salon.id);
-              return (
-                <button
-                  key={salon.id}
-                  type="button"
-                  className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
-                  onClick={() => handleRoomChange(salon.id)}
-                  disabled={roomSwitchLocked || working}
-                  role="tab"
-                  aria-selected={salon.id === roomId}
-                >
-                  <div>
-                    <strong>{salon.title}</strong>
-                    <span>{salon.chip}</span>
-                  </div>
-                  <b>{room?.playerCount || 0}</b>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div
-          className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--blackjack"
-          style={{ ["--room-art" as string]: `url("${blackjackCaptainArt}")` }}
-        >
-          <BlackjackTableScene
-            state={state}
-            playerName={playerName}
-            bet={bet}
-            isDecisionPhase={isDecisionPhase}
-            dealtCardDelays={dealtCardDelays}
-          />
-
-          <BlackjackSidebar
-            profile={profile}
-            state={state}
-            bet={bet}
-            working={working}
-            roomId={roomId}
-            rooms={rooms}
-            infoTab={infoTab}
-            isDecisionPhase={isDecisionPhase}
-            roomSwitchLocked={roomSwitchLocked}
-            onBetChange={setBet}
-            onInfoTabChange={setInfoTab}
-            onRoomChange={handleRoomChange}
-            onHit={() => void act("hit")}
-            onStand={() => void act("stand")}
-            onDeal={() => void startRound()}
-            onResetVisualState={resetTableVisualState}
-          />
         </div>
       </div>
     </section>

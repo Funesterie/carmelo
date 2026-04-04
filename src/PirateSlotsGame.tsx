@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import alerteSound from "./audio/alerte.mp3";
 import BlackjackRoom from "./BlackjackRoom";
 import CarteMiniGame from "./CarteMiniGame";
@@ -40,12 +40,19 @@ import {
   type CasinoSpinBonus,
   type CasinoSpinBonusStage,
   type CasinoSpin,
+  type CasinoTransaction,
 } from "./lib/casinoApi";
 
 type PirateSlotsGameProps = {
+  activeRoom: RoomId;
   profile: CasinoProfile;
   busy: boolean;
   mediaReady: boolean;
+  immersionActive: boolean;
+  ambientVideoAudible: boolean;
+  ambientVideoRef: MutableRefObject<HTMLVideoElement | null>;
+  freshVideo: string;
+  onAmbientPanelChange?: (panel: React.ReactNode | null) => void;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;
   onRequestMediaPlayback?: () => void;
@@ -53,10 +60,16 @@ type PirateSlotsGameProps = {
   onRoomChange?: (roomId: RoomId) => void;
 };
 
+function getRecentTransactions(profile: CasinoProfile): CasinoTransaction[] {
+  return profile.recentTransactions.slice(0, 8);
+}
+
 function SlotsRoom({
   profile,
   busy,
   mediaReady,
+  immersionActive,
+  ambientVideoRef,
   onProfileChange,
   onError,
   onRequestMediaPlayback,
@@ -75,7 +88,6 @@ function SlotsRoom({
   const [lastSpin, setLastSpin] = useState<CasinoSpin | null>(null);
   const [lastMessage, setLastMessage] = useState("Pret a lancer les reels.");
   const [activeFeature, setActiveFeature] = useState<SlotFeatureKey>("idle");
-  const [tightReels, setTightReels] = useState(true);
   const [slotIntroPlayed, setSlotIntroPlayed] = useState(() => {
     try {
       return sessionStorage.getItem(SLOT_VIDEO_INTRO_SESSION_KEY) === "1";
@@ -91,12 +103,11 @@ function SlotsRoom({
   const [autoSpinCount, setAutoSpinCount] = useState(0);
   const [autoSpinPreset, setAutoSpinPreset] = useState(10);
   const intervalRef = useRef<number | null>(null);
-  const featureTimeoutRef = useRef<number | null>(null);
   const goldRainTimeoutRef = useRef<number | null>(null);
   const autoSpinTimeoutRef = useRef<number | null>(null);
   const spinRunIdRef = useRef(0);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
-  const featureVideoRef = useRef<HTMLVideoElement | null>(null);
+  const featureVideoRef = ambientVideoRef;
 
   useEffect(() => {
     setBet((current) => {
@@ -110,7 +121,6 @@ function SlotsRoom({
     return () => {
       spinRunIdRef.current += 1;
       if (intervalRef.current) window.clearInterval(intervalRef.current);
-      if (featureTimeoutRef.current) window.clearTimeout(featureTimeoutRef.current);
       if (goldRainTimeoutRef.current) window.clearTimeout(goldRainTimeoutRef.current);
       if (autoSpinTimeoutRef.current) window.clearTimeout(autoSpinTimeoutRef.current);
       alertAudioRef.current?.pause();
@@ -119,7 +129,11 @@ function SlotsRoom({
 
   const highlightedIndexes = useMemo(() => {
     if (!lastSpin?.wins?.length) return new Set<number>();
-    return new Set(lastSpin.wins.flatMap((entry) => entry.indexes));
+    const flattenedIndexes = lastSpin.wins.reduce<number[]>((accumulator, entry) => {
+      accumulator.push(...entry.indexes);
+      return accumulator;
+    }, []);
+    return new Set(flattenedIndexes);
   }, [lastSpin]);
 
   const canSpin = spinState !== "spinning" && !busy && profile.wallet.balance >= bet;
@@ -131,7 +145,6 @@ function SlotsRoom({
     return "neutral";
   }, [lastSpin]);
 
-  const recentTransactions = useMemo(() => profile.recentTransactions.slice(0, 8), [profile.recentTransactions]);
   const reelColumns = useMemo(() => {
     const columnCount = displayGrid[0]?.length || 0;
     return Array.from({ length: columnCount }, (_, columnIndex) =>
@@ -149,12 +162,47 @@ function SlotsRoom({
   useEffect(() => {
     const video = featureVideoRef.current;
     if (!video || !featureMedia.video) return;
+
+    const shouldLoop = !isAlertFeatureActive && slotIntroPlayed;
+    video.loop = shouldLoop;
+
+    const currentSrc = video.currentSrc || video.src;
+    if (!currentSrc || !currentSrc.includes(featureMedia.video)) {
+      video.src = featureMedia.video;
+      video.poster = featureMedia.image;
+      video.load();
+    }
+
+    const handleEnded = () => {
+      if (!isAlertFeatureActive && !slotIntroPlayed) {
+        markSlotsIntroPlayed();
+      }
+    };
+    video.addEventListener("ended", handleEnded);
+
+    if (immersionActive) {
+      video.pause();
+      if (!slotIntroPlayed) {
+        try {
+          video.currentTime = 0;
+        } catch {
+          // ignore seek failures
+        }
+      }
+      return () => {
+        video.removeEventListener("ended", handleEnded);
+      };
+    }
+
     const shouldUseAudio = mediaReady;
     const volume = isAlertFeatureActive ? 0.5 : slotIntroPlayed ? 0.34 : 0.42;
     video.muted = !shouldUseAudio;
     video.volume = shouldUseAudio ? volume : 0;
     void video.play().catch(() => undefined);
-  }, [featureMedia.video, isAlertFeatureActive, mediaReady, slotIntroPlayed]);
+    return () => {
+      video.removeEventListener("ended", handleEnded);
+    };
+  }, [featureMedia.image, featureMedia.video, immersionActive, isAlertFeatureActive, mediaReady, slotIntroPlayed]);
 
   useEffect(() => {
     if (!autoSpinActive || spinState !== "idle" || busy) return;
@@ -224,22 +272,10 @@ function SlotsRoom({
     const nextFeature = chooseSlotFeature(spin);
     if (nextFeature !== "idle") {
       markSlotsIntroPlayed();
-    }
-    setActiveFeature(nextFeature);
-
-    if (featureTimeoutRef.current) {
-      window.clearTimeout(featureTimeoutRef.current);
-      featureTimeoutRef.current = null;
-    }
-
-    if (nextFeature !== "idle") {
-      featureTimeoutRef.current = window.setTimeout(() => {
-        setActiveFeature("idle");
-      }, 9000);
-    }
-
-    if (SLOT_FEATURE_MEDIA[nextFeature].video && nextFeature !== "idle") {
-      playCue(alertAudioRef, alerteSound, 0.78);
+      setActiveFeature(nextFeature);
+      if (SLOT_FEATURE_MEDIA[nextFeature].video) {
+        playCue(alertAudioRef, alerteSound, 0.78);
+      }
     }
   }
 
@@ -329,15 +365,6 @@ function SlotsRoom({
     setBonusHeldIndexes(stage.heldIndexes.length ? stage.heldIndexes : getJokerIndexes(stage.grid));
     setActiveFeature(bonusFlow.feature);
 
-    if (featureTimeoutRef.current) {
-      window.clearTimeout(featureTimeoutRef.current);
-      featureTimeoutRef.current = null;
-    }
-    featureTimeoutRef.current = window.setTimeout(() => {
-      setActiveFeature("idle");
-      featureTimeoutRef.current = null;
-    }, 5200);
-
     const nextStageNumber = bonusFlow.totalStages - restStages.length;
     setPendingBonusFlow(
       restStages.length
@@ -362,7 +389,6 @@ function SlotsRoom({
     const runId = spinRunIdRef.current;
     setSpinState("spinning");
     setGoldRain([]);
-    setActiveFeature("idle");
     setLastMessage(pendingBonusFlow ? "La vollee bonus se prepare..." : "Les tambours roulent...");
 
     try {
@@ -412,17 +438,10 @@ function SlotsRoom({
     }
   }
 
-  function adjustBet(direction: -1 | 1) {
-    const currentIndex = BET_PRESETS.findIndex((preset) => preset >= bet);
-    const safeIndex = currentIndex === -1 ? BET_PRESETS.length - 1 : currentIndex;
-    const nextIndex = Math.max(0, Math.min(BET_PRESETS.length - 1, safeIndex + direction));
-    setBet(Math.max(profile.wallet.minBet, Math.min(profile.wallet.maxBet, BET_PRESETS[nextIndex])));
-  }
-
   function renderCell(symbolId: string, cellIndex: number, key: string) {
     const meta = SYMBOL_META[symbolId] || SYMBOL_META.COIN;
     const isHighlighted = highlightedIndexes.has(cellIndex);
-    const isHeldJoker = bonusHeldIndexes.includes(cellIndex) && symbolId === "JOKER";
+    const isHeldJoker = bonusHeldIndexes.indexOf(cellIndex) !== -1 && symbolId === "JOKER";
 
     return (
       <div
@@ -439,29 +458,8 @@ function SlotsRoom({
   return (
     <section className="casino-table-layout casino-table-layout--slots">
       <div className="casino-stage">
-        <div className="casino-status-strip">
-          <article>
-            <span>Solde serveur</span>
-            <strong>{formatCredits(profile.wallet.balance)} credits</strong>
-          </article>
-          <article>
-            <span>Mise actuelle</span>
-            <strong>{formatCredits(bet)} credits</strong>
-          </article>
-          <article className={`tone-${netChangeTone}`}>
-            <span>Dernier resultat</span>
-            <strong>
-              {lastSpin ? `${lastSpin.netChange >= 0 ? "+" : ""}${formatCredits(lastSpin.netChange)}` : "Aucun spin"}
-            </strong>
-          </article>
-        </div>
-
-        <div className={`casino-reel-shell casino-room-shell casino-reel-shell--slots ${tightReels ? "is-tight-reels" : ""}`}>
+        <div className="casino-reel-shell casino-room-shell casino-reel-shell--slots is-tight-reels">
           <div className="casino-reel-shell__header">
-            <div>
-              <span className="casino-chip">Machine a sous</span>
-              <h2>Salon pirate principal</h2>
-            </div>
             <p>{lastMessage}</p>
           </div>
 
@@ -484,7 +482,7 @@ function SlotsRoom({
             </div>
           ) : null}
 
-          <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""} ${tightReels ? "is-tight" : ""}`}>
+          <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""} is-tight`}>
             {reelColumns.map((column, columnIndex) => {
               const strip = spinState === "spinning" ? [...column, ...column, ...column] : column;
 
@@ -510,14 +508,6 @@ function SlotsRoom({
 
           <div className="casino-controls">
             <div className="casino-bet-controls">
-              <button
-                type="button"
-                className="casino-ghost-button"
-                onClick={() => adjustBet(-1)}
-                disabled={spinState === "spinning" || Boolean(pendingBonusFlow)}
-              >
-                - Miser
-              </button>
               <div className="casino-bet-pills">
                 {BET_PRESETS.map((preset) => (
                   <button
@@ -531,26 +521,9 @@ function SlotsRoom({
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                className="casino-ghost-button"
-                onClick={() => adjustBet(1)}
-                disabled={spinState === "spinning" || Boolean(pendingBonusFlow)}
-              >
-                Miser +
-              </button>
             </div>
 
             <div className="casino-action-row__buttons">
-              <button
-                type="button"
-                className={`casino-ghost-button ${tightReels ? "is-active" : ""}`}
-                onClick={() => setTightReels((current) => !current)}
-                disabled={spinState === "spinning" || Boolean(pendingBonusFlow)}
-              >
-                {tightReels ? "Rouleaux serres" : "Rouleaux ouverts"}
-              </button>
-              
               {autoSpinActive ? (
                 <>
                   <button
@@ -610,24 +583,26 @@ function SlotsRoom({
         </div>
       </div>
 
-      <SlotsSideRail
-        profile={profile}
-        mediaReady={mediaReady}
-        featureMedia={featureMedia}
-        slotIntroPlayed={slotIntroPlayed}
-        isAlertFeatureActive={isAlertFeatureActive}
-        featureVideoRef={featureVideoRef}
-        recentTransactions={recentTransactions}
-        lastSpin={lastSpin}
-        onMarkSlotsIntroPlayed={markSlotsIntroPlayed}
-        onRequestMediaPlayback={onRequestMediaPlayback}
-      />
+      <div className="casino-mobile-widget">
+        <SlotsSideRail
+          profile={profile}
+          mediaReady={mediaReady}
+          featureMedia={featureMedia}
+          slotIntroPlayed={slotIntroPlayed}
+          isAlertFeatureActive={isAlertFeatureActive}
+          featureVideoRef={featureVideoRef}
+          lastSpin={lastSpin}
+          onMarkSlotsIntroPlayed={markSlotsIntroPlayed}
+          onRequestMediaPlayback={onRequestMediaPlayback}
+        />
+      </div>
     </section>
   );
 }
 
 export default function PirateSlotsGame(props: PirateSlotsGameProps) {
-  const [activeRoom, setActiveRoom] = useState<RoomId>("slots");
+  const [activeRoom, setActiveRoom] = useState<RoomId>(props.activeRoom || "slots");
+  const recentTransactions = useMemo(() => getRecentTransactions(props.profile), [props.profile]);
   const currentRoom = useMemo(
     () => ROOM_DEFINITIONS.find((room) => room.id === activeRoom) || ROOM_DEFINITIONS[0],
     [activeRoom],
@@ -637,6 +612,18 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
   useEffect(() => {
     props.onRoomChange?.(activeRoom);
   }, [activeRoom, props.onRoomChange]);
+
+  useEffect(() => {
+    if (props.activeRoom && props.activeRoom !== activeRoom) {
+      setActiveRoom(props.activeRoom);
+    }
+  }, [activeRoom, props.activeRoom]);
+
+  useEffect(() => {
+    if (activeRoom !== "roulette") {
+      props.onAmbientPanelChange?.(null);
+    }
+  }, [activeRoom, props.onAmbientPanelChange]);
 
   function renderRoom() {
     switch (activeRoom) {
@@ -649,7 +636,7 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
       case "poker":
         return <PokerRoom playerName={props.profile.user.username} profile={props.profile} mediaReady={props.mediaReady} onProfileChange={props.onProfileChange} onError={props.onError} />;
       case "roulette":
-        return <RouletteRoom profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} onRouletteEvent={props.onRouletteEvent} />;
+        return <RouletteRoom profile={props.profile} onProfileChange={props.onProfileChange} onError={props.onError} onRouletteEvent={props.onRouletteEvent} onAmbientPanelChange={props.onAmbientPanelChange} />;
       default:
         return <SlotsRoom {...props} />;
     }
@@ -657,13 +644,11 @@ export default function PirateSlotsGame(props: PirateSlotsGameProps) {
 
   return (
     <CasinoFloorShell
-      activeRoom={activeRoom}
       currentRoom={currentRoom}
+      profile={props.profile}
+      recentTransactions={recentTransactions}
       districtArtwork={CASINO_DISTRICT_ARTWORK}
       currentRoomArtwork={currentRoomArtwork}
-      playerName={props.profile.user.username}
-      balanceLabel={formatCredits(props.profile.wallet.balance)}
-      onRoomChange={setActiveRoom}
     >
       {renderRoom()}
     </CasinoFloorShell>

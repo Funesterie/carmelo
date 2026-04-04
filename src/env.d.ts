@@ -72,4 +72,17 @@ declare module '*.ogg' {
   export default content;
 }
 
+declare module 'vite' {
+  export function defineConfig(config: any): any;
+}
+
+declare module '@vitejs/plugin-react' {
+  const react: (...args: any[]) => any;
+  export default react;
+}
+
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 export {};

@@ -1,5 +1,4 @@
 import type * as React from "react";
-import { featureCards } from "../content";
 
 type AuthMode = "login" | "register" | "forgot";
 
@@ -56,50 +55,19 @@ export default function CasinoAuthScreen({
     <div className="casino-auth-layout">
       <section className="casino-poster">
         <div className="casino-poster__veil" />
-        <div className="casino-poster__content">
-          <span className="casino-eyebrow">casino.funesterie.pro</span>
-          <h1>Treasor Cruse</h1>
-          <p>
-            Un salon pirate plus propre, avec vrai compte, vrai solde persistant
-            et une salle de jeu enfin lisible sur telephone comme sur grand ecran.
-          </p>
-
-          <div className="casino-hero-stats" aria-label="points forts">
-            <div>
-              <strong>24/7</strong>
-              <span>solde sauve cote serveur</span>
-            </div>
-            <div>
-              <strong>5 lignes</strong>
-              <span>machine a sous calculee cote backend</span>
-            </div>
-            <div>
-              <strong>A11</strong>
-              <span>meme identite, meme auth, meme recuperation</span>
-            </div>
-          </div>
-
-          <div className="casino-feature-stack">
-            {featureCards.map((feature) => (
-              <article key={feature.title} className="casino-feature">
-                <span>{feature.kicker}</span>
-                <h2>{feature.title}</h2>
-                <p>{feature.body}</p>
-              </article>
-            ))}
-          </div>
+        <div className="casino-poster__content casino-poster__content--centered">
+          <h1 className="casino-poster__title">TREASURE CRUISE</h1>
         </div>
       </section>
 
       <aside className="casino-auth-panel">
         <div className="casino-auth-panel__header">
-          <span className="casino-chip">Compte joueur</span>
           <h2>{authMode === "login" ? "Connexion" : authMode === "register" ? "Inscription" : "Mot de passe oublie"}</h2>
           <p>
             {authMode === "login"
               ? "Reconnecte-toi avec tes identifiants pour retrouver instantanement ton solde."
               : authMode === "register"
-                ? "Cree un compte joueur avec le meme backend que l’univers A11."
+                ? ""
                 : "On reutilise le circuit mail A11 pour te renvoyer un lien de recuperation."}
           </p>
         </div>
@@ -171,9 +139,6 @@ export default function CasinoAuthScreen({
           </form>
         ) : null}
 
-        <div className="casino-auth-footnote">
-          <p>Le solde n’est plus stocke dans le navigateur. Il vit maintenant sur le backend A11, avec un vrai compte JWT.</p>
-        </div>
       </aside>
     </div>
   );

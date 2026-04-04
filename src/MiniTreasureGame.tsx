@@ -4,11 +4,13 @@ import opaleSound from "./audio/opale.mp3";
 import rubisSound from "./audio/rubis.mp3";
 import saphirSound from "./audio/saphir.mp3";
 import { useMemo, useState } from "react";
+import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import marineImg from "./images/marine.png";
 import opaleImg from "./images/opale.png";
 import rubisImg from "./images/rubis.png";
 import saphirImg from "./images/saphir.png";
 import drapImg from "./images/drap.png";
+import SceneHost from "./features/casino/components/SceneHost";
 import {
   type CasinoProfile,
   type TreasureHuntState,
@@ -41,9 +43,12 @@ export default function MiniTreasureGame({
   onProfileChange,
   onError,
 }: MiniTreasureGameProps) {
+  const huntRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "treasure-hunt");
   const [state, setState] = useState<TreasureHuntState | null>(null);
   const [status, setStatus] = useState("Lance une expedition et tire trois salves sur la baie.");
   const [working, setWorking] = useState(false);
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [activeInfoSection, setActiveInfoSection] = useState<"apercu" | "recompenses" | "salves">("apercu");
   const canonAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const opaleAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const rubisAudioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -128,119 +133,165 @@ export default function MiniTreasureGame({
   }
 
   return (
-    <section className="casino-table-layout">
-      <div className="casino-stage">
-        <div className="casino-status-strip">
-          <article>
-            <span>Solde serveur</span>
-            <strong>{formatCredits(profile.wallet.balance)}</strong>
-          </article>
-          <article>
-            <span>Affretement</span>
-            <strong>{formatCredits(ROOM_COST)}</strong>
-          </article>
-          <article className={phase === "resolved" && lastDelta > 0 ? "tone-positive" : phase === "resolved" ? "tone-negative" : ""}>
-            <span>Gain de la manche</span>
-            <strong>{phase === "resolved" ? `${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}` : "Aucun"}</strong>
-          </article>
-        </div>
-
-        <div className="casino-reel-shell casino-room-shell">
-          <div className="casino-reel-shell__header">
-            <div>
-              <span className="casino-chip">Chasse navale</span>
-              <h2>Baie aux epaves</h2>
-            </div>
-            <p>{status}</p>
-          </div>
-
-          <div className="casino-treasure-hunt">
-            <div className="casino-treasure-hunt__hero">
-              <img src={drapImg} alt="Drapeau pirate" />
-              <div>
-                <strong>Trois navires cachent des pierres fines.</strong>
-                <span>Les autres ne laissent qu’un nuage de poudre sur l’eau.</span>
-              </div>
-            </div>
-
-            <div className="casino-boat-grid">
-              {(state?.board || Array.from({ length: 9 }, (_, id) => ({ id, revealed: false, reward: null }))).map((tile) => {
-                const prizeMeta = getPrizeMeta(tile.reward);
-                return (
-                  <button
-                    key={tile.id}
-                    type="button"
-                    className={`casino-boat-tile ${tile.revealed ? "is-revealed" : ""}`}
-                    disabled={phase !== "playing" || tile.revealed || working}
-                    onClick={() => void revealTile(tile.id)}
-                  >
-                    {!tile.revealed ? (
-                      <img src={marineImg} alt="Navire" />
-                    ) : prizeMeta ? (
-                      <div className="casino-boat-tile__treasure">
-                        <img src={prizeMeta.art} alt={prizeMeta.label} />
-                        <strong>{formatCredits(prizeMeta.reward)}</strong>
-                      </div>
-                    ) : (
-                      <div className="casino-boat-tile__miss">
-                        <span>💥</span>
-                        <strong>Eau vide</strong>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="casino-action-row">
-              <div className="casino-chip-row">
-                <span className="casino-chip">Tirs restants: {state?.shotsLeft ?? 0}</span>
-                <span className="casino-chip">Pierres relevees: {revealedPrizes.length}</span>
-              </div>
-              <button
-                type="button"
-                className="casino-primary-button"
-                onClick={() => void handleStartRound()}
-                disabled={phase === "playing" || working}
-              >
-                {phase === "playing" ? "Expedition en cours" : "Lancer une expedition"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <aside className="casino-side-rail">
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Table</span>
-            <h3>Recompenses</h3>
-          </div>
-          <div className="casino-prize-stack">
-            {HUNT_PRIZES.map((entry) => (
-              <article key={entry.reward} className="casino-prize-card">
-                <img src={entry.art} alt={entry.label} />
-                <div>
-                  <strong>{entry.label}</strong>
-                  <span>+{formatCredits(entry.reward)} credits</span>
+    <SceneHost
+      template="template-b"
+      className="casino-table-layout"
+      main={(
+        <div className="casino-stage">
+          <div
+            className="casino-adventure-fused-stage casino-adventure-fused-stage--hunt"
+            style={{ ["--room-art" as string]: `url("${drapImg}")` }}
+          >
+            <div className="casino-room-hud casino-room-hud--adventure">
+              <div className="casino-room-hud__lead">
+                <img className="casino-room-hud__portrait" src={drapImg} alt="" aria-hidden="true" />
+                <div className="casino-room-hud__identity">
+                  <div className="casino-topdeck__chip-row">
+                    <span className="casino-chip">{huntRoomMeta?.chip || "Chasse navale"}</span>
+                    <button
+                      type="button"
+                      className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
+                      onClick={() => setShowRoomInfo((value) => !value)}
+                      aria-label="Informations chasse navale"
+                      aria-expanded={showRoomInfo}
+                    >
+                      <span className="casino-button-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M4 7h16" />
+                          <path d="M4 12h16" />
+                          <path d="M4 17h16" />
+                        </svg>
+                      </span>
+                    </button>
+                  </div>
+                  <strong>{huntRoomMeta?.title || "Baie aux epaves"}</strong>
+                  <p>{status}</p>
                 </div>
-              </article>
-            ))}
-          </div>
-        </section>
+              </div>
 
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Regles</span>
-            <h3>Comment jouer</h3>
+              {showRoomInfo ? (
+                <article className="casino-topdeck__info-panel" aria-label="Informations chasse navale">
+                  <div className="casino-topdeck__info-buttons" role="tablist" aria-label="Sections chasse navale">
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`casino-topdeck__info-button ${activeInfoSection === "apercu" ? "is-active" : ""}`}
+                      aria-selected={activeInfoSection === "apercu"}
+                      onClick={() => setActiveInfoSection("apercu")}
+                    >
+                      Apercu
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`casino-topdeck__info-button ${activeInfoSection === "recompenses" ? "is-active" : ""}`}
+                      aria-selected={activeInfoSection === "recompenses"}
+                      onClick={() => setActiveInfoSection("recompenses")}
+                    >
+                      Recompenses
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`casino-topdeck__info-button ${activeInfoSection === "salves" ? "is-active" : ""}`}
+                      aria-selected={activeInfoSection === "salves"}
+                      onClick={() => setActiveInfoSection("salves")}
+                    >
+                      Salves
+                    </button>
+                  </div>
+                  <div className="casino-topdeck__info-body" role="tabpanel">
+                    {activeInfoSection === "apercu" ? (
+                      <div className="casino-topdeck__info-stack">
+                        <div className="casino-topdeck__info-meta">
+                          <span>{huntRoomMeta?.label || "Chasse"}</span>
+                          <span>Expedition: {formatCredits(ROOM_COST)}</span>
+                          <span>Wallet: backend A11</span>
+                        </div>
+                        <p className="casino-topdeck__info-copy">
+                          Trois tirs par manche pour reveler jusqu'a trois navires gagnants dans la baie.
+                        </p>
+                      </div>
+                    ) : null}
+                    {activeInfoSection === "recompenses" ? (
+                      <div className="casino-prize-stack">
+                        {HUNT_PRIZES.map((reward) => (
+                          <article key={reward.reward} className="casino-prize-card">
+                            <img src={reward.art} alt={reward.label} />
+                            <div>
+                              <strong>{formatCredits(reward.reward)} credits</strong>
+                              <span>{reward.label}</span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+                    {activeInfoSection === "salves" ? (
+                      <div className="casino-rule-list">
+                        <p>Chaque expedition coute {formatCredits(ROOM_COST)} credits.</p>
+                        <p>Tu as trois tirs pour reveler jusqu'a trois navires gagnants.</p>
+                        <p>Le plateau et le paiement vivent cote serveur pour suivre le vrai wallet A11.</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </article>
+              ) : null}
+            </div>
+
+            <div className="casino-reel-shell casino-room-shell casino-room-shell--table-compact">
+              <div className="casino-reel-shell__header">
+                <p>{phase === "resolved" ? `Delta manche: ${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}` : status}</p>
+              </div>
+
+              <div className="casino-treasure-hunt">
+                <div className="casino-boat-grid">
+                  {(state?.board || Array.from({ length: 9 }, (_, id) => ({ id, revealed: false, reward: null }))).map((tile) => {
+                    const prizeMeta = getPrizeMeta(tile.reward);
+                    return (
+                      <button
+                        key={tile.id}
+                        type="button"
+                        className={`casino-boat-tile ${tile.revealed ? "is-revealed" : ""}`}
+                        disabled={phase !== "playing" || tile.revealed || working}
+                        onClick={() => void revealTile(tile.id)}
+                      >
+                        {!tile.revealed ? (
+                          <img src={marineImg} alt="Navire" />
+                        ) : prizeMeta ? (
+                          <div className="casino-boat-tile__treasure">
+                            <img src={prizeMeta.art} alt={prizeMeta.label} />
+                            <strong>{formatCredits(prizeMeta.reward)}</strong>
+                          </div>
+                        ) : (
+                          <div className="casino-boat-tile__miss">
+                            <span>💥</span>
+                            <strong>Eau vide</strong>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="casino-action-row">
+                  <div className="casino-chip-row">
+                    <span className="casino-chip">Tirs restants: {state?.shotsLeft ?? 0}</span>
+                    <span className="casino-chip">Pierres relevees: {revealedPrizes.length}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="casino-primary-button"
+                    onClick={() => void handleStartRound()}
+                    disabled={phase === "playing" || working}
+                  >
+                    {phase === "playing" ? "Expedition en cours" : `Lancer une expedition - ${formatCredits(ROOM_COST)}`}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="casino-rule-list">
-            <p>Chaque expedition coute {formatCredits(ROOM_COST)} credits.</p>
-            <p>Tu as trois tirs pour reveler jusqu’a trois navires gagnants.</p>
-            <p>Le plateau et le paiement vivent maintenant cote serveur pour suivre le vrai wallet A11.</p>
-          </div>
-        </section>
-      </aside>
-    </section>
+        </div>
+      )}
+    />
   );
 }

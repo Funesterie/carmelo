@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import PirateInspector from "../../../PirateInspector";
 import { formatCredits } from "../../../lib/casinoRoomState";
 import { BLACKJACK_SALONS } from "../../../lib/tableSalons";
@@ -41,6 +42,7 @@ export default function BlackjackSidebar({
   onDeal,
 }: BlackjackSidebarProps) {
   const stage = state?.stage || "idle";
+  const canDeal = stage !== "player-turn";
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
 
   return (
@@ -70,12 +72,6 @@ export default function BlackjackSidebar({
               </button>
             ))}
           </div>
-
-          <div className="casino-chip-row">
-            <span className="casino-chip">Mise {formatCredits(state?.wager || bet)}</span>
-            <span className="casino-chip">{state?.dealerHidden ? "Une carte cachee" : "Lecture ouverte"}</span>
-            <span className="casino-chip">Payout {formatCredits(state?.payoutAmount || 0)}</span>
-          </div>
         </div>
 
         <div className="casino-command-dock__actions">
@@ -95,14 +91,16 @@ export default function BlackjackSidebar({
           >
             Rester
           </button>
-          <button
-            type="button"
-            className="casino-primary-button casino-primary-button--cyan"
-            onClick={onDeal}
-            disabled={working || stage === "player-turn" || profile.wallet.balance < bet}
-          >
-            {stage === "player-turn" ? "Main en cours" : "Distribuer"}
-          </button>
+          {canDeal ? (
+            <button
+              type="button"
+              className="casino-primary-button casino-primary-button--cyan"
+              onClick={onDeal}
+              disabled={working || profile.wallet.balance < bet}
+            >
+              Distribuer
+            </button>
+          ) : null}
         </div>
       </div>
 

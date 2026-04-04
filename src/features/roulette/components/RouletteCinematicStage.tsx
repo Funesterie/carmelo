@@ -1,13 +1,11 @@
-import type { MutableRefObject } from "react";
 import type { RouletteResult } from "../../../lib/casinoApi";
 import type { RouletteSequencePhase } from "../model";
 
 type RouletteCinematicStageProps = {
   sequencePhase: RouletteSequencePhase;
-  phaseLabel: string;
   latestResolved: RouletteResult | null;
-  introVideoRef: MutableRefObject<HTMLVideoElement | null>;
-  reloadVideoRef: MutableRefObject<HTMLVideoElement | null>;
+  introVideoRef: React.MutableRefObject<HTMLVideoElement | null>;
+  reloadVideoRef: React.MutableRefObject<HTMLVideoElement | null>;
   introVideoSrc: string;
   reloadVideoSrc: string;
   idleImageSrc: string;
@@ -15,7 +13,6 @@ type RouletteCinematicStageProps = {
 
 export default function RouletteCinematicStage({
   sequencePhase,
-  phaseLabel,
   latestResolved,
   introVideoRef,
   reloadVideoRef,
@@ -60,22 +57,12 @@ export default function RouletteCinematicStage({
         </div>
 
         <div className="casino-roulette-overlay">
-          <div className="casino-roulette-phase">
-            <span>Sequence</span>
-            <strong>{phaseLabel}</strong>
-          </div>
           {latestResolved ? (
             <div className={`casino-roulette-result is-${latestResolved.winningColor}`}>
               <span>Dernier tir</span>
               <strong>{latestResolved.winningNumber}</strong>
             </div>
           ) : null}
-        </div>
-
-        <div className="casino-roulette-hero-copy">
-          <span className="casino-chip">Scene pirate</span>
-          <strong>{sequencePhase === "spin" ? "Le canon tonne, la roue de jeu travaille a droite." : "Hero visuel separé du plateau de jeu."}</strong>
-          <p>La scene garde l'ambiance et les videos. La lecture de la roue, des mises et du resultat passe par la console de jeu.</p>
         </div>
       </div>
     </div>

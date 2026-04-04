@@ -3,13 +3,7 @@ import { useEffect, useRef } from "react";
 import cardSound from "./carte.mp3";
 import checkSound from "./check.mp3";
 
-function resetAndPlay(audio: HTMLAudioElement, volume: number) {
-  audio.pause();
-  try {
-    audio.currentTime = 0;
-  } catch {
-    // ignore reset errors
-  }
+function startPlayback(audio: HTMLAudioElement, volume: number) {
   audio.volume = volume;
   void audio.play().catch(() => undefined);
 }
@@ -18,6 +12,7 @@ export function useTableAudio(enabled = true) {
   const cardAudioRef = useRef<HTMLAudioElement | null>(null);
   const checkAudioRef = useRef<HTMLAudioElement | null>(null);
   const timeoutIdsRef = useRef<number[]>([]);
+  const activeAudiosRef = useRef<Set<HTMLAudioElement>>(new Set());
   const enabledRef = useRef(enabled);
 
   useEffect(() => {
@@ -28,6 +23,10 @@ export function useTableAudio(enabled = true) {
     return () => {
       timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
       timeoutIdsRef.current = [];
+      activeAudiosRef.current.forEach((audio) => {
+        audio.pause();
+      });
+      activeAudiosRef.current.clear();
       cardAudioRef.current?.pause();
       checkAudioRef.current?.pause();
     };
@@ -44,6 +43,24 @@ export function useTableAudio(enabled = true) {
     return ref.current;
   }
 
+  function playFromSource(ref: MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
+    const baseAudio = getAudio(ref, src);
+    const audio = baseAudio.cloneNode(true) as HTMLAudioElement;
+    audio.preload = "auto";
+    activeAudiosRef.current.add(audio);
+
+    const release = () => {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      activeAudiosRef.current.delete(audio);
+    };
+
+    audio.onended = release;
+    audio.onerror = release;
+    startPlayback(audio, volume);
+  }
+
   function trackTimeout(timeoutId: number) {
     timeoutIdsRef.current.push(timeoutId);
     return timeoutId;
@@ -56,19 +73,23 @@ export function useTableAudio(enabled = true) {
   function clearQueuedAudio() {
     timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     timeoutIdsRef.current = [];
+    activeAudiosRef.current.forEach((audio) => {
+      audio.pause();
+    });
+    activeAudiosRef.current.clear();
   }
 
   function playCard(volume = 0.72, delayMs = 0) {
     if (!enabledRef.current) return;
-    const audio = getAudio(cardAudioRef, cardSound);
     if (delayMs <= 0) {
-      resetAndPlay(audio, volume);
+      playFromSource(cardAudioRef, cardSound, volume);
       return;
     }
 
     const timeoutId = trackTimeout(window.setTimeout(() => {
       clearTrackedTimeout(timeoutId);
-      resetAndPlay(audio, volume);
+      if (!enabledRef.current) return;
+      playFromSource(cardAudioRef, cardSound, volume);
     }, delayMs));
   }
 
@@ -93,8 +114,7 @@ export function useTableAudio(enabled = true) {
 
   function playCheck(volume = 0.68) {
     if (!enabledRef.current) return;
-    const audio = getAudio(checkAudioRef, checkSound);
-    resetAndPlay(audio, volume);
+    playFromSource(checkAudioRef, checkSound, volume);
   }
 
   return {

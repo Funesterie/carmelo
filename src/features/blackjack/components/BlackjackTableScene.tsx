@@ -1,13 +1,11 @@
 import PiratePlayingCardView from "../../../PiratePlayingCard";
-import jetonImg from "../../../images/jeton.png";
-import { formatCredits } from "../../../lib/casinoRoomState";
 import type { BlackjackState } from "../../../lib/casinoApi";
 
 const BLACKJACK_SEAT_LAYOUT = [
-  { x: "16%", y: "54%", align: "start", tag: "Spot 1" },
-  { x: "33%", y: "35%", align: "center", tag: "Spot 2" },
-  { x: "67%", y: "35%", align: "center", tag: "Spot 3" },
-  { x: "84%", y: "54%", align: "end", tag: "Spot 4" },
+  { x: "16%", y: "54%", align: "start" },
+  { x: "33%", y: "35%", align: "center" },
+  { x: "67%", y: "35%", align: "center" },
+  { x: "84%", y: "54%", align: "end" },
 ] as const;
 
 type BlackjackTableSceneProps = {
@@ -25,23 +23,13 @@ export default function BlackjackTableScene({
   isDecisionPhase,
   dealtCardDelays,
 }: BlackjackTableSceneProps) {
+  void playerName;
+  void bet;
   return (
     <div className={`casino-card-felt casino-card-felt--blackjack casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
       <div className={`casino-felt-table casino-felt-table--blackjack ${isDecisionPhase ? "is-decision-phase" : ""}`}>
-        <div className="casino-blackjack-arc-label">Blackjack paie 3:2</div>
-
         <section className="casino-blackjack-dealer-rail">
-          <div className="casino-card-seat__meta">
-            <strong>Le croupier</strong>
-            <span>
-              {state
-                ? state.dealerHidden
-                  ? "Carte cachee"
-                  : `${state.dealerScore.total} points`
-                : "Sabot ferme"}
-            </span>
-          </div>
-          <div className="casino-card-row casino-card-row--dealer">
+          <div className="casino-card-row casino-card-row--dealer casino-card-row--fan casino-card-row--fan-dealer">
             {(state?.dealerCards || []).length ? (
               (state?.dealerCards || []).map((card, index) => (
                 <PiratePlayingCardView
@@ -52,9 +40,7 @@ export default function BlackjackTableScene({
                   dealDelayMs={dealtCardDelays[`dealer-${card.id}-${index}`] || 0}
                 />
               ))
-            ) : (
-              <div className="casino-empty-seat">Le sabot n'est pas encore ouvert.</div>
-            )}
+            ) : null}
           </div>
         </section>
 
@@ -69,11 +55,6 @@ export default function BlackjackTableScene({
                 ["--seat-y" as string]: layout.y,
               }}
             >
-              <span className="casino-oval-seat__tag">{layout.tag}</span>
-              <header>
-                <strong>{seat.name}</strong>
-                <span className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(seat.chips)}</span>
-              </header>
               <div className="casino-card-row casino-card-row--compact casino-card-row--tight">
                 {seat.cards.length ? (
                   seat.cards.map((card, cardIndex) => (
@@ -84,36 +65,14 @@ export default function BlackjackTableScene({
                       dealDelayMs={dealtCardDelays[`${seat.id}-${card.id}-${cardIndex}`] || 0}
                     />
                   ))
-                ) : (
-                  <div className="casino-empty-seat">En attente</div>
-                )}
+                ) : null}
               </div>
-              <p>{seat.mood}</p>
-              <small>{seat.result}</small>
             </article>
           );
         })}
 
-        <section className={`casino-table-core casino-table-core--blackjack ${isDecisionPhase ? "is-focus" : ""}`}>
-          <div className="casino-table-core__headline">
-            <strong>{isDecisionPhase ? "A toi de jouer" : "Table en resolution"}</strong>
-            <span>{state?.message || "Le croupier attend la prochaine donne."}</span>
-          </div>
-          <div className="casino-chip-row">
-            <span className="casino-chip">Mise {formatCredits(state?.wager || bet)}</span>
-            <span className="casino-chip">
-              Croupier {state?.dealerCards.length ? `${state.dealerHidden ? "?" : state.dealerScore.total} pts` : "ferme"}
-            </span>
-            <span className="casino-chip">Hero {state?.playerCards.length ? `${state.playerScore.total} pts` : "en attente"}</span>
-          </div>
-        </section>
-
         <article className={`casino-oval-seat casino-oval-seat--player casino-oval-seat--blackjack-player ${isDecisionPhase ? "is-focus" : ""}`}>
-          <div className="casino-card-seat__meta">
-            <strong>{playerName}</strong>
-            <span>{state?.playerCards.length ? `${state.playerScore.total} points` : "En attente de la donne"}</span>
-          </div>
-          <div className="casino-card-row casino-card-row--player">
+          <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
             {state?.playerCards.length ? (
               state.playerCards.map((card, index) => (
                 <PiratePlayingCardView
@@ -124,9 +83,7 @@ export default function BlackjackTableScene({
                   dealDelayMs={dealtCardDelays[`player-${card.id}-${index}`] || 0}
                 />
               ))
-            ) : (
-              <div className="casino-empty-seat">Le sabot n'est pas encore ouvert.</div>
-            )}
+            ) : null}
           </div>
         </article>
       </div>

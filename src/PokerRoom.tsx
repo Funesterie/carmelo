@@ -1,9 +1,9 @@
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTableAudio } from "./audio/useTableAudio";
+import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import PokerSidebar from "./features/poker/components/PokerSidebar";
 import PokerTableScene from "./features/poker/components/PokerTableScene";
-import jetonImg from "./images/jeton.png";
 import pokerCaptainArt from "./images/poker-captain-art.png";
 import {
   actPokerRound,
@@ -17,8 +17,8 @@ import { formatCredits } from "./lib/casinoRoomState";
 import { POKER_SALONS } from "./lib/tableSalons";
 
 const ANTE_PRESETS = [60, 120, 200, 320];
-const STREET_ORDER = ["preflop", "flop", "turn", "river", "showdown"] as const;
 const TABLE_DEAL_STEP_MS = 92;
+const LIVE_MIN_PLAYERS = 2;
 
 type PokerAction = "reveal" | "showdown" | "check" | "call" | "bet" | "raise" | "fold";
 
@@ -85,12 +85,15 @@ export default function PokerRoom({
   onProfileChange,
   onError,
 }: PokerRoomProps) {
+  const pokerRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "poker");
   const [ante, setAnte] = useState(ANTE_PRESETS[1]);
   const [state, setState] = useState<PokerState | null>(null);
   const [working, setWorking] = useState(false);
   const [roomId, setRoomId] = useState(POKER_SALONS[0].id);
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
   const [infoTab, setInfoTab] = useState<"journal" | "lecture" | "salons" | "joueurs">("journal");
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [activeHeaderInfo, setActiveHeaderInfo] = useState<"structure" | "mises" | "live">("structure");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const [betTarget, setBetTarget] = useState(0);
 
@@ -102,10 +105,11 @@ export default function PokerRoom({
   const lastDelta = state?.lastDelta || 0;
   const roomSwitchLocked = !(stage === "idle" || stage === "showdown");
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const activePlayerCount = activeRoom?.playerCount || 0;
+  const isLiveMultiplayerReady = activePlayerCount >= LIVE_MIN_PLAYERS;
   const activeAnte = state?.ante || ante;
   const smallBlind = Math.max(10, Math.round(activeAnte / 2));
   const blindUnit = Math.max(10, Math.round(activeAnte / 2));
-  const currentStreetIndex = stage === "idle" ? -1 : STREET_ORDER.indexOf(stage);
   const communityCards = state?.communityCards || [];
   const toCall = state?.toCall || 0;
   const isDecisionPhase = Boolean(state && stage !== "showdown" && !state.playerFolded);
@@ -203,6 +207,10 @@ export default function PokerRoom({
   }, [aggressionMax, aggressionMin, aggressionPresets, blindUnit, canBet, canRaise]);
 
   async function dealHand() {
+    if (!isLiveMultiplayerReady) {
+      onError("Mode multijoueur: en attente d'au moins un autre joueur sur ce salon.");
+      return;
+    }
     onError("");
     clearQueuedAudio();
     previousCardKeysRef.current = [];
@@ -280,116 +288,181 @@ export default function PokerRoom({
 
   return (
     <section className="casino-table-layout casino-table-layout--compact casino-table-layout--cards">
-      <div className="casino-stage casino-stage--cards">
-        <div className="casino-room-hud casino-room-hud--poker">
-          <div className="casino-room-hud__lead">
-            <img className="casino-room-hud__portrait" src={pokerCaptainArt} alt="" aria-hidden="true" />
-            <div className="casino-room-hud__identity">
-              <span className="casino-chip">Poker ATS</span>
-              <strong>Texas Hold'em NL</strong>
-              <p>
-                {state?.message || "Table pirate premium plus sobre, plus tendue, avec vraies decisions de cash game par street."}
-                {" "}
-                {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
-              </p>
+      <div className="casino-stage casino-stage--cards casino-stage--cards--poker">
+        <div
+          className="casino-card-fused-stage casino-card-fused-stage--poker"
+          style={{ ["--room-art" as string]: `url("${pokerCaptainArt}")` }}
+        >
+          <div className="casino-room-hud casino-room-hud--poker">
+            <div className="casino-room-hud__lead">
+              <img className="casino-room-hud__portrait" src={pokerCaptainArt} alt="" aria-hidden="true" />
+              <div className="casino-room-hud__identity">
+                <div className="casino-topdeck__chip-row">
+                  <span className="casino-chip">{pokerRoomMeta?.chip || "Salon hold'em"}</span>
+                  <button
+                    type="button"
+                    className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
+                    onClick={() => setShowRoomInfo((value) => !value)}
+                    aria-label="Informations poker"
+                    aria-expanded={showRoomInfo}
+                  >
+                    <span className="casino-button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path d="M4 7h16" />
+                        <path d="M4 12h16" />
+                        <path d="M4 17h16" />
+                      </svg>
+                    </span>
+                  </button>
+                </div>
+                <strong>{pokerRoomMeta?.title || "Texas hold'em rapide"}</strong>
+                <p>
+                  {state?.message || "Table pirate premium plus sobre, plus tendue, avec vraies decisions de cash game par street."}
+                  {" "}
+                  {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
+                </p>
+              </div>
+            </div>
+
+            {showRoomInfo ? (
+              <article className="casino-topdeck__info-panel" aria-label="Informations poker">
+                <div className="casino-topdeck__info-buttons" role="tablist" aria-label="Sections poker">
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "structure" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "structure"}
+                    onClick={() => setActiveHeaderInfo("structure")}
+                  >
+                    Structure
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "mises" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "mises"}
+                    onClick={() => setActiveHeaderInfo("mises")}
+                  >
+                    Mises
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "live" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "live"}
+                    onClick={() => setActiveHeaderInfo("live")}
+                  >
+                    Live
+                  </button>
+                </div>
+                <div className="casino-topdeck__info-body" role="tabpanel">
+                  {activeHeaderInfo === "structure" ? (
+                    <div className="casino-rule-list">
+                      <p>Texas hold'em rapide avec preflop, flop, turn, river et showdown.</p>
+                      <p>Le backend gere les vraies decisions de check, call, bet, raise et fold.</p>
+                      <p>Le journal detaille et la lecture du spot restent disponibles dans le dock de table.</p>
+                    </div>
+                  ) : null}
+                  {activeHeaderInfo === "mises" ? (
+                    <div className="casino-metric-list">
+                      <div>
+                        <span>Ante presets</span>
+                        <strong>60 / 120 / 200 / 320</strong>
+                      </div>
+                      <div>
+                        <span>Blind unit</span>
+                        <strong>{formatCredits(blindUnit)}</strong>
+                      </div>
+                      <div>
+                        <span>A payer</span>
+                        <strong>{formatCredits(toCall)}</strong>
+                      </div>
+                      <div>
+                        <span>Pot</span>
+                        <strong>{formatCredits(state?.pot || 0)}</strong>
+                      </div>
+                    </div>
+                  ) : null}
+                  {activeHeaderInfo === "live" ? (
+                    <div className="casino-rule-list">
+                      <p>Le salon doit compter au moins 2 joueurs pour distribuer une main.</p>
+                      <p>Table en cours: {activeRoom ? POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
+                      <p>Joueurs presents: {activePlayerCount}</p>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            ) : null}
+
+            <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons poker">
+              {POKER_SALONS.map((salon) => {
+                const room = rooms.find((entry) => entry.id === salon.id);
+                return (
+                  <button
+                    key={salon.id}
+                    type="button"
+                    className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
+                    onClick={() => handleRoomChange(salon.id)}
+                    disabled={roomSwitchLocked || working}
+                    role="tab"
+                    aria-selected={salon.id === roomId}
+                  >
+                    <div>
+                      <strong>{salon.title}</strong>
+                      <span>{salon.chip}</span>
+                    </div>
+                    <b>{room?.playerCount || 0}</b>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="casino-status-strip casino-status-strip--compact casino-status-strip--poker-compact">
-            <article>
-              <span>Solde serveur</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(profile.wallet.balance)}</strong>
-            </article>
-            <article>
-              <span>Blindes</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(smallBlind)} / {formatCredits(activeAnte)}</strong>
-            </article>
-            <article>
-              <span>Pot</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(state?.pot || 0)}</strong>
-            </article>
-            <article>
-              <span>Tapis hero</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(playerChips)}</strong>
-            </article>
-            <article className={lastDelta >= 0 ? "tone-positive" : "tone-negative"}>
-              <span>Derniere variation</span>
-              <strong className="casino-token-inline"><img src={jetonImg} alt="" />{`${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}`}</strong>
-            </article>
+          <div className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--poker">
+            <PokerTableScene
+              state={state}
+              stage={stage}
+              playerName={playerName}
+              activeAnte={activeAnte}
+              smallBlind={smallBlind}
+              isDecisionPhase={isDecisionPhase}
+              dealtCardDelays={dealtCardDelays}
+            />
+
+            <PokerSidebar
+              profile={profile}
+              state={state}
+              stage={stage}
+              working={working}
+              roomId={roomId}
+              rooms={rooms}
+              infoTab={infoTab}
+              isDecisionPhase={isDecisionPhase}
+              roomSwitchLocked={roomSwitchLocked}
+              ante={ante}
+              playerChips={playerChips}
+              playerCommitted={playerCommitted}
+              playerStreetCommitted={playerStreetCommitted}
+              toCall={toCall}
+              canCheck={canCheck}
+              canCall={canCall}
+              canBet={canBet}
+              canRaise={canRaise}
+              normalizedBetTarget={normalizedBetTarget}
+              aggressionMin={aggressionMin}
+              aggressionMax={aggressionMax}
+              blindUnit={blindUnit}
+              aggressionPresets={aggressionPresets}
+              onAnteChange={setAnte}
+              onInfoTabChange={setInfoTab}
+              onRoomChange={handleRoomChange}
+              onBetTargetChange={setBetTarget}
+              onFold={() => void act("fold")}
+              onCheckOrCall={() => void handleCheckOrCall()}
+              onAggression={() => void handleAggression()}
+              onDeal={() => void dealHand()}
+            />
           </div>
-
-          <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons poker">
-            {POKER_SALONS.map((salon) => {
-              const room = rooms.find((entry) => entry.id === salon.id);
-              return (
-                <button
-                  key={salon.id}
-                  type="button"
-                  className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
-                  onClick={() => handleRoomChange(salon.id)}
-                  disabled={roomSwitchLocked || working}
-                  role="tab"
-                  aria-selected={salon.id === roomId}
-                >
-                  <div>
-                    <strong>{salon.title}</strong>
-                    <span>{salon.chip}</span>
-                  </div>
-                  <b>{room?.playerCount || 0}</b>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div
-          className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--poker"
-          style={{ ["--room-art" as string]: `url("${pokerCaptainArt}")` }}
-        >
-          <PokerTableScene
-            state={state}
-            stage={stage}
-            playerName={playerName}
-            activeAnte={activeAnte}
-            smallBlind={smallBlind}
-            isDecisionPhase={isDecisionPhase}
-            currentStreetIndex={currentStreetIndex}
-            dealtCardDelays={dealtCardDelays}
-          />
-
-          <PokerSidebar
-            profile={profile}
-            state={state}
-            stage={stage}
-            working={working}
-            roomId={roomId}
-            rooms={rooms}
-            infoTab={infoTab}
-            isDecisionPhase={isDecisionPhase}
-            roomSwitchLocked={roomSwitchLocked}
-            ante={ante}
-            playerChips={playerChips}
-            playerCommitted={playerCommitted}
-            playerStreetCommitted={playerStreetCommitted}
-            toCall={toCall}
-            canCheck={canCheck}
-            canCall={canCall}
-            canBet={canBet}
-            canRaise={canRaise}
-            normalizedBetTarget={normalizedBetTarget}
-            aggressionMin={aggressionMin}
-            aggressionMax={aggressionMax}
-            blindUnit={blindUnit}
-            aggressionPresets={aggressionPresets}
-            onAnteChange={setAnte}
-            onInfoTabChange={setInfoTab}
-            onRoomChange={handleRoomChange}
-            onBetTargetChange={setBetTarget}
-            onFold={() => void act("fold")}
-            onCheckOrCall={() => void handleCheckOrCall()}
-            onAggression={() => void handleAggression()}
-            onDeal={() => void dealHand()}
-          />
         </div>
       </div>
     </section>

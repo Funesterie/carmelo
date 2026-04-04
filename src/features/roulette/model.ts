@@ -1,4 +1,4 @@
-export const ROULETTE_AMOUNT_PRESETS = [20, 50, 100, 200, 500];
+export const ROULETTE_AMOUNT_PRESETS = [10, 50, 200, 500];
 
 export const QUICK_BETS = [
   { betType: "color", betValue: "red", label: "Rouge" },
@@ -23,8 +23,9 @@ export const BALL_TARGET_ANGLE = 270;
 export const BALL_OUTER_RADIUS = 45.4;
 export const BALL_INNER_RADIUS = 37.2;
 export const SPIN_DURATION_MS = 4100;
-export const HOLD_DURATION_MS = 5000;
-export const ROULETTE_TIRAGE_CANNON_DELAY_MS = 1180;
+export const HOLD_DURATION_MS = 30000;
+export const ROULETTE_TIRAGE_CANNON_DELAY_MS = 700;
+export const ROULETTE_ANNOUNCE_LEAD_IN_MS = 6200;
 
 export type RouletteSequencePhase = "idle" | "intro" | "spin" | "hold" | "reload";
 
@@ -173,6 +174,16 @@ export async function playVideoReverse(
 ) {
   await waitForVideoMetadata(video);
   video.pause();
+  video.playbackRate = 1;
+  video.muted = true;
+  video.volume = 0;
+
+  try {
+    await video.play();
+    video.pause();
+  } catch {
+    // ignore autoplay warmup failures
+  }
 
   const safeDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1.6;
   try {
@@ -234,5 +245,24 @@ export async function playVideoReverse(
 
 export function getBetLabel(betType: string, betValue: string) {
   if (betType === "straight") return `Numero ${betValue}`;
+  if (betType === "column") {
+    if (betValue === "col1") return "Colonne 1 (2 to 1)";
+    if (betValue === "col2") return "Colonne 2 (2 to 1)";
+    if (betValue === "col3") return "Colonne 3 (2 to 1)";
+    if (betValue === "first") return "Colonne 1 (2 to 1)";
+    if (betValue === "second") return "Colonne 2 (2 to 1)";
+    if (betValue === "third") return "Colonne 3 (2 to 1)";
+  }
+  if (betType === "street") {
+    const start = Number.parseInt(betValue, 10);
+    if (Number.isFinite(start)) return `Transversale ${start}-${start + 2}`;
+  }
+  if (betType === "sixline") {
+    const start = Number.parseInt(betValue, 10);
+    if (Number.isFinite(start)) return `Sixain ${start}-${start + 5}`;
+  }
+  if (betType === "split") return `Cheval ${betValue.split("-").join("/")}`;
+  if (betType === "corner") return `Carre ${betValue.split("-").join("/")}`;
+  if (betType === "trio") return `Trio ${betValue.split("-").join("/")}`;
   return QUICK_BETS.find((entry) => entry.betType === betType && entry.betValue === betValue)?.label || `${betType}:${betValue}`;
 }

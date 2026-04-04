@@ -1,6 +1,25 @@
+import * as React from "react";
+import { SLOT_AMBIENT_MEDIA } from "../../casino/catalog";
+import { ROOM_DEFINITIONS, type RoomId } from "../../casino/catalog";
 import type { MutableRefObject, ReactNode } from "react";
+import icoSlotsImg from "../../../images/icomachine.png";
+import icoMapImg from "../../../images/icochassetresor.png";
+import icoHuntImg from "../../../images/icochassenaval.png";
+import icoBlackjackImg from "../../../images/icoblackjack.png";
+import icoPokerImg from "../../../images/icopoker.png";
+import icoRouletteImg from "../../../images/icoroulette.png";
 import type { CasinoProfile } from "../../../lib/casinoApi";
+import { formatCredits } from "../../../lib/casinoRoomState";
 import LoadingPanel from "./LoadingPanel";
+
+const HAMBURGER_ROOM_ICONS: Record<RoomId, string> = {
+  slots: icoSlotsImg,
+  "treasure-map": icoMapImg,
+  "treasure-hunt": icoHuntImg,
+  blackjack: icoBlackjackImg,
+  poker: icoPokerImg,
+  roulette: icoRouletteImg,
+};
 
 type MenuIconKind = "bonus" | "sync" | "logout";
 
@@ -38,24 +57,43 @@ function HeaderActionIcon({ kind }: { kind: MenuIconKind }) {
   }
 }
 
+function HeaderWidgetIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="6.3" />
+      <circle cx="12" cy="12" r="2.1" />
+      <path d="M12 2.6v3.2" />
+      <path d="M12 18.2v3.2" />
+      <path d="M2.6 12h3.2" />
+      <path d="M18.2 12h3.2" />
+      <path d="M5.35 5.35l2.26 2.26" />
+      <path d="M16.39 16.39l2.26 2.26" />
+      <path d="M18.65 5.35l-2.26 2.26" />
+      <path d="M7.61 16.39l-2.26 2.26" />
+    </svg>
+  );
+}
+
 type CasinoGameScreenProps = {
   profile: CasinoProfile;
   busy: boolean;
   error: string;
   notice: string;
   displayName: string;
-  activeCasinoRoom: string;
-  ambientVideoAudible: boolean;
+  activeCasinoRoom: RoomId;
   showImmersion: boolean;
   immersionLine: string;
   mediaReady: boolean;
+  ambientVideoAudible: boolean;
   ambientVideoRef: MutableRefObject<HTMLVideoElement | null>;
+  ambientPanel?: ReactNode;
   freshVideo: string;
   districtArtwork: string;
   cardArtwork: string;
   onClaimBonus: () => void;
   onRefreshProfile: () => void;
   onLogout: () => void;
+  onRoomChange: (roomId: RoomId) => void;
   gameTable: ReactNode;
 };
 
@@ -66,19 +104,73 @@ export default function CasinoGameScreen({
   notice,
   displayName,
   activeCasinoRoom,
-  ambientVideoAudible,
   showImmersion,
   immersionLine,
   mediaReady,
+  ambientVideoAudible,
   ambientVideoRef,
+  ambientPanel,
   freshVideo,
   districtArtwork,
   cardArtwork,
   onClaimBonus,
   onRefreshProfile,
   onLogout,
+  onRoomChange,
   gameTable,
 }: CasinoGameScreenProps) {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [clockLabel, setClockLabel] = React.useState(() =>
+    new Date().toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  );
+  const profileMenuRef = React.useRef<HTMLDivElement | null>(null);
+
+  void mediaReady;
+
+  const headerVideoSrc =
+    activeCasinoRoom === "slots"
+      ? SLOT_AMBIENT_MEDIA.video
+      : freshVideo;
+
+  React.useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const updateClock = () => {
+      setClockLabel(
+        new Date().toLocaleTimeString("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      );
+    };
+
+    updateClock();
+    const intervalId = window.setInterval(updateClock, 30000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   return (
     <div className={`casino-game-shell ${activeCasinoRoom !== "slots" ? "casino-game-shell--with-ambient" : ""}`}>
 
@@ -122,80 +214,119 @@ export default function CasinoGameScreen({
       ) : null}
 
       <header className="casino-account-bar">
-        <div>
+        <div className="casino-account-bar__identity">
           <span className="casino-eyebrow">Salle privee</span>
           <h1>{displayName}</h1>
         </div>
 
-        <div className="casino-account-bar__actions">
-          <button
-            type="button"
-            className="casino-ghost-button casino-ghost-button--menu"
-            disabled={busy || !profile.wallet.canClaimDailyBonus}
-            onClick={onClaimBonus}
-            title={profile.wallet.canClaimDailyBonus ? "Recuperer le bonus journalier" : "Bonus journalier deja recupere"}
-          >
-            <span className="casino-button-icon">
-              <HeaderActionIcon kind="bonus" />
-            </span>
-            <span className="casino-button-label">
-              {profile.wallet.canClaimDailyBonus ? `Bonus +${profile.wallet.dailyBonusAmount}` : "Bonus pris"}
-            </span>
-          </button>
-          <button
-            type="button"
-            className="casino-ghost-button casino-ghost-button--menu"
-            disabled={busy}
-            onClick={onRefreshProfile}
-            title="Synchroniser le compte"
-          >
-            <span className="casino-button-icon">
-              <HeaderActionIcon kind="sync" />
-            </span>
-            <span className="casino-button-label">Sync</span>
-          </button>
-          <button
-            type="button"
-            className="casino-ghost-button casino-ghost-button--menu"
-            onClick={onLogout}
-            title="Fermer la session"
-          >
-            <span className="casino-button-icon">
-              <HeaderActionIcon kind="logout" />
-            </span>
-            <span className="casino-button-label">Quitter</span>
-          </button>
-          {activeCasinoRoom !== "slots" ? (
-            <div className="casino-ambient-indicator" aria-live="polite">
-              <span className="casino-chip">Pont ATS</span>
-              <small>{ambientVideoAudible ? "Video d'ambiance en haut a droite" : "Video visible, audio en attente d'un geste"}</small>
-            </div>
-          ) : null}
-        </div>
-      </header>
-
-      {activeCasinoRoom !== "slots" ? (
-        <div className="casino-ambient-corner" aria-live="polite">
-          <div className="casino-ambient-corner__frame">
+        <div className={`casino-account-bar__ambient ${ambientPanel ? "is-custom-ambient" : ""}`}>
+          {ambientPanel ? (
+            ambientPanel
+          ) : (
             <video
               ref={ambientVideoRef}
-              className="casino-ambient-corner__video"
-              src={freshVideo}
+              className="casino-account-bar__ambient-video"
+              src={headerVideoSrc}
               autoPlay
               loop
               playsInline
               muted={!ambientVideoAudible}
               preload="metadata"
             />
-            <div className="casino-ambient-corner__veil" />
-            <div className="casino-ambient-corner__copy">
-              <span className="casino-chip">Pont ATS</span>
-              <strong>Ambiance live</strong>
-              <small>{ambientVideoAudible ? "Flux ambiance actif" : "En attente d'un geste pour l'audio"}</small>
+          )}
+        </div>
+
+        <div
+          ref={profileMenuRef}
+          className={`casino-account-bar__menu ${menuOpen ? "is-open" : ""}`}
+        >
+          <button
+            type="button"
+            className="casino-ghost-button casino-account-bar__menu-toggle"
+            aria-label="Ouvrir le menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            <span className="casino-button-icon casino-button-icon--widget" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+              </svg>
+            </span>
+          </button>
+
+          <div className="casino-account-bar__actions">
+            <div className="casino-account-bar__room-list" role="tablist" aria-label="Jeux casino">
+              {ROOM_DEFINITIONS.map((room) => {
+                const roomIcon = HAMBURGER_ROOM_ICONS[room.id] || room.icon;
+                return (
+                  <button
+                    key={room.id}
+                    type="button"
+                    className={`casino-ghost-button casino-ghost-button--menu ${room.id === activeCasinoRoom ? "is-active" : ""}`}
+                    onClick={() => {
+                      onRoomChange(room.id);
+                      setMenuOpen(false);
+                    }}
+                    role="tab"
+                    aria-selected={room.id === activeCasinoRoom}
+                  >
+                    <span className="casino-button-icon casino-button-icon--room" aria-hidden="true">
+                      <img src={roomIcon} alt="" />
+                    </span>
+                    <span className="casino-button-label">{room.label}</span>
+                  </button>
+                );
+              })}
             </div>
+
+            <button
+              type="button"
+              className="casino-ghost-button casino-ghost-button--menu"
+              disabled={busy || !profile.wallet.canClaimDailyBonus}
+              onClick={onClaimBonus}
+              title={profile.wallet.canClaimDailyBonus ? "Recuperer le bonus journalier" : "Bonus journalier deja recupere"}
+            >
+              <span className="casino-button-icon">
+                <HeaderActionIcon kind="bonus" />
+              </span>
+              <span className="casino-button-label">
+                {profile.wallet.canClaimDailyBonus ? `Bonus +${profile.wallet.dailyBonusAmount}` : "Bonus pris"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="casino-ghost-button casino-ghost-button--menu"
+              disabled={busy}
+              onClick={onRefreshProfile}
+              title="Synchroniser le compte"
+            >
+              <span className="casino-button-icon">
+                <HeaderActionIcon kind="sync" />
+              </span>
+              <span className="casino-button-label">Sync</span>
+            </button>
+            <button
+              type="button"
+              className="casino-ghost-button casino-ghost-button--menu"
+              onClick={onLogout}
+              title="Fermer la session"
+            >
+              <span className="casino-button-icon">
+                <HeaderActionIcon kind="logout" />
+              </span>
+              <span className="casino-button-label">Quitter</span>
+            </button>
           </div>
         </div>
-      ) : null}
+
+        <div className="casino-account-bar__clock">{clockLabel}</div>
+
+        <div className="casino-account-bar__coins" aria-label="Solde du compte">
+          {formatCredits(profile.wallet.balance)} credits
+        </div>
+      </header>
 
       {(error || notice) ? (
         <div className="casino-toast-rail" aria-live="polite">

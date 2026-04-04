@@ -1,12 +1,13 @@
 import * as React from "react";
 import { startTransition, useEffect, useMemo, useState } from "react";
-import type { RoomId } from "../casino/catalog";
+import { SLOT_VIDEO_INTRO_SESSION_KEY, type RoomId } from "../casino/catalog";
 import {
   claimCasinoDailyBonus,
   clearCasinoSession,
   fetchCasinoProfile,
   getCasinoDisplayName,
   hasCasinoToken,
+  isCasinoSessionError,
   loginCasino,
   registerCasino,
   requestCasinoPasswordReset,
@@ -14,6 +15,8 @@ import {
 } from "../../lib/casinoApi";
 
 export type AuthMode = "login" | "register" | "forgot";
+
+const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
 
 type UseCasinoSessionOptions = {
 };
@@ -50,10 +53,14 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
         if (cancelled) return;
         startTransition(() => setProfile(nextProfile));
         setNotice(`Bienvenue a bord, ${nextProfile.user.username}.`);
-      } catch {
+      } catch (error_) {
         if (cancelled) return;
-        clearCasinoSession();
-        setError("La session a expire. Reconnecte-toi pour retrouver ton solde.");
+        if (isCasinoSessionError(error_)) {
+          clearCasinoSession();
+          setError("La session a expire. Reconnecte-toi pour retrouver ton solde.");
+        } else {
+          setError(error_ instanceof Error ? error_.message : "Le compte est momentanement indisponible.");
+        }
       } finally {
         if (!cancelled) setBooting(false);
       }
@@ -80,6 +87,15 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     return profile?.user?.username || getCasinoDisplayName() || "Capitaine";
   }, [profile]);
 
+  function resetConnectedSessionMediaIntro() {
+    try {
+      sessionStorage.removeItem(SLOT_VIDEO_INTRO_SESSION_KEY);
+      sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
+    } catch {
+      // ignore storage failures
+    }
+  }
+
   async function refreshProfile(message = "") {
     setBusy(true);
     setError("");
@@ -88,6 +104,11 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       startTransition(() => setProfile(nextProfile));
       if (message) setNotice(message);
     } catch (error_) {
+      if (isCasinoSessionError(error_)) {
+        handleLogout();
+        setError("La session a expire. Reconnecte-toi pour retrouver ton solde.");
+        return;
+      }
       setError(error_ instanceof Error ? error_.message : "Impossible de charger le compte.");
     } finally {
       setBusy(false);
@@ -102,6 +123,8 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     try {
       await loginCasino(loginName, loginPassword);
       const nextProfile = await fetchCasinoProfile();
+      resetConnectedSessionMediaIntro();
+      setActiveCasinoRoom("slots");
       startTransition(() => setProfile(nextProfile));
       setPendingImmersionName(nextProfile.user.username);
       setNotice(`Bienvenue a bord, ${nextProfile.user.username}.`);
@@ -126,6 +149,8 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     try {
       await registerCasino(registerName, registerEmail, registerPassword);
       const nextProfile = await fetchCasinoProfile();
+      resetConnectedSessionMediaIntro();
+      setActiveCasinoRoom("slots");
       startTransition(() => setProfile(nextProfile));
       setPendingImmersionName(nextProfile.user.username);
       setNotice(`Compte cree. Bon vent, ${nextProfile.user.username}.`);
@@ -138,8 +163,8 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     }
   }
 
-  async function handleForgot(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleForgot(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     setBusy(true);
     setError("");
     try {
@@ -160,6 +185,11 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       startTransition(() => setProfile(result.profile));
       setNotice(`Bonus journalier recupere: +${result.claimedAmount} credits.`);
     } catch (error_) {
+      if (isCasinoSessionError(error_)) {
+        handleLogout();
+        setError("La session a expire. Reconnecte-toi pour retrouver ton solde.");
+        return;
+      }
       setError(error_ instanceof Error ? error_.message : "Bonus indisponible.");
     } finally {
       setBusy(false);

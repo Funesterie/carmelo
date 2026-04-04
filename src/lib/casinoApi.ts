@@ -111,12 +111,11 @@ type SpinResponse = {
 function getDefaultApiBase() {
   if (typeof window !== "undefined") {
     const host = String(window.location.hostname || "").trim().toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1") {
-      return window.location.origin;
-    }
+    if (host === "funesterie.pro" || host === "www.funesterie.pro") return "https://api.funesterie.pro";
+    return window.location.origin;
   }
 
-  return "https://api.funesterie.pro";
+  return "";
 }
 
 const API_BASE = String(import.meta.env.VITE_A11_API_BASE_URL || getDefaultApiBase()).trim().replace(/\/$/, "");
@@ -142,6 +141,22 @@ function getErrorMessage(payload: any, fallback: string) {
   return raw || fallback;
 }
 
+export class CasinoApiError extends Error {
+  status: number;
+  code: string;
+
+  constructor(message: string, options: { status?: number; code?: string } = {}) {
+    super(message);
+    this.name = "CasinoApiError";
+    this.status = Number(options.status || 0);
+    this.code = String(options.code || "").trim();
+  }
+}
+
+export function isCasinoSessionError(error: unknown) {
+  return error instanceof CasinoApiError && (error.status === 401 || error.status === 403);
+}
+
 export function getCasinoToken() {
   try {
     return String(localStorage.getItem(TOKEN_KEY) || '').trim();
@@ -155,7 +170,11 @@ export function hasCasinoToken() {
 }
 
 export function setCasinoToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, String(token || '').trim());
+  try {
+    localStorage.setItem(TOKEN_KEY, String(token || '').trim());
+  } catch {
+    // ignore storage failures
+  }
 }
 
 export function clearCasinoSession() {
@@ -211,7 +230,7 @@ export async function loginCasino(username: string, password: string) {
 
   const payload = (await readJsonSafe(response)) as AuthResponse | null;
   if (!response.ok || !payload?.success || !payload?.token) {
-    throw new Error(getErrorMessage(payload, 'Connexion impossible'));
+    throw new CasinoApiError(getErrorMessage(payload, 'Connexion impossible'), { status: response.status });
   }
 
   setCasinoToken(payload.token);
@@ -232,7 +251,7 @@ export async function registerCasino(username: string, email: string, password: 
 
   const payload = (await readJsonSafe(response)) as AuthResponse | null;
   if (!response.ok || !payload?.token) {
-    throw new Error(getErrorMessage(payload, 'Inscription impossible'));
+    throw new CasinoApiError(getErrorMessage(payload, 'Inscription impossible'), { status: response.status });
   }
 
   setCasinoToken(payload.token);
@@ -248,7 +267,7 @@ export async function requestCasinoPasswordReset(email: string) {
   });
   const payload = await readJsonSafe(response);
   if (!response.ok) {
-    throw new Error(getErrorMessage(payload, 'Envoi du lien impossible'));
+    throw new CasinoApiError(getErrorMessage(payload, 'Envoi du lien impossible'), { status: response.status });
   }
   return payload;
 }
@@ -260,7 +279,7 @@ export async function fetchCasinoProfile() {
 
   const payload = (await readJsonSafe(response)) as CasinoProfile | { error?: string } | null;
   if (!response.ok || !payload || (payload as CasinoProfile).ok !== true) {
-    throw new Error(getErrorMessage(payload, 'Profil casino indisponible'));
+    throw new CasinoApiError(getErrorMessage(payload, 'Profil casino indisponible'), { status: response.status });
   }
 
   const profile = payload as CasinoProfile;
@@ -277,7 +296,7 @@ export async function claimCasinoDailyBonus() {
 
   const payload = (await readJsonSafe(response)) as DailyBonusResponse | { error?: string } | null;
   if (!response.ok || !payload || !('ok' in payload) || !payload.ok) {
-    throw new Error(getErrorMessage(payload, 'Bonus indisponible'));
+    throw new CasinoApiError(getErrorMessage(payload, 'Bonus indisponible'), { status: response.status });
   }
   return payload as DailyBonusResponse;
 }
@@ -291,7 +310,7 @@ export async function spinCasinoSlots(bet: number) {
 
   const payload = (await readJsonSafe(response)) as SpinResponse | { error?: string } | null;
   if (!response.ok || !payload || !('ok' in payload) || !payload.ok) {
-    throw new Error(getErrorMessage(payload, 'Spin impossible'));
+    throw new CasinoApiError(getErrorMessage(payload, 'Spin impossible'), { status: response.status });
   }
   return payload as SpinResponse;
 }
@@ -510,7 +529,7 @@ async function postCasinoAuthed<T>(path: string, body: unknown) {
   });
   const payload = (await readJsonSafe(response)) as T | { error?: string } | null;
   if (!response.ok || !payload || ("ok" in (payload as any) && (payload as any).ok === false)) {
-    throw new Error(getErrorMessage(payload, "Operation casino impossible"));
+    throw new CasinoApiError(getErrorMessage(payload, "Operation casino impossible"), { status: response.status });
   }
   return payload as T;
 }
@@ -521,7 +540,7 @@ async function getCasinoAuthed<T>(path: string) {
   });
   const payload = (await readJsonSafe(response)) as T | { error?: string } | null;
   if (!response.ok || !payload || ("ok" in (payload as any) && (payload as any).ok === false)) {
-    throw new Error(getErrorMessage(payload, "Lecture casino impossible"));
+    throw new CasinoApiError(getErrorMessage(payload, "Lecture casino impossible"), { status: response.status });
   }
   return payload as T;
 }

@@ -1,4 +1,3 @@
-import amightImg from "../../images/amight.png";
 import batIconImg from "../../images/bat.png";
 import blackjackCaptainArt from "../../images/blackjack-captain-art.png";
 import cardArtwork from "../../images/Cartes de pirate au crépuscule.png";
@@ -12,12 +11,17 @@ import elephantImg from "../../images/elephant.png";
 import flushImg from "../../images/flush.png";
 import fondImg from "../../images/fond.png";
 import gunImg from "../../images/gun.png";
+import icoBlackjackImg from "../../images/icoblackjack.png";
+import icoHuntImg from "../../images/icochassenaval.png";
+import icoMapImg from "../../images/icochassetresor.png";
+import icoSlotsImg from "../../images/icomachine.png";
+import icoPokerImg from "../../images/icopoker.png";
+import icoRouletteImg from "../../images/icoroulette.png";
 import lingotImg from "../../images/lingot.png";
 import mapImg from "../../images/map.png";
 import perroImg from "../../images/perro.png";
 import pokerCaptainArt from "../../images/poker-captain-art.png";
 import qflushImg from "../../images/qflush.png";
-import romeImg from "../../images/rome.png";
 import rouletteArtwork from "../../images/casino ats.png";
 import soldatImg from "../../images/soldat.png";
 import batVideo from "../../videos/bat.mp4";
@@ -64,9 +68,11 @@ export const ROOM_DEFINITIONS = [
     id: "slots",
     label: "Slots",
     chip: "Machine a sous",
-    title: "Salon principal",
-    body: "Le coeur du casino, avec la machine a sous branchee sur le vrai backend A11 et le solde persistant.",
-    icon: qflushImg,
+    title: "Salon des machines",
+    body: "Une salle de jeu dediee aux machines a sous, branchee sur le backend A11 avec solde persistant.",
+    icon: icoSlotsImg,
+    costLabel: "Mise variable",
+    layoutTemplate: "template-c",
   },
   {
     id: "treasure-map",
@@ -74,7 +80,9 @@ export const ROOM_DEFINITIONS = [
     chip: "Carte au tresor",
     title: "Archiviste des criques",
     body: "Une seule croix, une seule chance, mais un positionnement enfin propre et lisible jusque sur telephone.",
-    icon: dragoncImg,
+    icon: perroImg,
+    costLabel: "90 credits / recherche",
+    layoutTemplate: "template-a",
   },
   {
     id: "treasure-hunt",
@@ -82,7 +90,9 @@ export const ROOM_DEFINITIONS = [
     chip: "Chasse navale",
     title: "Baie aux epaves",
     body: "Trois tirs, trois navires caches, et une lecture de plateau robuste au lieu des vieux overlays fragiles.",
-    icon: dragonImg,
+    icon: perroImg,
+    costLabel: "Mise variable",
+    layoutTemplate: "template-b",
   },
   {
     id: "blackjack",
@@ -90,7 +100,9 @@ export const ROOM_DEFINITIONS = [
     chip: "Table des lanternes",
     title: "Blackjack pirate",
     body: "Une vraie table avec croupier, quatre IA autour de toi et des mises qui debitent le wallet A11 en direct.",
-    icon: amightImg,
+    icon: icoBlackjackImg,
+    costLabel: "Mise variable",
+    layoutTemplate: "template-c",
   },
   {
     id: "poker",
@@ -98,7 +110,9 @@ export const ROOM_DEFINITIONS = [
     chip: "Salon hold'em",
     title: "Texas hold'em rapide",
     body: "Cinq joueurs a table, quatre IA, un showdown net et des paiements serves par le backend A11.",
-    icon: romeImg,
+    icon: icoPokerImg,
+    costLabel: "Mise variable",
+    layoutTemplate: "template-c",
   },
   {
     id: "roulette",
@@ -106,11 +120,67 @@ export const ROOM_DEFINITIONS = [
     chip: "ATS live",
     title: "Roulette multijoueur",
     body: "Une salle commune, un compte a rebours partage, des mises visibles par plusieurs comptes et un tir serveur unique pour toute la table.",
-    icon: batIconImg,
+    icon: icoRouletteImg,
+    costLabel: "Mise variable",
+    layoutTemplate: "template-c",
   },
 ] as const;
 
 export type RoomId = (typeof ROOM_DEFINITIONS)[number]["id"];
+export type GameLayoutTemplate = "template-a" | "template-b" | "template-c";
+
+export type GameLayoutConfig = {
+  main: "canvas" | "react";
+  leftPanel: "react";
+  rightPanel: "react";
+  preview?: "canvas" | "image" | "none";
+  ambient?: "canvas" | "video" | "image" | "none";
+};
+
+export const ROOM_LAYOUT_CONFIG: Record<RoomId, GameLayoutConfig> = {
+  slots: {
+    main: "react",
+    leftPanel: "react",
+    rightPanel: "react",
+    preview: "none",
+    ambient: "video",
+  },
+  "treasure-map": {
+    main: "canvas",
+    leftPanel: "react",
+    rightPanel: "react",
+    preview: "none",
+    ambient: "image",
+  },
+  "treasure-hunt": {
+    main: "canvas",
+    leftPanel: "react",
+    rightPanel: "react",
+    preview: "canvas",
+    ambient: "video",
+  },
+  blackjack: {
+    main: "react",
+    leftPanel: "react",
+    rightPanel: "react",
+    preview: "none",
+    ambient: "none",
+  },
+  poker: {
+    main: "react",
+    leftPanel: "react",
+    rightPanel: "react",
+    preview: "none",
+    ambient: "none",
+  },
+  roulette: {
+    main: "react",
+    leftPanel: "react",
+    rightPanel: "react",
+    preview: "none",
+    ambient: "video",
+  },
+};
 
 export type SlotFeatureKey =
   | "idle"

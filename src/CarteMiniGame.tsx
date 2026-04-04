@@ -2,9 +2,11 @@ import * as React from "react";
 import failSound from "./audio/fail.mp3";
 import moneySound from "./audio/money.mp3";
 import { useMemo, useState } from "react";
+import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import carteImg from "./images/carte.png";
 import coffreImg from "./images/coffre.png";
-import lingotImg from "./images/lingot.png";
+import perroImg from "./images/perro.png";
+import SceneHost from "./features/casino/components/SceneHost";
 import { type CasinoProfile, playTreasureMap } from "./lib/casinoApi";
 import { formatCredits } from "./lib/casinoRoomState";
 
@@ -29,12 +31,15 @@ export default function CarteMiniGame({
   onProfileChange,
   onError,
 }: CarteMiniGameProps) {
+  const mapRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "treasure-map");
   const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
   const [winningPoint, setWinningPoint] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "playing" | "resolved">("idle");
   const [status, setStatus] = useState("Etudie la carte et choisis la bonne croix.");
   const [working, setWorking] = useState(false);
   const [lastDelta, setLastDelta] = useState(0);
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [activeInfoSection, setActiveInfoSection] = useState<"apercu" | "butin" | "lecture">("apercu");
   const moneyAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const failAudioRef = React.useRef<HTMLAudioElement | null>(null);
 
@@ -111,99 +116,153 @@ export default function CarteMiniGame({
   }
 
   return (
-    <section className="casino-table-layout">
-      <div className="casino-stage">
-        <div className="casino-status-strip">
-          <article>
-            <span>Solde serveur</span>
-            <strong>{formatCredits(profile.wallet.balance)}</strong>
-          </article>
-          <article>
-            <span>Cout de recherche</span>
-            <strong>{formatCredits(MAP_ROOM_COST)}</strong>
-          </article>
-          <article className={isWin ? "tone-positive" : phase === "resolved" ? "tone-negative" : ""}>
-            <span>Variation</span>
-            <strong>{phase === "idle" ? "Aucune" : `${visibleDelta >= 0 ? "+" : ""}${formatCredits(visibleDelta)}`}</strong>
-          </article>
+    <SceneHost
+      template="template-a"
+      className="casino-table-layout casino-table-layout--map-compact"
+      main={(
+        <div className="casino-stage">
+          <div
+            className="casino-adventure-fused-stage casino-adventure-fused-stage--map"
+            style={{ ["--room-art" as string]: `url("${carteImg}")` }}
+          >
+            <div className="casino-room-hud casino-room-hud--adventure">
+              <div className="casino-room-hud__lead">
+                <img className="casino-room-hud__portrait" src={perroImg} alt="" aria-hidden="true" />
+                <div className="casino-room-hud__identity">
+                  <div className="casino-topdeck__chip-row">
+                    <span className="casino-chip">{mapRoomMeta?.chip || "Carte au tresor"}</span>
+                    <button
+                      type="button"
+                      className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
+                      onClick={() => setShowRoomInfo((value) => !value)}
+                      aria-label="Informations carte au tresor"
+                      aria-expanded={showRoomInfo}
+                    >
+                      <span className="casino-button-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M4 7h16" />
+                          <path d="M4 12h16" />
+                          <path d="M4 17h16" />
+                        </svg>
+                      </span>
+                    </button>
+                  </div>
+                  <strong>{mapRoomMeta?.title || "Archiviste des criques"}</strong>
+                  <p>{status}</p>
+                </div>
+              </div>
+
+              {showRoomInfo ? (
+                <article className="casino-topdeck__info-panel" aria-label="Informations carte au tresor">
+                  <div className="casino-topdeck__info-buttons" role="tablist" aria-label="Sections carte au tresor">
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`casino-topdeck__info-button ${activeInfoSection === "apercu" ? "is-active" : ""}`}
+                      aria-selected={activeInfoSection === "apercu"}
+                      onClick={() => setActiveInfoSection("apercu")}
+                    >
+                      Apercu
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`casino-topdeck__info-button ${activeInfoSection === "butin" ? "is-active" : ""}`}
+                      aria-selected={activeInfoSection === "butin"}
+                      onClick={() => setActiveInfoSection("butin")}
+                    >
+                      Butin
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`casino-topdeck__info-button ${activeInfoSection === "lecture" ? "is-active" : ""}`}
+                      aria-selected={activeInfoSection === "lecture"}
+                      onClick={() => setActiveInfoSection("lecture")}
+                    >
+                      Lecture
+                    </button>
+                  </div>
+                  <div className="casino-topdeck__info-body" role="tabpanel">
+                    {activeInfoSection === "apercu" ? (
+                      <div className="casino-topdeck__info-stack">
+                        <div className="casino-topdeck__info-meta">
+                          <span>{mapRoomMeta?.label || "Carte"}</span>
+                          <span>Cout: {formatCredits(MAP_ROOM_COST)}</span>
+                          <span>Wallet: backend A11</span>
+                        </div>
+                        <p className="casino-topdeck__info-copy">
+                          Une seule tentative par carte. Le coffre principal rapporte {formatCredits(MAP_REWARD)} credits si la bonne croix est choisie.
+                        </p>
+                      </div>
+                    ) : null}
+                    {activeInfoSection === "butin" ? (
+                      <div className="casino-prize-card casino-prize-card--single">
+                        <img src={coffreImg} alt="Coffre pirate" />
+                        <div>
+                          <strong>Cache principale</strong>
+                          <span>+{formatCredits(MAP_REWARD)} credits si la croix est juste</span>
+                        </div>
+                      </div>
+                    ) : null}
+                    {activeInfoSection === "lecture" ? (
+                      <div className="casino-rule-list">
+                        <p>Les marqueurs restent centres sur les croix, meme sur mobile.</p>
+                        <p>La carte est debitée et resolue cote serveur pour coller au vrai wallet A11.</p>
+                        <p>Quand le coffre apparait, la manche se ferme sans popup parasite ni solde fantome.</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </article>
+              ) : null}
+            </div>
+
+            <div className="casino-reel-shell casino-room-shell casino-room-shell--table-compact">
+              <div className="casino-reel-shell__header">
+                <p>{phase === "resolved" ? `Delta manche: ${visibleDelta >= 0 ? "+" : ""}${formatCredits(visibleDelta)}` : status}</p>
+              </div>
+
+              <div className="casino-map-board">
+                <div className="casino-map-board__frame">
+                  <img src={carteImg} alt="Carte au tresor" className="casino-map-board__image" />
+                  {TREASURE_POINTS.map((point) => {
+                    const isSelected = selectedPoint === point.id;
+                    const isWinner = phase === "resolved" && winningPoint === point.id;
+                    return (
+                      <button
+                        key={point.id}
+                        type="button"
+                        className={`casino-map-marker ${isSelected ? "is-selected" : ""} ${isWinner ? "is-winning" : ""}`}
+                        style={{ left: point.left, top: point.top }}
+                        onClick={() => void choosePoint(point.id)}
+                        disabled={phase !== "playing" || working}
+                        aria-label={point.label}
+                      >
+                        {isWinner ? <img src={coffreImg} alt="" /> : <span>✕</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="casino-action-row">
+                <div className="casino-chip-row">
+                  <span className="casino-chip">{phase === "playing" ? "Une seule tentative active" : "Recherche fermee"}</span>
+                  <span className="casino-chip">Jackpot: +{formatCredits(MAP_REWARD)}</span>
+                </div>
+                <button
+                  type="button"
+                  className="casino-primary-button"
+                  onClick={startSearch}
+                  disabled={phase === "playing" || working}
+                >
+                  {phase === "playing" ? "Carte ouverte" : `Ouvrir une carte - ${formatCredits(MAP_ROOM_COST)}`}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <div className="casino-reel-shell casino-room-shell">
-          <div className="casino-reel-shell__header">
-            <div>
-              <span className="casino-chip">Carte au tresor</span>
-              <h2>Archiviste des criques</h2>
-            </div>
-            <p>{status}</p>
-          </div>
-
-          <div className="casino-map-board">
-            <div className="casino-map-board__frame">
-              <img src={carteImg} alt="Carte au tresor" className="casino-map-board__image" />
-              {TREASURE_POINTS.map((point) => {
-                const isSelected = selectedPoint === point.id;
-                const isWinner = phase === "resolved" && winningPoint === point.id;
-                return (
-                  <button
-                    key={point.id}
-                    type="button"
-                    className={`casino-map-marker ${isSelected ? "is-selected" : ""} ${isWinner ? "is-winning" : ""}`}
-                    style={{ left: point.left, top: point.top }}
-                    onClick={() => void choosePoint(point.id)}
-                    disabled={phase !== "playing" || working}
-                    aria-label={point.label}
-                  >
-                    {isWinner ? <img src={coffreImg} alt="" /> : <span>✕</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="casino-action-row">
-            <div className="casino-chip-row">
-              <span className="casino-chip">{phase === "playing" ? "Une seule tentative active" : "Recherche fermee"}</span>
-              <span className="casino-chip">Jackpot: +{formatCredits(MAP_REWARD)}</span>
-            </div>
-            <button
-              type="button"
-              className="casino-primary-button"
-              onClick={startSearch}
-              disabled={phase === "playing" || working}
-            >
-              {phase === "playing" ? "Carte ouverte" : "Ouvrir une carte"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <aside className="casino-side-rail">
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Butin</span>
-            <h3>Coffre du cartographe</h3>
-          </div>
-          <div className="casino-prize-card casino-prize-card--single">
-            <img src={lingotImg} alt="Lingot pirate" />
-            <div>
-              <strong>Cache principale</strong>
-              <span>+{formatCredits(MAP_REWARD)} credits si la croix est juste</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="casino-panel">
-          <div className="casino-panel__header">
-            <span className="casino-chip">Repere</span>
-            <h3>Lecture de carte</h3>
-          </div>
-          <div className="casino-rule-list">
-            <p>Les marqueurs restent centres sur les croix, meme sur mobile.</p>
-            <p>La carte est maintenant debitée et resolue cote serveur pour coller au vrai wallet A11.</p>
-            <p>Quand le coffre apparait, la manche se ferme sans popup parasite ni solde fantome.</p>
-          </div>
-        </section>
-      </aside>
-    </section>
+      )}
+    />
   );
 }
