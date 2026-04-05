@@ -13921,17 +13921,75 @@ button {
   }
 }
 
+/* Slots controls: hard lock centering in all states (spin/autospin/mobile) */
+.casino-table-layout--slots .casino-controls {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  justify-content: center !important;
+  justify-items: center !important;
+  align-items: center !important;
+  width: 100% !important;
+  margin-inline: auto !important;
+}
+
+.casino-table-layout--slots .casino-controls > .casino-bet-controls,
+.casino-table-layout--slots .casino-controls > .casino-action-row__buttons {
+  width: min(100%, 340px) !important;
+  margin-inline: auto !important;
+  justify-self: center !important;
+}
+
+.casino-table-layout--slots .casino-bet-controls,
+.casino-table-layout--slots .casino-action-row__buttons {
+  display: grid !important;
+  justify-items: stretch !important;
+  align-items: stretch !important;
+}
+
+.casino-table-layout--slots .casino-bet-pills {
+  width: 100% !important;
+  margin-inline: auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  justify-content: center !important;
+}
+
+.casino-table-layout--slots .casino-action-row__buttons {
+  width: 100% !important;
+  margin-inline: auto !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  justify-content: stretch !important;
+  justify-items: stretch !important;
+  gap: 8px !important;
+}
+
+.casino-table-layout--slots .casino-action-row__buttons > .casino-primary-button,
+.casino-table-layout--slots .casino-action-row__buttons > .casino-ghost-button,
+.casino-table-layout--slots .casino-action-row__buttons > .casino-auto-spin-select {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin-inline: 0 !important;
+}
+
+.casino-table-layout--slots .casino-action-row__buttons > .casino-auto-spin-select {
+  grid-column: 1 / -1 !important;
+}
+
 /* Final slots controls centering pass */
 .casino-table-layout--slots .casino-controls {
   display: grid;
-  justify-items: center;
+  width: min(100%, 340px);
+  margin-inline: auto;
+  justify-self: center;
+  justify-items: stretch;
   gap: 10px;
 }
 
 .casino-table-layout--slots .casino-bet-controls,
 .casino-table-layout--slots .casino-action-row__buttons {
-  width: min(100%, 340px);
+  width: 100%;
   margin-inline: auto;
+  justify-self: center;
 }
 
 .casino-table-layout--slots .casino-bet-controls {
@@ -13949,20 +14007,23 @@ button {
 }
 
 .casino-table-layout--slots .casino-action-row__buttons {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: stretch;
+  justify-items: stretch;
+  align-items: stretch;
   gap: 8px;
 }
 
 .casino-table-layout--slots .casino-action-row__buttons > .casino-primary-button,
 .casino-table-layout--slots .casino-action-row__buttons > .casino-ghost-button {
-  flex: 1 1 0;
+  width: 100%;
   min-width: 0;
+  text-align: center;
 }
 
 .casino-table-layout--slots .casino-action-row__buttons > .casino-auto-spin-select {
+  grid-column: 1 / -1;
   width: 100%;
   margin-inline: auto;
 }

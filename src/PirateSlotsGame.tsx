@@ -193,19 +193,37 @@ function SlotsRoom({
     const video = featureVideoRef.current;
     if (!video || !featureMedia.video) return;
     let removeRestoreListener = () => undefined;
+    let removeAmbientTimeListener = () => undefined;
 
     const shouldLoop = !isAlertFeatureActive && slotIntroPlayed;
     video.loop = shouldLoop;
 
     const currentSrc = video.currentSrc || video.src;
-    if (isAlertFeatureActive && currentSrc && currentSrc.includes(SLOT_AMBIENT_MEDIA.video)) {
-      try {
-        ambientResumeTimeRef.current = video.currentTime;
-        ambientResumePendingRef.current = true;
-      } catch {
-        ambientResumeTimeRef.current = 0;
-        ambientResumePendingRef.current = false;
+    if (isAlertFeatureActive && slotIntroPlayed) {
+      ambientResumePendingRef.current = true;
+      if (currentSrc && currentSrc.includes(SLOT_AMBIENT_MEDIA.video)) {
+        try {
+          ambientResumeTimeRef.current = video.currentTime;
+        } catch {
+          // ignore seek read failures
+        }
       }
+    }
+
+    const isAmbientVideo = !isAlertFeatureActive && slotIntroPlayed && featureMedia.video === SLOT_AMBIENT_MEDIA.video;
+    if (isAmbientVideo) {
+      const syncAmbientTime = () => {
+        try {
+          ambientResumeTimeRef.current = video.currentTime;
+        } catch {
+          // ignore seek read failures
+        }
+      };
+      syncAmbientTime();
+      video.addEventListener("timeupdate", syncAmbientTime);
+      removeAmbientTimeListener = () => {
+        video.removeEventListener("timeupdate", syncAmbientTime);
+      };
     }
 
     const shouldReloadAlertVideo =
@@ -226,7 +244,10 @@ function SlotsRoom({
         const restoreAmbientPosition = () => {
           ambientResumePendingRef.current = false;
           try {
-            video.currentTime = resumeTime;
+            const maxResumeTime = Number.isFinite(video.duration) && video.duration > 0
+              ? Math.max(0, video.duration - 0.15)
+              : resumeTime;
+            video.currentTime = Math.min(resumeTime, maxResumeTime);
           } catch {
             // ignore seek failures
           }
@@ -264,6 +285,7 @@ function SlotsRoom({
         }
       }
       return () => {
+        removeAmbientTimeListener();
         removeRestoreListener();
         video.removeEventListener("ended", handleEnded);
       };
@@ -275,6 +297,7 @@ function SlotsRoom({
     video.volume = shouldUseAudio ? volume : 0;
     void video.play().catch(() => undefined);
     return () => {
+      removeAmbientTimeListener();
       removeRestoreListener();
       video.removeEventListener("ended", handleEnded);
     };

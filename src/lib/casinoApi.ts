@@ -112,6 +112,7 @@ function getDefaultApiBase() {
   if (typeof window !== "undefined") {
     const host = String(window.location.hostname || "").trim().toLowerCase();
     if (
+
       host === "funesterie.pro"
       || host === "www.funesterie.pro"
       || host === "casino.funesterie.pro"

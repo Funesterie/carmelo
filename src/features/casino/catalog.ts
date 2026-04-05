@@ -331,8 +331,9 @@ export function formatTransactionTime(value: string | null) {
 }
 
 export function getJokerIndexes(grid: string[][]) {
+  const reelCount = grid[0]?.length || 0;
   return grid.flatMap((row, rowIndex) =>
-    row.flatMap((symbolId, columnIndex) => (symbolId === "JOKER" ? [rowIndex * row.length + columnIndex] : [])),
+    row.flatMap((symbolId, columnIndex) => (symbolId === "JOKER" ? [rowIndex * reelCount + columnIndex] : [])),
   );
 }
 
