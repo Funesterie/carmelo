@@ -87,6 +87,8 @@ function SlotsRoom({
     totalStages: number;
   };
 
+  type BonusHeldTurns = Partial<Record<number, number>>;
+
   const [bet, setBet] = useState(() => Math.max(profile.wallet.minBet, BET_PRESETS[1]));
   const [displayGrid, setDisplayGrid] = useState<string[][]>(() => buildPlaceholderGrid());
   const [spinState, setSpinState] = useState<"idle" | "spinning" | "bonus">("idle");
@@ -100,7 +102,7 @@ function SlotsRoom({
       return false;
     }
   });
-  const [bonusHeldIndexes, setBonusHeldIndexes] = useState<number[]>([]);
+  const [bonusHeldTurns, setBonusHeldTurns] = useState<BonusHeldTurns>({});
   const [goldRain, setGoldRain] = useState<
     Array<{ id: string; left: string; delay: string; duration: string; scale: string; drift: string }>
   >([]);
@@ -117,6 +119,8 @@ function SlotsRoom({
   const ambientResumeTimeRef = useRef(0);
   const ambientResumePendingRef = useRef(false);
   const lastAppliedFeaturePlaybackNonceRef = useRef(-1);
+  const jokerFeaturePlayedForBonusRef = useRef(false);
+  const powerFeaturePlayedForBonusRef = useRef(false);
 
   useEffect(() => {
     setBet((current) => {
@@ -322,6 +326,29 @@ function SlotsRoom({
     void ref.current.play().catch(() => undefined);
   }
 
+  function buildBonusHeldTurns(indexes: number[], previous: BonusHeldTurns = {}) {
+    const nextHeldTurns: BonusHeldTurns = {};
+
+    Object.entries(previous).forEach(([indexKey, turnsLeft]) => {
+      const nextTurnsLeft = Number(turnsLeft || 0) - 1;
+      if (nextTurnsLeft > 0) {
+        nextHeldTurns[Number(indexKey)] = nextTurnsLeft;
+      }
+    });
+
+    indexes.forEach((index) => {
+      if (!Number.isFinite(index) || index < 0) return;
+      if (!(index in previous) || Number(previous[index] || 0) <= 0) {
+        nextHeldTurns[index] = 3;
+        return;
+      }
+
+      nextHeldTurns[index] = Math.max(Number(nextHeldTurns[index] || 0), Number(previous[index] || 0) - 1);
+    });
+
+    return nextHeldTurns;
+  }
+
   function triggerGoldRain(spin: CasinoSpin) {
     if (goldRainTimeoutRef.current) {
       window.clearTimeout(goldRainTimeoutRef.current);
@@ -338,8 +365,20 @@ function SlotsRoom({
     }, 4800);
   }
 
-  function activateFeature(nextFeature: SlotFeatureKey) {
+  function activateFeature(nextFeature: SlotFeatureKey, options?: { isBonusFeature?: boolean }) {
     if (nextFeature === "idle") return;
+    if (options?.isBonusFeature && nextFeature === "joker-line") {
+      if (jokerFeaturePlayedForBonusRef.current) {
+        return;
+      }
+      jokerFeaturePlayedForBonusRef.current = true;
+    }
+    if (options?.isBonusFeature && nextFeature === "joker-cross") {
+      if (powerFeaturePlayedForBonusRef.current) {
+        return;
+      }
+      powerFeaturePlayedForBonusRef.current = true;
+    }
     markSlotsIntroPlayed();
     setActiveFeature(nextFeature);
     setFeaturePlaybackNonce((current) => current + 1);
@@ -358,9 +397,14 @@ function SlotsRoom({
 
     if (bonus?.triggered) {
       setDisplayGrid(bonus.openingGrid);
-      setBonusHeldIndexes(getJokerIndexes(bonus.openingGrid));
+      setBonusHeldTurns(
+        getJokerIndexes(bonus.openingGrid).reduce<BonusHeldTurns>((accumulator, index) => {
+          accumulator[index] = 3;
+          return accumulator;
+        }, {}),
+      );
       setLastSpin(result.spin);
-      triggerSlotFeedback(result.spin);
+      activateFeature(chooseSlotFeature(result.spin), { isBonusFeature: true });
       triggerGoldRain(result.spin);
       setPendingBonusFlow({
         holdDurationMs: bonus.holdDurationMs,
@@ -368,6 +412,10 @@ function SlotsRoom({
         stages: bonus.stages,
         totalStages: bonus.stages.length,
       });
+      if (!bonus.stages.length) {
+        jokerFeaturePlayedForBonusRef.current = false;
+        powerFeaturePlayedForBonusRef.current = false;
+      }
       setAutoSpinCount(0);
       if (autoSpinTimeoutRef.current) {
         window.clearTimeout(autoSpinTimeoutRef.current);
@@ -388,8 +436,10 @@ function SlotsRoom({
     if (spinRunIdRef.current !== runId) return;
 
     setDisplayGrid(result.spin.grid);
-    setBonusHeldIndexes([]);
+    setBonusHeldTurns({});
     setLastSpin(result.spin);
+    jokerFeaturePlayedForBonusRef.current = false;
+    powerFeaturePlayedForBonusRef.current = false;
     triggerSlotFeedback(result.spin);
     triggerGoldRain(result.spin);
     setSpinState("idle");
@@ -424,12 +474,15 @@ function SlotsRoom({
     }
 
     setDisplayGrid(stage.grid);
-    setBonusHeldIndexes(stage.heldIndexes.length ? stage.heldIndexes : getJokerIndexes(stage.grid));
+    setBonusHeldTurns((current) =>
+      buildBonusHeldTurns(stage.heldIndexes.length ? stage.heldIndexes : getJokerIndexes(stage.grid), current),
+    );
     const stageFeature = getSlotFeatureForBonusGrid(stage.grid);
     activateFeature(
       stageFeature !== "idle"
         ? stageFeature
         : getSlotFeatureForBonusFeature(lastSpin?.bonus?.feature),
+      { isBonusFeature: true },
     );
 
     const nextStageNumber = bonusFlow.totalStages - restStages.length;
@@ -441,6 +494,10 @@ function SlotsRoom({
           }
         : null,
     );
+    if (!restStages.length) {
+      jokerFeaturePlayedForBonusRef.current = false;
+      powerFeaturePlayedForBonusRef.current = false;
+    }
     setSpinState(restStages.length ? "bonus" : "idle");
     setLastMessage(
       restStages.length
@@ -465,7 +522,7 @@ function SlotsRoom({
       }
 
       setPendingBonusFlow(null);
-      setBonusHeldIndexes([]);
+      setBonusHeldTurns({});
       const result = await spinCasinoSlots(bet);
       let step = 0;
       intervalRef.current = window.setInterval(() => {
@@ -506,10 +563,11 @@ function SlotsRoom({
   }
 
   function renderCell(symbolId: string, cellIndex: number, key: string) {
-    const meta = SYMBOL_META[symbolId] || SYMBOL_META.COIN;
+    const effectiveSymbolId = Number(bonusHeldTurns[cellIndex] || 0) > 0 ? "JOKER" : symbolId;
+    const meta = SYMBOL_META[effectiveSymbolId] || SYMBOL_META.COIN;
     const isHighlighted = highlightedIndexes.has(cellIndex);
-    const isHeldJoker = bonusHeldIndexes.indexOf(cellIndex) !== -1 && symbolId === "JOKER";
-    const isWildHighlight = highlightedWildIndexes.has(cellIndex) && symbolId === "JOKER";
+    const isHeldJoker = Number(bonusHeldTurns[cellIndex] || 0) > 0;
+    const isWildHighlight = highlightedWildIndexes.has(cellIndex) && effectiveSymbolId === "JOKER";
 
     return (
       <div
