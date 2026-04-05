@@ -13942,11 +13942,29 @@ button {
 .casino-table-layout--slots .casino-bet-pills {
   width: 100%;
   justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   margin-inline: auto;
 }
 
 .casino-table-layout--slots .casino-action-row__buttons {
+  display: flex;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.casino-table-layout--slots .casino-action-row__buttons > .casino-primary-button,
+.casino-table-layout--slots .casino-action-row__buttons > .casino-ghost-button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.casino-table-layout--slots .casino-action-row__buttons > .casino-auto-spin-select {
+  width: 100%;
+  margin-inline: auto;
 }
 
 /* ===== Phone landscape fit pass: keep everything on screen without touching portrait ===== */

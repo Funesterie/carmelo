@@ -80,6 +80,8 @@ function SlotsRoom({
   onError,
   onRequestMediaPlayback,
 }: PirateSlotsGameProps) {
+  const BIG_WIN_MULTIPLIER = 8;
+
   type PendingBonusFlow = {
     holdDurationMs: number;
     stageDurationMs: number;
@@ -353,6 +355,13 @@ function SlotsRoom({
     if (goldRainTimeoutRef.current) {
       window.clearTimeout(goldRainTimeoutRef.current);
       goldRainTimeoutRef.current = null;
+    }
+
+    const payoutRatio = spin.totalPayout / Math.max(1, spin.bet);
+    const isBigWin = spin.totalPayout > 0 && (payoutRatio >= BIG_WIN_MULTIPLIER || Boolean(spin.bonus?.triggered));
+    if (!isBigWin) {
+      setGoldRain([]);
+      return;
     }
 
     const nextDrops = buildGoldRainDrops(spin.totalPayout, spin.bet);
