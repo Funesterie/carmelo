@@ -356,12 +356,59 @@ export function buildGoldRainDrops(totalPayout: number, bet: number) {
   }));
 }
 
+export function getSlotFeatureForBonusFeature(feature: CasinoSpin["bonus"]["feature"] | null | undefined): SlotFeatureKey {
+  switch (feature) {
+    case "joker_cross":
+      return "joker-cross";
+    case "joker_full":
+      return "joker-full";
+    case "joker_line":
+      return "joker-line";
+    default:
+      return "idle";
+  }
+}
+
+export function getSlotFeatureForBonusGrid(grid: string[][]): SlotFeatureKey {
+  const rowCount = grid.length;
+  const reelCount = grid[0]?.length || 0;
+  const jokerCount = getJokerIndexes(grid).length;
+  const totalCells = rowCount * reelCount;
+
+  if (totalCells > 0 && jokerCount === totalCells) {
+    return "joker-full";
+  }
+
+  const hasCrossPattern =
+    rowCount === 3
+    && reelCount === 5
+    && grid[0]?.[0] === "JOKER"
+    && grid[0]?.[4] === "JOKER"
+    && grid[1]?.[2] === "JOKER"
+    && grid[2]?.[0] === "JOKER"
+    && grid[2]?.[4] === "JOKER";
+
+  if (hasCrossPattern) {
+    return "joker-cross";
+  }
+
+  if (jokerCount >= 4) {
+    return "joker-line";
+  }
+
+  return "idle";
+}
+
 export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
   if (!spin) return "idle";
 
-  if (spin.bonus?.feature === "joker_full") return "joker-full";
-  if (spin.bonus?.feature === "joker_cross") return "joker-cross";
-  if (spin.bonus?.feature === "joker_line") return "joker-line";
+  if (spin.bonus?.triggered) {
+    const bonusFeature = getSlotFeatureForBonusGrid(spin.bonus.openingGrid);
+    if (bonusFeature !== "idle") return bonusFeature;
+
+    const mappedBonusFeature = getSlotFeatureForBonusFeature(spin.bonus.feature);
+    if (mappedBonusFeature !== "idle") return mappedBonusFeature;
+  }
 
   const strongestWin = [...spin.wins].sort((left, right) => right.payout - left.payout)[0];
   if (strongestWin?.symbol === "ELEPHANT") return "elephant";

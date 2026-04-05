@@ -73,11 +73,12 @@ type ActiveRouletteBet = {
 };
 
 const ROULETTE_POLL_INTERVAL_MS = 1200;
-const DEFAULT_ROULETTE_DRAW_INTERVAL_MS = 120_000;
+const DEFAULT_ROULETTE_DRAW_INTERVAL_MS = 0;
 const ROULETTE_DRAW_INTERVAL_STORAGE_KEY = "casino.roulette.drawIntervalMs";
 const ROULETTE_DRAW_INTERVAL_OPTIONS = [
-  { label: "1 min 30", value: 90_000 },
-  { label: "2 min", value: 120_000 },
+  { label: "Direct", value: 0 },
+  { label: "2 s", value: 2_000 },
+  { label: "5 s", value: 5_000 },
 ] as const;
 
 export default function RouletteRoom({
@@ -369,7 +370,7 @@ export default function RouletteRoom({
               <span>Cadence locale d'affichage</span>
             </div>
             <p className="casino-topdeck__info-copy">
-              Regle l'intervalle entre deux sequences de tirage pour cette table sur cet appareil.
+              Regle le delai local entre deux sequences. Le mode Direct affiche le resultat des qu'il remonte du serveur.
             </p>
             <div className="casino-topdeck__info-buttons" role="group" aria-label="Cadence des tirages">
               {ROULETTE_DRAW_INTERVAL_OPTIONS.map((option) => (

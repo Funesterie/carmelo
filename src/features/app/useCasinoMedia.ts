@@ -37,7 +37,7 @@ type UseCasinoMediaOptions = {
 };
 
 const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
-const SLOT_ONE_START_DELAY_MS = 15_000;
+const SLOT_ONE_START_DELAY_MS = 14_000;
 
 export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMediaOptions) {
   const [showImmersion, setShowImmersion] = useState(false);
