@@ -72,7 +72,8 @@ type ActiveRouletteBet = {
   amount: number;
 };
 
-const ROULETTE_POLL_INTERVAL_MS = 1200;
+const ROULETTE_POLL_ACTIVE_INTERVAL_MS = 1200;
+const ROULETTE_POLL_IDLE_INTERVAL_MS = 15000;
 const DEFAULT_ROULETTE_DRAW_INTERVAL_MS = 0;
 const ROULETTE_DRAW_INTERVAL_STORAGE_KEY = "casino.roulette.drawIntervalMs";
 const ROULETTE_DRAW_INTERVAL_OPTIONS = [
@@ -105,6 +106,10 @@ export default function RouletteRoom({
       ? stored
       : DEFAULT_ROULETTE_DRAW_INTERVAL_MS;
   });
+  const [isDocumentVisible, setIsDocumentVisible] = useState(() => {
+    if (typeof document === "undefined") return true;
+    return document.visibilityState !== "hidden";
+  });
 
   const onProfileChangeRef = useRef(onProfileChange);
   const onErrorRef = useRef(onError);
@@ -128,6 +133,15 @@ export default function RouletteRoom({
     roundId: number;
     resultId: number;
   } | null>(null);
+  const documentVisibleRef = useRef(isDocumentVisible);
+
+  function getRoulettePollDelay(nextRoom: RouletteRoom | null) {
+    const participantCount = Number(nextRoom?.round.playerCount || 0);
+    const hasMyBets = Boolean(nextRoom?.round.myBets?.length);
+    return participantCount > 0 || hasMyBets
+      ? ROULETTE_POLL_ACTIVE_INTERVAL_MS
+      : ROULETTE_POLL_IDLE_INTERVAL_MS;
+  }
 
   useEffect(() => {
     onProfileChangeRef.current = onProfileChange;
@@ -144,6 +158,32 @@ export default function RouletteRoom({
   useEffect(() => {
     animationRef.current = animation;
   }, [animation]);
+
+  useEffect(() => {
+    documentVisibleRef.current = isDocumentVisible;
+    if (isDocumentVisible || syncInFlightRef.current) return;
+    if (pollTimeoutRef.current) {
+      window.clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+  }, [isDocumentVisible]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
+    function updateVisibility() {
+      setIsDocumentVisible(document.visibilityState !== "hidden");
+    }
+
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+    window.addEventListener("focus", updateVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", updateVisibility);
+      window.removeEventListener("focus", updateVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -172,6 +212,8 @@ export default function RouletteRoom({
   }, []);
 
   useEffect(() => {
+    if (!isDocumentVisible) return undefined;
+
     let mounted = true;
     let tickId = 0;
 
@@ -197,9 +239,11 @@ export default function RouletteRoom({
     async function syncRoom() {
       if (syncInFlightRef.current) return;
       syncInFlightRef.current = true;
+      let nextRoom: RouletteRoom | null = null;
       try {
         const result = await fetchRouletteRoom();
         if (!mounted) return;
+        nextRoom = result.room;
         setRoom(result.room);
         syncProfileIfChanged(result.profile);
       } catch (error_) {
@@ -213,10 +257,10 @@ export default function RouletteRoom({
         );
       } finally {
         syncInFlightRef.current = false;
-        if (mounted) {
+        if (mounted && documentVisibleRef.current) {
           pollTimeoutRef.current = window.setTimeout(() => {
             void syncRoom();
-          }, ROULETTE_POLL_INTERVAL_MS);
+          }, getRoulettePollDelay(nextRoom));
         }
       }
     }
@@ -232,7 +276,7 @@ export default function RouletteRoom({
         pollTimeoutRef.current = null;
       }
     };
-  }, []);
+  }, [isDocumentVisible]);
 
   const remainingMs = useMemo(() => {
     const closesAt = room?.round.closesAt ? new Date(room.round.closesAt).getTime() : 0;
