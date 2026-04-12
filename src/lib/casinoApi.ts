@@ -553,6 +553,26 @@ async function getCasinoAuthed<T>(path: string) {
   return payload as T;
 }
 
+async function getCasinoAuthedOptionalState<T>(path: string) {
+  const response = await fetch(getApiUrl(path), {
+    headers: buildAuthHeaders(),
+  });
+
+  if (response.status === 404 || response.status === 405) {
+    return null;
+  }
+
+  const payload = (await readJsonSafe(response)) as
+    | { ok?: boolean; state?: T | null; error?: string }
+    | null;
+
+  if (!response.ok || !payload || ("ok" in payload && payload.ok === false)) {
+    throw new CasinoApiError(getErrorMessage(payload, "Lecture casino impossible"), { status: response.status });
+  }
+
+  return payload.state ?? null;
+}
+
 export async function playTreasureMap(pointId: string) {
   return postCasinoAuthed<TreasureMapResponse>("/api/casino/treasure-map/play", { pointId });
 }
@@ -573,6 +593,11 @@ export async function actBlackjackRound(token: string, action: "hit" | "stand") 
   return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/action", { token, action });
 }
 
+export async function fetchBlackjackRoomState(roomId: string) {
+  const query = new URLSearchParams({ roomId: String(roomId || "").trim() }).toString();
+  return getCasinoAuthedOptionalState<BlackjackState>(`/api/casino/blackjack/state?${query}`);
+}
+
 export async function startPokerRound(ante: number, roomId?: string) {
   return postCasinoAuthed<PokerResponse>("/api/casino/poker/start", { ante, roomId });
 }
@@ -587,6 +612,11 @@ export async function actPokerRound(
     action,
     ...(typeof amount === "number" ? { amount } : {}),
   });
+}
+
+export async function fetchPokerRoomState(roomId: string) {
+  const query = new URLSearchParams({ roomId: String(roomId || "").trim() }).toString();
+  return getCasinoAuthedOptionalState<PokerState>(`/api/casino/poker/state?${query}`);
 }
 
 export async function fetchRouletteRoom() {

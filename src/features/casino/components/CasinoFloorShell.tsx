@@ -260,6 +260,7 @@ export default function CasinoFloorShell({
             content: (
               <div className="casino-rule-list">
                 <p>La table reste synchronisee sur le salon courant pour tous les participants humains.</p>
+                <p>En live, chaque decision laisse 90 secondes avant resolution automatique du tour.</p>
                 <p>Le croupier joue apres les joueurs et la lecture de la table reste compacte sur mobile.</p>
                 <p>Les participants actifs sont visibles dans le panneau de jeu a droite.</p>
               </div>
@@ -309,6 +310,7 @@ export default function CasinoFloorShell({
             content: (
               <div className="casino-rule-list">
                 <p>Les changements de table restent disponibles depuis le panneau de jeu principal.</p>
+                <p>Le tour de parole reste borne a 90 secondes sur chaque salon multijoueur.</p>
                 <p>Le journal de main et la lecture du spot restent accessibles sur le dock lateral.</p>
                 <p>Le hamburger concentre ici les infos rapides pour le mode portrait.</p>
               </div>

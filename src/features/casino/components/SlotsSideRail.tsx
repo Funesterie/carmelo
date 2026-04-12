@@ -3,8 +3,9 @@ import {
   SLOT_AMBIENT_MEDIA,
   SLOT_FEATURE_MEDIA,
   SLOT_INTRO_MEDIA,
-  SYMBOL_META,
   getSlotGridSymbolAtIndex,
+  getSlotDisplaySymbolId,
+  getSlotSymbolMeta,
   type SlotFeatureKey,
 } from "../catalog";
 import { formatCredits } from "../../../lib/casinoRoomState";
@@ -20,21 +21,55 @@ type SlotsSideRailProps = {
   isAlertFeatureActive: boolean;
   featureVideoRef: { current: HTMLVideoElement | null };
   lastSpin: CasinoSpin | null;
+  recapGrid?: string[][] | null;
   onMarkSlotsIntroPlayed: () => void;
   onRequestMediaPlayback?: () => void;
 };
 
-function resolveWinTrail(spin: CasinoSpin, win: CasinoSpin["wins"][number]) {
-  return win.indexes.map((index) => {
-    const symbolId = getSlotGridSymbolAtIndex(spin.grid, spin.reelCount, index) || win.symbol;
-    const meta = SYMBOL_META[symbolId] || SYMBOL_META.COIN;
+function isRenderableGrid(grid: string[][] | null | undefined, spin: CasinoSpin) {
+  return Array.isArray(grid)
+    && grid.length === spin.rowCount
+    && grid.every((row) => Array.isArray(row) && row.length === spin.reelCount);
+}
+
+function pickDisplaySymbolId(
+  fallbackSymbolId: string,
+  symbols: string[],
+) {
+  const nonJokerSymbols = symbols
+    .filter((symbolId) => symbolId && symbolId !== "JOKER")
+    .map((symbolId) => getSlotDisplaySymbolId(symbolId));
+  if (!nonJokerSymbols.length) return fallbackSymbolId;
+
+  const counts = new Map<string, number>();
+  nonJokerSymbols.forEach((symbolId) => {
+    counts.set(symbolId, Number(counts.get(symbolId) || 0) + 1);
+  });
+
+  return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || fallbackSymbolId;
+}
+
+function resolveWinTrail(spin: CasinoSpin, win: CasinoSpin["wins"][number], grid: string[][]) {
+  const trailSymbols = win.indexes.map((index) => getSlotGridSymbolAtIndex(grid, spin.reelCount, index) || win.symbol);
+  const displaySymbolId = pickDisplaySymbolId(win.symbol, trailSymbols);
+  const displayMeta = getSlotSymbolMeta(displaySymbolId);
+  const displayLabel = displayMeta.label || win.label;
+  const trail = trailSymbols.map((symbolId, trailIndex) => {
+    const meta = getSlotSymbolMeta(symbolId);
     return {
-      index,
+      index: win.indexes[trailIndex],
       symbolId,
       meta,
-      isWild: symbolId === "JOKER" && win.symbol !== "JOKER",
+      isWild: symbolId === "JOKER" && displaySymbolId !== "JOKER",
     };
   });
+
+  return {
+    trail,
+    displayMeta,
+    displayLabel,
+    wildCount: trail.filter((entry) => entry.isWild).length,
+  };
 }
 
 export default function SlotsSideRail({
@@ -45,6 +80,7 @@ export default function SlotsSideRail({
   isAlertFeatureActive,
   featureVideoRef,
   lastSpin,
+  recapGrid = null,
   onMarkSlotsIntroPlayed,
   onRequestMediaPlayback,
 }: SlotsSideRailProps) {
@@ -68,28 +104,31 @@ export default function SlotsSideRail({
           <div className="casino-win-list">
             {lastSpin.wins.length ? (
               lastSpin.wins.map((win) => {
-                const meta = SYMBOL_META[win.symbol] || SYMBOL_META.COIN;
-                const winTrail = resolveWinTrail(lastSpin, win);
-                const wildCount = winTrail.filter((entry) => entry.isWild).length;
+                const sourceGrid = isRenderableGrid(recapGrid, lastSpin)
+                  ? recapGrid
+                  : lastSpin.bonus?.triggered && isRenderableGrid(lastSpin.bonus.openingGrid, lastSpin)
+                    ? lastSpin.bonus.openingGrid
+                    : lastSpin.grid;
+                const resolvedWin = resolveWinTrail(lastSpin, win, sourceGrid);
                 return (
                   <article key={`${win.lineIndex}-${win.symbol}-${win.indexes.join("-")}`} className="casino-win-entry">
                     <div className="casino-win-entry__summary">
-                      <img className="casino-paytable__symbol-art" src={meta.image} alt="" aria-hidden="true" />
+                      <img className="casino-paytable__symbol-art" src={resolvedWin.displayMeta.image} alt="" aria-hidden="true" />
                       <div className="casino-win-entry__copy">
-                        <strong>{win.label}</strong>
+                        <strong>{resolvedWin.displayLabel}</strong>
                         <span>
                           Ligne {win.lineIndex + 1} · {win.matchCount} symboles
                         </span>
-                        {wildCount ? (
+                        {resolvedWin.wildCount ? (
                           <span className="casino-win-entry__note">
-                            {wildCount} joker{wildCount > 1 ? "s" : ""} wild complete{wildCount > 1 ? "nt" : ""} la ligne
+                            {resolvedWin.wildCount} joker{resolvedWin.wildCount > 1 ? "s" : ""} wild complete{resolvedWin.wildCount > 1 ? "nt" : ""} la ligne
                           </span>
                         ) : null}
                       </div>
                     </div>
                     <b>+{formatCredits(win.payout)}</b>
                     <div className="casino-win-entry__trail" aria-label={`Symboles de la ligne ${win.lineIndex + 1}`}>
-                      {winTrail.map((entry, trailIndex) => (
+                      {resolvedWin.trail.map((entry, trailIndex) => (
                         <div
                           key={`${win.lineIndex}-${entry.index}-${trailIndex}`}
                           className={`casino-win-entry__tile ${entry.isWild ? "is-wild" : ""}`}

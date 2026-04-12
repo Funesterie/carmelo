@@ -2,7 +2,7 @@
 import { randInt } from "./rng";
 import * as React from "react";
 
-export type PirateSymbolId = "PIRATE" | "CHEST" | "COIN" | "BAT" | "BLUNDERBUSS" | "MAP" | "PARROT";
+export type PirateSymbolId = "PIRATE" | "CHEST" | "COIN" | "BAT" | "BLUNDERBUSS" | "MAP" | "SOLDAT";
 
 export const pirateSymbols: { id: PirateSymbolId; weight: number; emoji: string }[] = [
   { id: "PIRATE", weight: 18, emoji: "🏴‍☠️" }, // pirate
@@ -11,7 +11,7 @@ export const pirateSymbols: { id: PirateSymbolId; weight: number; emoji: string 
   { id: "BAT", weight: 14, emoji: "🦇" }, // bat
   { id: "BLUNDERBUSS", weight: 10, emoji: "🔫" }, // gun
   { id: "MAP", weight: 12, emoji: "🗺️" }, // map
-  { id: "PARROT", weight: 9, emoji: "🦜" } // parrot
+  { id: "SOLDAT", weight: 9, emoji: "🛡️" } // soldat
 ];
 
 export function pickWeightedPirate(): PirateSymbolId {

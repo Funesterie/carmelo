@@ -10,13 +10,34 @@ export type SelectedBet = {
 
 export type PortAction = "http" | "https" | "app" | "ssh";
 
+export type RoulettePortOccupant = {
+  port: PortAction;
+  userId: string;
+  username: string;
+  totalAmount: number;
+  chipCount: number;
+  tone: "red" | "green" | "amber" | "blue";
+  isSelf?: boolean;
+};
+
+export type RoulettePlacedBet = {
+  betType: string;
+  betValue: string;
+  amount: number;
+  stackCount: number;
+  tone: "red" | "green" | "amber" | "blue";
+};
+
 type AtsRouletteBoardProps = {
   feltImageSrc: string;
   chipImageSrc: string;
   amount: number;
   onAmountChange: (amount: number) => void;
   selectedBet: SelectedBet;
+  selectedBetTone?: "red" | "green" | "amber" | "blue";
+  placedBets?: RoulettePlacedBet[];
   onBetChange: (bet: NonNullable<SelectedBet>) => void;
+  portOccupants?: RoulettePortOccupant[];
   onPortClick?: (port: PortAction) => void;
   disabled?: boolean;
   debug?: boolean;
@@ -81,7 +102,10 @@ export default function AtsRouletteBoard({
   amount,
   onAmountChange,
   selectedBet,
+  selectedBetTone = "amber",
+  placedBets = [],
   onBetChange,
+  portOccupants = [],
   onPortClick,
   disabled = false,
   debug = false,
@@ -89,6 +113,50 @@ export default function AtsRouletteBoard({
 }: AtsRouletteBoardProps) {
   function isSelectedBet(betType: string, betValue: string) {
     return selectedBet?.betType === betType && selectedBet?.betValue === betValue;
+  }
+
+  function getPortOccupant(portId: PortAction) {
+    return portOccupants.find((entry) => entry.port === portId) || null;
+  }
+
+  function getPlacedBet(betType: string, betValue: string) {
+    return placedBets.find((entry) => entry.betType === betType && entry.betValue === betValue) || null;
+  }
+
+  function renderBetStack(
+    betType: string,
+    betValue: string,
+    placement: "corner" | "center" = "corner",
+  ) {
+    const placedBet = getPlacedBet(betType, betValue);
+    const isPreview = !placedBet && isSelectedBet(betType, betValue);
+    const stackCount = Math.max(1, Math.min(4, placedBet?.stackCount || (isPreview ? 1 : 0)));
+    const totalAmount = placedBet?.amount || (isPreview ? amount : 0);
+    const tone = placedBet?.tone || selectedBetTone;
+    if (!stackCount || !totalAmount) return null;
+
+    return (
+      <span
+        className={cx(
+          "ats-roulette-cell__stack",
+          `ats-roulette-cell__stack--${tone}`,
+          placement === "center" && "ats-roulette-cell__stack--center",
+          isPreview && "is-preview",
+        )}
+        aria-hidden="true"
+      >
+        {Array.from({ length: stackCount }, (_, index) => (
+          <span
+            key={`${betType}-${betValue}-${index}`}
+            className="ats-roulette-cell__stack-chip"
+            style={{ ["--stack-offset" as string]: `${index * 3}px` }}
+          >
+            <img src={chipImageSrc} alt="" />
+          </span>
+        ))}
+        <b>{totalAmount}</b>
+      </span>
+    );
   }
 
   return (
@@ -112,95 +180,113 @@ export default function AtsRouletteBoard({
       </div>
 
       <div className="ats-roulette-board__surface">
+        {(() => {
+          const isActive = isSelectedBet("straight", "0");
+          return (
         <button
           type="button"
           className={cx(
             "ats-roulette-cell",
             "ats-roulette-cell--zero",
             "ats-roulette-cell--green",
-            isSelectedBet("straight", "0") && "is-active",
+            isActive && "is-active",
           )}
           onClick={() =>
             onBetChange({ betType: "straight", betValue: "0", label: "Numero 0" })
           }
           aria-label="Numero 0"
-          aria-pressed={isSelectedBet("straight", "0")}
+          aria-pressed={isActive}
           disabled={disabled}
         >
           <span>0</span>
+          {renderBetStack("straight", "0", "center")}
         </button>
+          );
+        })()}
 
         <div className="ats-roulette-board__numbers" role="grid" aria-label="Tapis ATS">
           {ATS_ROWS.map((row, rowIndex) => (
             <div key={`ats-row-${rowIndex}`} className="ats-roulette-board__row" role="row">
-              {row.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="gridcell"
-                  className={cx(
-                    "ats-roulette-cell",
-                    `ats-roulette-cell--${getNumberColor(value)}`,
-                    isSelectedBet("straight", String(value)) && "is-active",
-                  )}
-                  onClick={() =>
-                    onBetChange({
-                      betType: "straight",
-                      betValue: String(value),
-                      label: `Numero ${value}`,
-                    })
-                  }
-                  aria-label={`Numero ${value}`}
-                  aria-pressed={isSelectedBet("straight", String(value))}
-                  disabled={disabled}
-                >
-                  <span>{value}</span>
-                </button>
-              ))}
+              {row.map((value) => {
+                const isActive = isSelectedBet("straight", String(value));
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="gridcell"
+                    className={cx(
+                      "ats-roulette-cell",
+                      `ats-roulette-cell--${getNumberColor(value)}`,
+                      isActive && "is-active",
+                    )}
+                    onClick={() =>
+                      onBetChange({
+                        betType: "straight",
+                        betValue: String(value),
+                        label: `Numero ${value}`,
+                      })
+                    }
+                    aria-label={`Numero ${value}`}
+                    aria-pressed={isActive}
+                    disabled={disabled}
+                  >
+                    <span>{value}</span>
+                    {renderBetStack("straight", String(value), "center")}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>
 
         <div className="ats-roulette-board__columns">
-          {ATS_COLUMN_BETS.map((bet) => (
+          {ATS_COLUMN_BETS.map((bet) => {
+            const isActive = isSelectedBet(bet.betType, bet.betValue);
+            return (
+              <button
+                key={`${bet.betType}-${bet.betValue}`}
+                type="button"
+                className={cx(
+                  "ats-roulette-cell",
+                  "ats-roulette-cell--column",
+                  isActive && "is-active",
+                )}
+                onClick={() => onBetChange({ ...bet })}
+                aria-label={bet.label}
+                aria-pressed={isActive}
+                disabled={disabled}
+              >
+                <span>{bet.label}</span>
+                {renderBetStack(bet.betType, bet.betValue)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="ats-roulette-board__dozens">
+        {ATS_DOZENS.map((bet) => {
+          const isActive = isSelectedBet(bet.betType, bet.betValue);
+          return (
             <button
               key={`${bet.betType}-${bet.betValue}`}
               type="button"
               className={cx(
                 "ats-roulette-cell",
-                "ats-roulette-cell--column",
-                isSelectedBet(bet.betType, bet.betValue) && "is-active",
+                "ats-roulette-cell--outside",
+                "ats-roulette-cell--dozen",
+                isActive && "is-active",
               )}
               onClick={() => onBetChange({ ...bet })}
               aria-label={bet.label}
-              aria-pressed={isSelectedBet(bet.betType, bet.betValue)}
+              aria-pressed={isActive}
               disabled={disabled}
             >
               <span>{bet.label}</span>
+              {renderBetStack(bet.betType, bet.betValue)}
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="ats-roulette-board__dozens">
-        {ATS_DOZENS.map((bet) => (
-          <button
-            key={`${bet.betType}-${bet.betValue}`}
-            type="button"
-            className={cx(
-              "ats-roulette-cell",
-              "ats-roulette-cell--outside",
-              "ats-roulette-cell--dozen",
-              isSelectedBet(bet.betType, bet.betValue) && "is-active",
-            )}
-            onClick={() => onBetChange({ ...bet })}
-            aria-label={bet.label}
-            aria-pressed={isSelectedBet(bet.betType, bet.betValue)}
-            disabled={disabled}
-          >
-            <span>{bet.label}</span>
-          </button>
-        ))}
+          );
+        })}
       </div>
 
       <div className="ats-roulette-board__outside">
@@ -237,25 +323,55 @@ export default function AtsRouletteBoard({
               {bet.tone === "red-diamond" ? <span className="ats-shape ats-shape--diamond" /> : null}
               {bet.tone === "black-skull" ? <span className="ats-shape ats-shape--skull">☠</span> : null}
               {bet.label ? <span>{bet.label}</span> : null}
+              {renderBetStack(bet.betType, bet.betValue)}
             </button>
           );
         })}
       </div>
 
       <div className="ats-roulette-board__ports">
-        {ATS_PORTS.map((port) => (
-          <button
-            key={port.id}
-            type="button"
-            className={cx("ats-port-button", `ats-port-button--${port.tone}`)}
-            onClick={() => onPortClick?.(port.id)}
-            aria-label={`${port.title} ${port.subtitle}`}
-            disabled={disabled}
-          >
-            <strong>{port.title}</strong>
-            <span>{port.subtitle}</span>
-          </button>
-        ))}
+        {ATS_PORTS.map((port) => {
+          const occupant = getPortOccupant(port.id);
+          return (
+            <button
+              key={port.id}
+              type="button"
+              className={cx(
+                "ats-port-button",
+                `ats-port-button--${port.tone}`,
+                occupant && "has-occupant",
+                occupant?.isSelf && "is-self",
+              )}
+              onClick={() => onPortClick?.(port.id)}
+              aria-label={`${port.title} ${port.subtitle}${occupant ? ` ${occupant.username} ${occupant.totalAmount}` : ""}`}
+              disabled={disabled}
+              title={occupant ? `${occupant.username} • ${occupant.totalAmount}` : `${port.title} ${port.subtitle}`}
+            >
+              {occupant ? (
+                <>
+                  <div className="ats-port-button__stack" aria-hidden="true">
+                    {Array.from({ length: occupant.chipCount }, (_, index) => (
+                      <span
+                        key={`${occupant.userId}-${index}`}
+                        className={cx("ats-port-chip", `ats-port-chip--${occupant.tone}`)}
+                        style={{ ["--chip-offset" as string]: `${index * 4}px` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="ats-port-button__meta">
+                    <b>{occupant.username.slice(0, 10)}</b>
+                    <small>{port.title} • {port.subtitle}</small>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <strong>{port.title}</strong>
+                  <span>{port.subtitle}</span>
+                </>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

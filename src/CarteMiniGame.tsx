@@ -1,7 +1,7 @@
 import * as React from "react";
 import failSound from "./audio/fail.mp3";
 import moneySound from "./audio/money.mp3";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import carteImg from "./images/carte.png";
 import coffreImg from "./images/coffre.png";
@@ -13,9 +13,9 @@ import { formatCredits } from "./lib/casinoRoomState";
 const MAP_ROOM_COST = 90;
 const MAP_REWARD = 340;
 const TREASURE_POINTS = [
-  { id: "west", left: "24.8%", top: "37.4%", label: "Recif ouest" },
-  { id: "south", left: "35.6%", top: "69.7%", label: "Maree du sud" },
-  { id: "east", left: "68.3%", top: "53.8%", label: "Crique est" },
+  { id: "west", left: "26.3%", top: "36.1%", label: "Recif ouest" },
+  { id: "south", left: "36.7%", top: "64%", label: "Maree du sud" },
+  { id: "east", left: "69.9%", top: "49.6%", label: "Crique est" },
 ] as const;
 
 type CarteMiniGameProps = {
@@ -37,7 +37,6 @@ export default function CarteMiniGame({
   const [phase, setPhase] = useState<"idle" | "playing" | "resolved">("idle");
   const [status, setStatus] = useState("Etudie la carte et choisis la bonne croix.");
   const [working, setWorking] = useState(false);
-  const [lastDelta, setLastDelta] = useState(0);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [activeInfoSection, setActiveInfoSection] = useState<"apercu" | "butin" | "lecture">("apercu");
   const moneyAudioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -45,11 +44,6 @@ export default function CarteMiniGame({
 
   const canPlay = profile.wallet.balance >= MAP_ROOM_COST;
   const isWin = phase === "resolved" && selectedPoint && selectedPoint === winningPoint;
-
-  const visibleDelta = useMemo(() => {
-    if (phase === "idle") return 0;
-    return lastDelta;
-  }, [lastDelta, phase]);
 
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
     if (!mediaReady) return;
@@ -83,7 +77,6 @@ export default function CarteMiniGame({
     setPhase("playing");
     setSelectedPoint(null);
     setWinningPoint(null);
-    setLastDelta(0);
     setStatus("Une seule tentative. Choisis la croix qui te semble la plus juste.");
   }
 
@@ -96,7 +89,6 @@ export default function CarteMiniGame({
       setSelectedPoint(result.result.selectedPoint);
       setWinningPoint(result.result.winningPoint);
       setPhase("resolved");
-      setLastDelta(result.result.netChange);
       setStatus(
         result.result.reward > 0
           ? `Trouve. Le coffre rapporte ${formatCredits(result.result.reward)} credits.`
@@ -218,41 +210,44 @@ export default function CarteMiniGame({
             </div>
 
             <div className="casino-reel-shell casino-room-shell casino-room-shell--table-compact">
-              <div className="casino-reel-shell__header">
-                <p>{phase === "resolved" ? `Delta manche: ${visibleDelta >= 0 ? "+" : ""}${formatCredits(visibleDelta)}` : status}</p>
-              </div>
-
               <div className="casino-map-board">
                 <div className="casino-map-board__frame">
                   <img src={carteImg} alt="Carte au tresor" className="casino-map-board__image" />
                   {TREASURE_POINTS.map((point) => {
                     const isSelected = selectedPoint === point.id;
                     const isWinner = phase === "resolved" && winningPoint === point.id;
+                    const isMiss = phase === "resolved" && isSelected && !isWinner;
                     return (
                       <button
                         key={point.id}
                         type="button"
-                        className={`casino-map-marker ${isSelected ? "is-selected" : ""} ${isWinner ? "is-winning" : ""}`}
+                        className={`casino-map-marker ${isSelected ? "is-selected" : ""} ${isWinner ? "is-winning" : ""} ${isMiss ? "is-miss" : ""}`}
                         style={{ left: point.left, top: point.top }}
                         onClick={() => void choosePoint(point.id)}
                         disabled={phase !== "playing" || working}
                         aria-label={point.label}
                       >
-                        {isWinner ? <img src={coffreImg} alt="" /> : <span>✕</span>}
+                        {isWinner ? (
+                          <>
+                            <img src={coffreImg} alt="" />
+                            <span className="casino-map-marker__badge casino-map-marker__badge--win">+{formatCredits(MAP_REWARD)}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="casino-map-marker__cross" aria-hidden="true" />
+                            {isMiss ? <span className="casino-map-marker__badge casino-map-marker__badge--miss">Rate</span> : null}
+                          </>
+                        )}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="casino-action-row">
-                <div className="casino-chip-row">
-                  <span className="casino-chip">{phase === "playing" ? "Une seule tentative active" : "Recherche fermee"}</span>
-                  <span className="casino-chip">Jackpot: +{formatCredits(MAP_REWARD)}</span>
-                </div>
+              <div className="casino-action-row casino-action-row--map">
                 <button
                   type="button"
-                  className="casino-primary-button"
+                  className="casino-primary-button casino-primary-button--map"
                   onClick={startSearch}
                   disabled={phase === "playing" || working}
                 >

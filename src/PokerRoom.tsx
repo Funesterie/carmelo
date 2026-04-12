@@ -7,18 +7,30 @@ import PokerTableScene from "./features/poker/components/PokerTableScene";
 import pokerCaptainArt from "./images/poker-captain-art.png";
 import {
   actPokerRound,
+  fetchPokerRoomState,
   joinPokerRoom,
   startPokerRound,
   type CasinoTableRoom,
+  type CasinoTableRoomParticipant,
   type CasinoProfile,
   type PokerState,
 } from "./lib/casinoApi";
 import { formatCredits } from "./lib/casinoRoomState";
+import {
+  readTableChannelSnapshot,
+  readSyncedTableSelection,
+  subscribeTableChannel,
+  subscribeSyncedTableSelection,
+  writeSyncedTableSelection,
+  writeTableChannelSnapshot,
+} from "./lib/tableChannelSync";
 import { POKER_SALONS } from "./lib/tableSalons";
 
 const ANTE_PRESETS = [60, 120, 200, 320];
 const TABLE_DEAL_STEP_MS = 92;
 const LIVE_MIN_PLAYERS = 2;
+const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
+const LIVE_TURN_LIMIT_MS = 90_000;
 
 type PokerAction = "reveal" | "showdown" | "check" | "call" | "bet" | "raise" | "fold";
 
@@ -78,6 +90,38 @@ function buildAggressionPresets(state: PokerState | null, blindUnit: number) {
     .slice(0, 5);
 }
 
+function buildPokerSyncSignature(state: PokerState | null) {
+  if (!state?.token) return "";
+  return JSON.stringify({
+    token: state.token,
+    roomId: state.roomId || null,
+    stage: state.stage,
+    pot: state.pot,
+    currentBet: state.currentBet,
+    toCall: state.toCall,
+    playerFolded: state.playerFolded,
+    playerCards: state.playerCards.map((card) => card.id),
+    communityCards: state.communityCards.map((card) => card.id),
+    aiSeats: state.aiSeats.map((seat) => ({
+      id: seat.id,
+      folded: Boolean(seat.folded),
+      lastAction: seat.lastAction || "",
+      committed: seat.totalCommitted || 0,
+      cards: seat.cards.map((card) => card.id),
+      winner: seat.isWinner,
+    })),
+    actionLogSize: state.actionLog.length,
+    lastDelta: state.lastDelta,
+  });
+}
+
+function formatTurnClock(remainingMs: number) {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export default function PokerRoom({
   playerName,
   profile,
@@ -89,13 +133,15 @@ export default function PokerRoom({
   const [ante, setAnte] = useState(ANTE_PRESETS[1]);
   const [state, setState] = useState<PokerState | null>(null);
   const [working, setWorking] = useState(false);
-  const [roomId, setRoomId] = useState(POKER_SALONS[0].id);
+  const [roomId, setRoomId] = useState(() => readSyncedTableSelection("poker") || POKER_SALONS[0].id);
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
   const [infoTab, setInfoTab] = useState<"journal" | "lecture" | "salons" | "joueurs">("journal");
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [activeHeaderInfo, setActiveHeaderInfo] = useState<"structure" | "mises" | "live">("structure");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const [betTarget, setBetTarget] = useState(0);
+  const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const displayState = useMemo<PokerState | null>(() => {
     if (!state) return null;
     return {
@@ -106,12 +152,37 @@ export default function PokerRoom({
 
   const previousCardKeysRef = useRef<string[]>([]);
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
+  const latestAppliedSyncAtRef = useRef(0);
+  const skipNextSyncPublishRef = useRef(false);
+  const lastTurnSignatureRef = useRef("");
+  const lastTimedOutSignatureRef = useRef("");
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
   const roomSwitchLocked = !(stage === "idle" || stage === "showdown");
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const tableParticipants = useMemo<Array<CasinoTableRoomParticipant & { isSelf: boolean }>>(() => {
+    const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
+
+    (activeRoom?.participants || []).forEach((participant) => {
+      deduped.set(participant.userId, {
+        ...participant,
+        isSelf: participant.userId === profile.user.id,
+      });
+    });
+
+    if (!deduped.has(profile.user.id)) {
+      deduped.set(profile.user.id, {
+        userId: profile.user.id,
+        username: String(playerName || profile.user.username || "Toi").trim(),
+        updatedAt: null,
+        isSelf: true,
+      });
+    }
+
+    return [...deduped.values()];
+  }, [activeRoom?.participants, playerName, profile.user.id, profile.user.username]);
   const activePlayerCount = activeRoom?.playerCount || 0;
   const isLiveMultiplayerReady = activePlayerCount >= LIVE_MIN_PLAYERS;
   const activeAnte = state?.ante || ante;
@@ -132,6 +203,48 @@ export default function PokerRoom({
   const aggressionPresets = buildAggressionPresets(state, blindUnit);
   const normalizedBetTarget =
     canBet || canRaise ? normalizeAggressionTarget(betTarget || aggressionMin, aggressionMin, aggressionMax, blindUnit) : 0;
+  const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
+  const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "1:30";
+
+  function applySyncedState(nextState: PokerState | null, syncedAt: number, nextDeadlineAt: number | null) {
+    if (!nextState) return;
+    if (syncedAt <= latestAppliedSyncAtRef.current) return;
+    latestAppliedSyncAtRef.current = syncedAt;
+    skipNextSyncPublishRef.current = true;
+    setState(nextState);
+    setTurnDeadlineAt(nextDeadlineAt);
+  }
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    latestAppliedSyncAtRef.current = 0;
+    skipNextSyncPublishRef.current = false;
+    lastTurnSignatureRef.current = "";
+    lastTimedOutSignatureRef.current = "";
+    setTurnDeadlineAt(null);
+  }, [roomId]);
+
+  useEffect(() => {
+    writeSyncedTableSelection("poker", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    return subscribeSyncedTableSelection("poker", (nextRoomId) => {
+      if (!nextRoomId || nextRoomId === roomId || roomSwitchLocked || working) return;
+      resetTableVisualState();
+      setState(null);
+      setRoomId(nextRoomId);
+    });
+  }, [roomId, roomSwitchLocked, working]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +254,22 @@ export default function PokerRoom({
         const result = await joinPokerRoom(roomId);
         if (cancelled) return;
         setRooms(result.rooms);
+
+        try {
+          const sharedState = await fetchPokerRoomState(roomId);
+          if (cancelled || !sharedState) return;
+          applySyncedState(sharedState, Date.now(), turnDeadlineAt);
+          return;
+        } catch (syncError) {
+          if (cancelled) return;
+          if (syncError instanceof Error) {
+            onError(syncError.message);
+          }
+        }
+
+        const snapshot = readTableChannelSnapshot<PokerState>("poker", roomId);
+        if (cancelled || !snapshot?.state) return;
+        applySyncedState(snapshot.state, snapshot.syncedAt, snapshot.turnDeadlineAt);
       } catch (error_) {
         if (cancelled) return;
         onError(error_ instanceof Error ? error_.message : "Le salon poker ne repond pas.");
@@ -148,13 +277,79 @@ export default function PokerRoom({
     }
 
     void syncRoom();
-    const intervalId = window.setInterval(() => void syncRoom(), 15000);
+    const intervalId = window.setInterval(() => void syncRoom(), LIVE_ROOM_POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [onError, roomId]);
+  }, [onError, roomId, turnDeadlineAt]);
+
+  useEffect(() => {
+    const existingSnapshot = readTableChannelSnapshot<PokerState>("poker", roomId);
+    if (existingSnapshot?.state) {
+      applySyncedState(existingSnapshot.state, existingSnapshot.syncedAt, existingSnapshot.turnDeadlineAt);
+    }
+
+    return subscribeTableChannel<PokerState>("poker", roomId, (snapshot) => {
+      if (snapshot.roomId !== roomId) return;
+      applySyncedState(snapshot.state, snapshot.syncedAt, snapshot.turnDeadlineAt);
+    });
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!state) return;
+
+    if (skipNextSyncPublishRef.current) {
+      skipNextSyncPublishRef.current = false;
+      return;
+    }
+
+    const signature = buildPokerSyncSignature(state);
+    const isActionable = stage !== "showdown" && !state.playerFolded && Boolean(state.token);
+    const shouldResetTurnClock = Boolean(
+      isActionable && (!turnDeadlineAt || signature !== lastTurnSignatureRef.current || turnDeadlineAt <= Date.now()),
+    );
+    const nextDeadlineAt = isActionable
+      ? shouldResetTurnClock
+        ? Date.now() + LIVE_TURN_LIMIT_MS
+        : turnDeadlineAt
+      : null;
+
+    if (signature !== lastTurnSignatureRef.current) {
+      lastTimedOutSignatureRef.current = "";
+    }
+    lastTurnSignatureRef.current = signature;
+
+    if (nextDeadlineAt !== turnDeadlineAt) {
+      setTurnDeadlineAt(nextDeadlineAt);
+    }
+
+    const syncedAt = Date.now();
+    latestAppliedSyncAtRef.current = syncedAt;
+    writeTableChannelSnapshot<PokerState>({
+      game: "poker",
+      roomId,
+      syncedAt,
+      turnDeadlineAt: nextDeadlineAt,
+      state,
+    });
+  }, [roomId, stage, state, turnDeadlineAt]);
+
+  useEffect(() => {
+    if (!state?.token || stage === "showdown" || state.playerFolded || !turnDeadlineAt || working) return;
+
+    const signature = buildPokerSyncSignature(state);
+    if (!signature || turnDeadlineAt > nowTick || lastTimedOutSignatureRef.current === signature) return;
+
+    lastTimedOutSignatureRef.current = signature;
+    onError(
+      canCheck
+        ? "Temps ecoule: la table check automatiquement."
+        : "Temps ecoule: la table couche automatiquement la main.",
+    );
+    void act(canCheck ? "check" : "fold");
+  }, [act, canCheck, nowTick, onError, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     return () => {
@@ -213,9 +408,9 @@ export default function PokerRoom({
     });
   }, [aggressionMax, aggressionMin, aggressionPresets, blindUnit, canBet, canRaise]);
 
-  async function dealHand() {
+  async function joinHand() {
     if (!isLiveMultiplayerReady) {
-      onError("Mode multijoueur: en attente d'au moins un autre joueur sur ce salon.");
+      onError("En attente d'au moins un autre joueur sur ce salon avant de rejoindre la table.");
       return;
     }
     onError("");
@@ -235,7 +430,7 @@ export default function PokerRoom({
         onProfileChange(result.profile);
       }
     } catch (error_) {
-      onError(error_ instanceof Error ? error_.message : "La main n'a pas pu etre distribuee.");
+      onError(error_ instanceof Error ? error_.message : "L'entree a la table a echoue.");
     } finally {
       setWorking(false);
     }
@@ -270,9 +465,25 @@ export default function PokerRoom({
     }
   }
 
+  async function handleCheckOrFold() {
+    if (working || stage === "idle" || stage === "showdown") return;
+    if (canCheck) {
+      playCheck();
+      await act("check");
+      return;
+    }
+    await act("fold");
+  }
+
   async function handleAggression() {
     if (working || !(canBet || canRaise) || !normalizedBetTarget) return;
     await act(canRaise ? "raise" : "bet", normalizedBetTarget);
+  }
+
+  async function handleAllIn() {
+    if (working || !(canBet || canRaise) || !aggressionMax) return;
+    setBetTarget(aggressionMax);
+    await act(canRaise ? "raise" : "bet", aggressionMax);
   }
 
   function resetTableVisualState() {
@@ -280,6 +491,7 @@ export default function PokerRoom({
     previousCardKeysRef.current = [];
     setDealtCardDelays({});
     setBetTarget(0);
+    setTurnDeadlineAt(null);
     if (clearDealAnimationTimeoutRef.current) {
       window.clearTimeout(clearDealAnimationTimeoutRef.current);
       clearDealAnimationTimeoutRef.current = null;
@@ -291,6 +503,7 @@ export default function PokerRoom({
     resetTableVisualState();
     setState(null);
     setRoomId(nextRoomId);
+    writeSyncedTableSelection("poker", nextRoomId);
   }
 
   return (
@@ -306,25 +519,33 @@ export default function PokerRoom({
               <div className="casino-room-hud__identity">
                 <div className="casino-topdeck__chip-row">
                   <span className="casino-chip">{pokerRoomMeta?.chip || "Salon hold'em"}</span>
-                  <button
-                    type="button"
-                    className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
-                    onClick={() => setShowRoomInfo((value) => !value)}
-                    aria-label="Informations poker"
-                    aria-expanded={showRoomInfo}
-                  >
-                    <span className="casino-button-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path d="M4 7h16" />
-                        <path d="M4 12h16" />
-                        <path d="M4 17h16" />
-                      </svg>
+                  <div className="casino-room-hud__utility-stack">
+                    <button
+                      type="button"
+                      className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
+                      onClick={() => setShowRoomInfo((value) => !value)}
+                      aria-label="Informations poker"
+                      aria-expanded={showRoomInfo}
+                    >
+                      <span className="casino-button-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M4 7h16" />
+                          <path d="M4 12h16" />
+                          <path d="M4 17h16" />
+                        </svg>
+                      </span>
+                    </button>
+                    <span
+                      className={`casino-poker-turn-timer ${turnDeadlineAt ? "is-live" : ""} ${turnCountdownMs <= 10_000 && turnDeadlineAt ? "is-warning" : ""}`}
+                      aria-label={turnDeadlineAt ? `Temps restant ${turnCountdownLabel}` : "Timer de table en attente"}
+                    >
+                      {turnDeadlineAt ? turnCountdownLabel : "Timer --:--"}
                     </span>
-                  </button>
+                  </div>
                 </div>
                 <strong>{pokerRoomMeta?.title || "Texas hold'em rapide"}</strong>
                 <p>
-                  {state?.message || "Table live plus sobre, plus tendue, sans bots ajoutes cote front sur le tapis."}
+                  {state?.message || "Table partagee par salon avec etat synchronise et actions gerees cote serveur."}
                   {" "}
                   {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
                 </p>
@@ -392,7 +613,8 @@ export default function PokerRoom({
                   ) : null}
                   {activeHeaderInfo === "live" ? (
                     <div className="casino-rule-list">
-                      <p>Le salon doit compter au moins 2 joueurs pour distribuer une main.</p>
+                      <p>Le salon doit compter au moins 2 joueurs pour rejoindre une main multijoueur.</p>
+                      <p>Le tour actif reste synchronise entre les joueurs du meme salon.</p>
                       <p>Table en cours: {activeRoom ? POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
                       <p>Joueurs presents: {activePlayerCount}</p>
                     </div>
@@ -430,6 +652,7 @@ export default function PokerRoom({
               state={displayState}
               stage={stage}
               playerName={playerName}
+              participants={tableParticipants}
               activeAnte={activeAnte}
               smallBlind={smallBlind}
               isDecisionPhase={isDecisionPhase}
@@ -459,15 +682,15 @@ export default function PokerRoom({
               aggressionMin={aggressionMin}
               aggressionMax={aggressionMax}
               blindUnit={blindUnit}
-              aggressionPresets={aggressionPresets}
-              onAnteChange={setAnte}
               onInfoTabChange={setInfoTab}
               onRoomChange={handleRoomChange}
               onBetTargetChange={setBetTarget}
               onFold={() => void act("fold")}
               onCheckOrCall={() => void handleCheckOrCall()}
+              onCheckOrFold={() => void handleCheckOrFold()}
               onAggression={() => void handleAggression()}
-              onDeal={() => void dealHand()}
+              onAllIn={() => void handleAllIn()}
+              onJoin={() => void joinHand()}
             />
           </div>
         </div>

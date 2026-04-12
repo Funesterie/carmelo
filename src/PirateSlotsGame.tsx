@@ -7,6 +7,9 @@ import MiniTreasureGame from "./MiniTreasureGame";
 import PokerRoom from "./PokerRoom";
 import RouletteRoom from "./RouletteRoom";
 import lingotImg from "./images/lingot.png";
+import opaleImg from "./images/opale.png";
+import rubisImg from "./images/rubis.png";
+import saphirImg from "./images/saphir.png";
 import {
   BET_PRESETS,
   CASINO_DISTRICT_ARTWORK,
@@ -17,8 +20,6 @@ import {
   SLOT_FEATURE_MEDIA,
   SLOT_INTRO_MEDIA,
   SLOT_VIDEO_INTRO_SESSION_KEY,
-  SYMBOL_META,
-  buildGoldRainDrops,
   buildPlaceholderGrid,
   chooseSlotFeature,
   getSlotFeatureForBonusGrid,
@@ -26,8 +27,10 @@ import {
   formatTransactionTime,
   getBonusNarration,
   getJokerIndexes,
+  getSlotDisplaySymbolId,
   getSlotFeatureForBonusFeature,
   getSlotGridSymbolAtIndex,
+  getSlotSymbolMeta,
   resolveRoomArtwork,
   waitForMs,
   type RoomId,
@@ -81,6 +84,11 @@ function SlotsRoom({
   onRequestMediaPlayback,
 }: PirateSlotsGameProps) {
   const BIG_WIN_MULTIPLIER = 8;
+  const SLOT_CELEBRATION_FLASH_MS = 3_400;
+  const SLOT_BIG_RAIN_MS = 4_800;
+  const SLOT_EPIC_RAIN_MS = 6_000;
+
+  type SlotCelebrationTone = "win" | "big" | "epic";
 
   type PendingBonusFlow = {
     holdDurationMs: number;
@@ -90,6 +98,25 @@ function SlotsRoom({
   };
 
   type BonusHeldTurns = Partial<Record<number, number>>;
+
+  type SlotCelebration = {
+    id: string;
+    amount: number;
+    tone: SlotCelebrationTone;
+    label: string;
+    caption: string;
+  };
+
+  type SlotPrizeRainItem = {
+    id: string;
+    left: string;
+    delay: string;
+    duration: string;
+    drift: string;
+    scale: string;
+    asset: string;
+    kind: "lingot" | "diamond";
+  };
 
   const [bet, setBet] = useState(() => Math.max(profile.wallet.minBet, BET_PRESETS[1]));
   const [displayGrid, setDisplayGrid] = useState<string[][]>(() => buildPlaceholderGrid());
@@ -105,15 +132,15 @@ function SlotsRoom({
     }
   });
   const [bonusHeldTurns, setBonusHeldTurns] = useState<BonusHeldTurns>({});
-  const [goldRain, setGoldRain] = useState<
-    Array<{ id: string; left: string; delay: string; duration: string; scale: string; drift: string }>
-  >([]);
+  const [goldRain, setGoldRain] = useState<SlotPrizeRainItem[]>([]);
+  const [celebration, setCelebration] = useState<SlotCelebration | null>(null);
   const [pendingBonusFlow, setPendingBonusFlow] = useState<PendingBonusFlow | null>(null);
   const [autoSpinCount, setAutoSpinCount] = useState(0);
   const [autoSpinPreset, setAutoSpinPreset] = useState(10);
   const [featurePlaybackNonce, setFeaturePlaybackNonce] = useState(0);
   const intervalRef = useRef<number | null>(null);
   const goldRainTimeoutRef = useRef<number | null>(null);
+  const celebrationTimeoutRef = useRef<number | null>(null);
   const autoSpinTimeoutRef = useRef<number | null>(null);
   const spinRunIdRef = useRef(0);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -137,6 +164,7 @@ function SlotsRoom({
       spinRunIdRef.current += 1;
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       if (goldRainTimeoutRef.current) window.clearTimeout(goldRainTimeoutRef.current);
+      if (celebrationTimeoutRef.current) window.clearTimeout(celebrationTimeoutRef.current);
       if (autoSpinTimeoutRef.current) window.clearTimeout(autoSpinTimeoutRef.current);
       alertAudioRef.current?.pause();
     };
@@ -380,21 +408,94 @@ function SlotsRoom({
       goldRainTimeoutRef.current = null;
     }
 
-    const payoutRatio = spin.totalPayout / Math.max(1, spin.bet);
-    const isBigWin = spin.totalPayout > 0 && (payoutRatio >= BIG_WIN_MULTIPLIER || Boolean(spin.bonus?.triggered));
-    if (!isBigWin) {
+    const tone = getSlotCelebrationTone(spin);
+    if (tone === "win" || spin.totalPayout <= 0) {
       setGoldRain([]);
       return;
     }
 
-    const nextDrops = buildGoldRainDrops(spin.totalPayout, spin.bet);
+    const nextDrops = buildSlotPrizeRain(spin.totalPayout, spin.bet, tone);
     setGoldRain(nextDrops);
     if (!nextDrops.length) return;
 
     goldRainTimeoutRef.current = window.setTimeout(() => {
       setGoldRain([]);
       goldRainTimeoutRef.current = null;
-    }, 4800);
+    }, tone === "epic" ? SLOT_EPIC_RAIN_MS : SLOT_BIG_RAIN_MS);
+  }
+
+  function getSlotCelebrationTone(spin: CasinoSpin): SlotCelebrationTone {
+    const payoutRatio = spin.totalPayout / Math.max(1, spin.bet);
+    const isEpicWin = Boolean(spin.bonus?.fullJoker) || spin.bonus?.feature === "joker_full";
+    if (isEpicWin) return "epic";
+    if (payoutRatio >= BIG_WIN_MULTIPLIER || spin.totalPayout >= 1_200 || Boolean(spin.bonus?.triggered)) return "big";
+    return "win";
+  }
+
+  function getSlotCelebrationLabel(tone: SlotCelebrationTone) {
+    if (tone === "epic") return "EEEPIIIC WIIIIIN";
+    if (tone === "big") return "BIG WIIIN";
+    return "GAIN";
+  }
+
+  function getSlotCelebrationCaption(spin: CasinoSpin, tone: SlotCelebrationTone) {
+    if (tone === "epic") return "Jackpot full wild";
+    if (tone === "big") return "La cale deborde d'or et de diamants";
+    if (spin.wins.length > 1) return `${spin.wins.length} lignes payeuses`;
+    return "Gain encaisse";
+  }
+
+  function buildSlotPrizeRain(totalPayout: number, betAmount: number, tone: SlotCelebrationTone): SlotPrizeRainItem[] {
+    const ratio = totalPayout / Math.max(1, betAmount);
+    const count =
+      tone === "epic"
+        ? Math.min(36, Math.max(18, Math.round(ratio * 3.4)))
+        : Math.min(22, Math.max(10, Math.round(ratio * 2.4)));
+
+    return Array.from({ length: count }, (_, index) => {
+      const useDiamond = tone === "epic" ? index % 2 === 0 : index % 3 === 0;
+      const asset = useDiamond
+        ? [saphirImg, rubisImg, opaleImg][index % 3] || saphirImg
+        : lingotImg;
+
+      return {
+        id: `slots-rain-${Date.now()}-${index}`,
+        left: `${4 + ((index * 7.8) % 92)}%`,
+        delay: `${(index % 8) * 0.1}s`,
+        duration: `${2.1 + (index % 5) * 0.2}s`,
+        drift: `${-22 + (index % 9) * 6}px`,
+        scale: `${0.7 + (index % 4) * 0.16}`,
+        asset,
+        kind: useDiamond ? "diamond" : "lingot",
+      };
+    });
+  }
+
+  function triggerCelebration(spin: CasinoSpin) {
+    if (celebrationTimeoutRef.current) {
+      window.clearTimeout(celebrationTimeoutRef.current);
+      celebrationTimeoutRef.current = null;
+    }
+
+    if (spin.totalPayout <= 0) {
+      setCelebration(null);
+      return;
+    }
+
+    const tone = getSlotCelebrationTone(spin);
+    const nextCelebration = {
+      id: `${spin.generatedAt}-${spin.totalPayout}-${spin.bet}`,
+      amount: spin.totalPayout,
+      tone,
+      label: getSlotCelebrationLabel(tone),
+      caption: getSlotCelebrationCaption(spin, tone),
+    };
+
+    setCelebration(nextCelebration);
+    celebrationTimeoutRef.current = window.setTimeout(() => {
+      setCelebration((current) => (current?.id === nextCelebration.id ? null : current));
+      celebrationTimeoutRef.current = null;
+    }, tone === "epic" ? SLOT_EPIC_RAIN_MS : SLOT_CELEBRATION_FLASH_MS);
   }
 
   function activateFeature(nextFeature: SlotFeatureKey, options?: { isBonusFeature?: boolean }) {
@@ -437,6 +538,7 @@ function SlotsRoom({
       );
       setLastSpin(result.spin);
       activateFeature(chooseSlotFeature(result.spin), { isBonusFeature: true });
+      triggerCelebration(result.spin);
       triggerGoldRain(result.spin);
       setPendingBonusFlow({
         holdDurationMs: bonus.holdDurationMs,
@@ -473,6 +575,7 @@ function SlotsRoom({
     jokerFeaturePlayedForBonusRef.current = false;
     powerFeaturePlayedForBonusRef.current = false;
     triggerSlotFeedback(result.spin);
+    triggerCelebration(result.spin);
     triggerGoldRain(result.spin);
     setSpinState("idle");
     setLastMessage(getBonusNarration(result.spin));
@@ -545,6 +648,7 @@ function SlotsRoom({
     const runId = spinRunIdRef.current;
     setSpinState("spinning");
     setGoldRain([]);
+    setCelebration(null);
     setLastMessage(pendingBonusFlow ? "La vollee bonus se prepare..." : "Les tambours roulent...");
 
     try {
@@ -596,7 +700,8 @@ function SlotsRoom({
 
   function renderCell(symbolId: string, cellIndex: number, key: string) {
     const effectiveSymbolId = Number(bonusHeldTurns[cellIndex] || 0) > 0 ? "JOKER" : symbolId;
-    const meta = SYMBOL_META[effectiveSymbolId] || SYMBOL_META.COIN;
+    const displaySymbolId = getSlotDisplaySymbolId(effectiveSymbolId);
+    const meta = getSlotSymbolMeta(effectiveSymbolId);
     const isHighlighted = highlightedIndexes.has(cellIndex);
     const isHeldJoker = Number(bonusHeldTurns[cellIndex] || 0) > 0;
     const isWildHighlight = highlightedWildIndexes.has(cellIndex) && effectiveSymbolId === "JOKER";
@@ -607,7 +712,7 @@ function SlotsRoom({
         className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${isHeldJoker ? "is-bonus-held" : ""} ${isWildHighlight ? "is-wild-highlight" : ""}`}
         style={{ ["--cell-accent" as string]: meta.accent }}
       >
-        <img className="casino-reel-cell__art" src={meta.image} alt="" aria-hidden="true" />
+        <img className={`casino-reel-cell__art casino-reel-cell__art--${displaySymbolId.toLowerCase()}`} src={meta.image} alt="" aria-hidden="true" />
         {isWildHighlight ? <span className="casino-reel-cell__badge">Wild</span> : null}
         <span className="casino-reel-cell__label">{meta.label}</span>
       </div>
@@ -622,66 +727,64 @@ function SlotsRoom({
             <p>{lastMessage}</p>
           </div>
 
-          {goldRain.length ? (
-            <div className="casino-gold-rain" aria-hidden="true">
-              {goldRain.map((drop) => (
-                <span
-                  key={drop.id}
-                  className="casino-gold-rain__bar"
-                  style={{
-                    left: drop.left,
-                    animationDelay: drop.delay,
-                    animationDuration: drop.duration,
-                    transform: `translateX(${drop.drift}) scale(${drop.scale})`,
-                  }}
-                >
-                  <img src={lingotImg} alt="" />
-                </span>
-              ))}
-            </div>
-          ) : null}
+          <div className="casino-slot-grid-stage">
+            {goldRain.length ? (
+              <div className="casino-gold-rain" aria-hidden="true">
+                {goldRain.map((drop) => (
+                  <span
+                    key={drop.id}
+                    className={`casino-gold-rain__bar is-${drop.kind}`}
+                    style={{
+                      left: drop.left,
+                      animationDelay: drop.delay,
+                      animationDuration: drop.duration,
+                      ["--rain-drift" as string]: drop.drift,
+                      ["--rain-scale" as string]: drop.scale,
+                    }}
+                  >
+                    <img src={drop.asset} alt="" />
+                  </span>
+                ))}
+              </div>
+            ) : null}
 
-          <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""} is-tight`}>
-            {reelColumns.map((column, columnIndex) => {
-              const strip = spinState === "spinning" ? [...column, ...column, ...column] : column;
+            {celebration ? (
+              <div className={`casino-slot-win-overlay is-${celebration.tone}`} aria-live="polite">
+                <div className="casino-slot-win-overlay__burst" aria-hidden="true" />
+                <div className="casino-slot-win-overlay__card">
+                  <span className="casino-slot-win-overlay__eyebrow">{celebration.label}</span>
+                  <strong>+{formatCredits(celebration.amount)}</strong>
+                  <p>{celebration.caption}</p>
+                </div>
+              </div>
+            ) : null}
 
-              return (
-                <div
-                  key={`reel-${columnIndex}`}
-                  className={`casino-reel-column ${spinState === "spinning" ? "is-spinning" : ""}`}
-                  style={{ ["--reel-order" as string]: `${columnIndex}` }}
-                >
-                  <div className="casino-reel-column__viewport">
-                    <div className="casino-reel-column__track">
-                      {strip.map((symbolId, rowIndex) => {
-                        const visibleRowIndex = rowIndex % column.length;
-                        const cellIndex = visibleRowIndex * reelColumns.length + columnIndex;
-                        return renderCell(symbolId, cellIndex, `${columnIndex}-${rowIndex}-${symbolId}`);
-                      })}
+            <div className={`casino-reel-grid ${spinState === "spinning" ? "is-spinning" : ""} ${spinState === "bonus" ? "is-bonus" : ""} is-tight`}>
+              {reelColumns.map((column, columnIndex) => {
+                const strip = spinState === "spinning" ? [...column, ...column, ...column] : column;
+
+                return (
+                  <div
+                    key={`reel-${columnIndex}`}
+                    className={`casino-reel-column ${spinState === "spinning" ? "is-spinning" : ""}`}
+                    style={{ ["--reel-order" as string]: `${columnIndex}` }}
+                  >
+                    <div className="casino-reel-column__viewport">
+                      <div className="casino-reel-column__track">
+                        {strip.map((symbolId, rowIndex) => {
+                          const visibleRowIndex = rowIndex % column.length;
+                          const cellIndex = visibleRowIndex * reelColumns.length + columnIndex;
+                          return renderCell(symbolId, cellIndex, `${columnIndex}-${rowIndex}-${symbolId}`);
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           <div className="casino-controls">
-            <div className="casino-bet-controls">
-              <div className="casino-bet-pills">
-                {BET_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`casino-bet-pill ${bet === preset ? "is-active" : ""}`}
-                    disabled={spinState === "spinning" || Boolean(pendingBonusFlow) || preset < profile.wallet.minBet || preset > profile.wallet.maxBet}
-                    onClick={() => setBet(preset)}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="casino-action-row__buttons">
               {autoSpinActive ? (
                 <>
@@ -732,6 +835,22 @@ function SlotsRoom({
                 </>
               )}
             </div>
+
+            <div className="casino-bet-controls">
+              <div className="casino-bet-pills">
+                {BET_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`casino-bet-pill ${bet === preset ? "is-active" : ""}`}
+                    disabled={spinState === "spinning" || Boolean(pendingBonusFlow) || preset < profile.wallet.minBet || preset > profile.wallet.maxBet}
+                    onClick={() => setBet(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {profile.wallet.balance < bet ? (
@@ -751,6 +870,7 @@ function SlotsRoom({
           isAlertFeatureActive={isAlertFeatureActive}
           featureVideoRef={featureVideoRef}
           lastSpin={lastSpin}
+          recapGrid={spinState === "spinning" ? null : displayGrid}
           onMarkSlotsIntroPlayed={markSlotsIntroPlayed}
           onRequestMediaPlayback={onRequestMediaPlayback}
         />

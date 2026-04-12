@@ -3,8 +3,6 @@ import { formatCredits } from "../../../lib/casinoRoomState";
 import { POKER_SALONS } from "../../../lib/tableSalons";
 import type { CasinoProfile, CasinoTableRoom, PokerState } from "../../../lib/casinoApi";
 
-const ANTE_PRESETS = [60, 120, 200, 320];
-
 const STREET_LABELS = {
   preflop: { title: "Preflop" },
   flop: { title: "Flop" },
@@ -36,19 +34,19 @@ type PokerSidebarProps = {
   aggressionMin: number;
   aggressionMax: number;
   blindUnit: number;
-  aggressionPresets: number[];
-  onAnteChange: (ante: number) => void;
   onInfoTabChange: (tab: "journal" | "lecture" | "salons" | "joueurs") => void;
   onRoomChange: (roomId: string) => void;
   onBetTargetChange: (value: number) => void;
   onFold: () => void;
   onCheckOrCall: () => void;
+  onCheckOrFold: () => void;
   onAggression: () => void;
-  onDeal: () => void;
+  onAllIn: () => void;
+  onJoin: () => void;
 };
 
 function getDecisionHeadline(state: PokerState | null) {
-  if (!state) return "Selectionne une structure puis distribue.";
+  if (!state) return "Selectionne une structure puis rejoins.";
   if (state.playerFolded) return "Main couchee";
   if (state.stage === "showdown") return "Pot resolu";
   if (state.legalActions.includes("call")) return `Defense a ${formatCredits(state.toCall)}`;
@@ -69,7 +67,7 @@ function getDecisionCaption(state: PokerState | null) {
     return `${state.aggressorName || "La table"} ouvre l'action. Tu peux payer ${formatCredits(state.toCall)}, relancer ou jeter.`;
   }
   if (state.legalActions.includes("bet")) {
-    return "La table t'a checke la parole. Tu peux controler le pot ou attaquer avec un sizing reel.";
+    return "La table t'a checke la parole. Tu peux miser avec un sizing libre ou pousser tapis.";
   }
   return state.message;
 }
@@ -97,30 +95,47 @@ export default function PokerSidebar({
   aggressionMin,
   aggressionMax,
   blindUnit,
-  aggressionPresets,
-  onAnteChange,
   onInfoTabChange,
   onRoomChange,
   onBetTargetChange,
   onFold,
   onCheckOrCall,
+  onCheckOrFold,
   onAggression,
-  onDeal,
+  onAllIn,
+  onJoin,
 }: PokerSidebarProps) {
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
-  const potBetTarget = Math.max(0, (state?.pot || 0) + toCall);
-  const canDeal = stage === "idle" || stage === "showdown";
+  const canJoin = stage === "idle" || stage === "showdown";
 
   return (
     <div className="casino-stage-sidebar">
       <div className={`casino-command-dock casino-command-dock--poker ${isDecisionPhase ? "is-attention" : ""}`}>
+          <div className="casino-command-dock__copy">
+            <span className="casino-chip">{isDecisionPhase ? "Decision" : "Table live"}</span>
+            <strong>{getDecisionHeadline(state)}</strong>
+            <p>{getDecisionCaption(state)}</p>
+          </div>
+
+          {canJoin ? (
+            <div className="casino-command-dock__actions casino-command-dock__actions--poker-join">
+              <button
+                type="button"
+                className="casino-primary-button"
+                onClick={onJoin}
+                disabled={working || profile.wallet.balance < ante}
+              >
+                Rejoindre
+              </button>
+            </div>
+          ) : null}
 
           {(canBet || canRaise) ? (
             <div className="casino-poker-betbox casino-poker-betbox--dock">
               <div className="casino-poker-betbox__header">
                 <div>
                   <span className="casino-chip">{canRaise ? "Relance" : "Mise"}</span>
-                  <strong>{canRaise ? "Sizing de raise" : "Sizing d'ouverture"}</strong>
+                  <strong>{canRaise ? "Curseur de raise" : "Curseur de bet"}</strong>
                 </div>
                 <b>{formatCredits(normalizedBetTarget)}</b>
               </div>
@@ -134,49 +149,36 @@ export default function PokerSidebar({
                 onChange={(event) => onBetTargetChange(Number(event.target.value))}
                 disabled={working || !(canBet || canRaise)}
               />
-              <div className="casino-bet-pills">
+              <div className="casino-poker-betbox__actions">
                 <button
                   type="button"
-                  className={`casino-bet-pill casino-bet-pill--dubloon ${normalizedBetTarget === potBetTarget ? "is-active" : ""}`}
-                  onClick={() => onBetTargetChange(potBetTarget)}
-                  disabled={working || !(canBet || canRaise) || !potBetTarget}
+                  className="casino-ghost-button casino-ghost-button--danger"
+                  onClick={onCheckOrFold}
+                  disabled={working || stage === "idle" || stage === "showdown"}
                 >
-                  Pot
+                  Check / Fold
                 </button>
-                {aggressionPresets.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`casino-bet-pill casino-bet-pill--dubloon ${normalizedBetTarget === preset ? "is-active" : ""}`}
-                    onClick={() => onBetTargetChange(preset)}
-                    disabled={working}
-                  >
-                    {formatCredits(preset)}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  className="casino-primary-button casino-primary-button--cyan"
+                  onClick={onAggression}
+                  disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
+                >
+                  Bet
+                </button>
+                <button
+                  type="button"
+                  className="casino-primary-button"
+                  onClick={onAllIn}
+                  disabled={working || (!(canBet || canRaise)) || !aggressionMax}
+                >
+                  Tapis
+                </button>
               </div>
             </div>
           ) : null}
 
-          {canDeal ? (
-            <div className="casino-command-dock__betline">
-              <div className="casino-bet-pills">
-                {ANTE_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`casino-bet-pill casino-bet-pill--dubloon ${ante === preset ? "is-active" : ""}`}
-                    onClick={() => onAnteChange(preset)}
-                    disabled={working}
-                  >
-                    {Math.max(10, Math.round(preset / 2))}/{preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="casino-command-dock__actions">
+          <div className="casino-command-dock__actions casino-command-dock__actions--poker-decision">
             <button
               type="button"
               className="casino-ghost-button casino-ghost-button--danger"
@@ -191,30 +193,8 @@ export default function PokerSidebar({
               onClick={onCheckOrCall}
               disabled={working || (!canCheck && !canCall)}
             >
-              {canCheck ? "Check" : canCall ? `Call ${formatCredits(toCall)}` : "Check / Call"}
+              Check / Call
             </button>
-            <button
-              type="button"
-              className="casino-primary-button casino-primary-button--cyan"
-              onClick={onAggression}
-              disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
-            >
-              {canRaise
-                ? `Raise a ${formatCredits(normalizedBetTarget)}`
-                : canBet
-                  ? `Bet ${formatCredits(normalizedBetTarget)}`
-                  : "Bet / Raise"}
-            </button>
-            {canDeal ? (
-              <button
-                type="button"
-                className="casino-primary-button"
-                onClick={onDeal}
-                disabled={working || profile.wallet.balance < ante}
-              >
-                Distribuer une main
-              </button>
-            ) : null}
           </div>
         </div>
 

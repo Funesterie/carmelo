@@ -1,7 +1,7 @@
 import PiratePlayingCardView from "../../../PiratePlayingCard";
 import jetonImg from "../../../images/jeton.png";
 import { formatCredits } from "../../../lib/casinoRoomState";
-import type { PokerState } from "../../../lib/casinoApi";
+import type { CasinoTableRoomParticipant, PokerState } from "../../../lib/casinoApi";
 
 const POKER_SEAT_LAYOUT = [
   { x: "15%", y: "34%", align: "start", tag: "UTG" },
@@ -14,6 +14,7 @@ type PokerTableSceneProps = {
   state: PokerState | null;
   stage: "idle" | PokerState["stage"];
   playerName: string;
+  participants: Array<CasinoTableRoomParticipant & { isSelf: boolean }>;
   activeAnte: number;
   smallBlind: number;
   isDecisionPhase: boolean;
@@ -24,12 +25,16 @@ export default function PokerTableScene({
   state,
   stage,
   playerName,
+  participants,
   activeAnte,
   smallBlind,
   isDecisionPhase,
   dealtCardDelays,
 }: PokerTableSceneProps) {
+  void activeAnte;
+  void smallBlind;
   const communityCards = state?.communityCards || [];
+  const remoteParticipants = participants.filter((participant) => !participant.isSelf).slice(0, POKER_SEAT_LAYOUT.length);
 
   return (
     <>
@@ -37,12 +42,12 @@ export default function PokerTableScene({
         <div className={`casino-felt-table casino-felt-table--poker ${isDecisionPhase ? "is-decision-phase" : ""}`}>
           <div className="casino-felt-table__halo" />
 
-          {(state?.aiSeats || []).map((seat, index) => {
+          {remoteParticipants.map((participant, index) => {
             const layout = POKER_SEAT_LAYOUT[index] || POKER_SEAT_LAYOUT[POKER_SEAT_LAYOUT.length - 1];
             return (
               <article
-                key={seat.id}
-                className={`casino-oval-seat casino-oval-seat--ai casino-oval-seat--${layout.align} ${seat.isWinner ? "is-winner" : ""} ${seat.folded ? "is-folded" : ""} ${isDecisionPhase ? "is-muted" : ""}`}
+                key={participant.userId}
+                className={`casino-oval-seat casino-oval-seat--ai casino-oval-seat--poker-peer casino-oval-seat--${layout.align} ${isDecisionPhase ? "is-muted" : ""}`}
                 style={{
                   ["--seat-x" as string]: layout.x,
                   ["--seat-y" as string]: layout.y,
@@ -50,26 +55,14 @@ export default function PokerTableScene({
               >
                 <span className="casino-oval-seat__tag">{layout.tag}</span>
                 <header>
-                  <strong>{seat.name}</strong>
-                  <span className="casino-token-inline"><img src={jetonImg} alt="" />{formatCredits(seat.chips)}</span>
+                  <strong>{participant.username}</strong>
+                  <span className="casino-token-inline"><img src={jetonImg} alt="" />Salon</span>
                 </header>
-                <div className="casino-card-row casino-card-row--compact casino-card-row--tight casino-card-row--fan casino-card-row--fan-tight">
-                  {seat.cards.length ? (
-                    seat.cards.map((card, cardIndex) => (
-                      <PiratePlayingCardView
-                        key={`${seat.id}-${card.id}-${cardIndex}`}
-                        card={card}
-                        hidden={stage !== "showdown"}
-                        dealt={Boolean(dealtCardDelays[`${seat.id}-${card.id}-${cardIndex}`] !== undefined)}
-                        dealDelayMs={dealtCardDelays[`${seat.id}-${card.id}-${cardIndex}`] || 0}
-                      />
-                    ))
-                  ) : (
-                    <div className="casino-empty-seat">En attente</div>
-                  )}
+                <div className="casino-empty-seat casino-empty-seat--poker-peer">
+                  <strong>Joueur connecte</strong>
+                  <span>{stage === "showdown" ? "Showdown sur le salon" : "Main partagee sur ce canal"}</span>
                 </div>
-                <p>{seat.read}</p>
-                <small>{seat.folded ? "Seat couche" : seat.lastAction || (stage === "showdown" ? seat.hand?.label || "Lecture cachee" : "Observe le coup")}</small>
+                <small>{stage === "showdown" ? "Resultat gere par la table" : "En attente de l'action synchronisee"}</small>
               </article>
             );
           })}

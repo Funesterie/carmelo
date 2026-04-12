@@ -17,7 +17,16 @@ import icoMapImg from "../../images/icochassetresor.png";
 import icoSlotsImg from "../../images/icomachine.png";
 import icoPokerImg from "../../images/icopoker.png";
 import icoRouletteImg from "../../images/icoroulette.png";
-import lingotImg from "../../images/lingot.png";
+import slot777ParrotImg from "../../images/slots-adventure/slot-777-parrot.png";
+import slotBatImg from "../../images/slots-adventure/slot-bat.png";
+import slotBlunderbussImg from "../../images/slots-adventure/slot-blunderbuss.png";
+import slotChestImg from "../../images/slots-adventure/slot-chest.png";
+import slotCoinImg from "../../images/slots-adventure/slot-coin.png";
+import slotElephantImg from "../../images/slots-adventure/slot-elephant.png";
+import slotJokerImg from "../../images/slots-adventure/slot-joker.png";
+import slotMapImg from "../../images/slots-adventure/slot-map.png";
+import slotPirateImg from "../../images/slots-adventure/slot-pirate.png";
+import slotSoldatImg from "../../images/slots-adventure/slot-soldat.png";
 import mapImg from "../../images/map.png";
 import perroImg from "../../images/perro.png";
 import pokerCaptainArt from "../../images/poker-captain-art.png";
@@ -43,17 +52,28 @@ export const SLOT_VIDEO_INTRO_SESSION_KEY = "funesterie-slots-intro-played";
 export const CASINO_DISTRICT_ARTWORK = districtArtwork;
 
 export const SYMBOL_META: Record<string, { emoji: string; label: string; accent: string; image: string }> = {
-  PIRATE: { emoji: "🏴‍☠️", label: "Pavillon noir", accent: "var(--casino-gold)", image: drapImg },
-  CHEST: { emoji: "🧰", label: "Coffre", accent: "var(--casino-copper)", image: coffreImg },
-  COIN: { emoji: "🪙", label: "Piastres", accent: "var(--casino-sun)", image: lingotImg },
-  BAT: { emoji: "🦇", label: "Chauve-souris", accent: "var(--casino-rose)", image: chauveImg },
-  BLUNDERBUSS: { emoji: "🔫", label: "Canon court", accent: "var(--casino-fire)", image: gunImg },
-  MAP: { emoji: "🗺️", label: "Carte", accent: "var(--casino-sea)", image: mapImg },
-  PARROT: { emoji: "🦜", label: "Perroquet", accent: "var(--casino-lime)", image: perroImg },
-  SOLDAT: { emoji: "🛡️", label: "Spartiate", accent: "var(--casino-silver)", image: soldatImg },
-  ELEPHANT: { emoji: "🐘", label: "Elephant royal", accent: "var(--casino-ice)", image: elephantImg },
-  JOKER: { emoji: "🃏", label: "Joker royal", accent: "var(--casino-violet)", image: flushImg },
+  PIRATE: { emoji: "🏴‍☠️", label: "Pavillon noir", accent: "var(--casino-gold)", image: slotPirateImg },
+  CHEST: { emoji: "🧰", label: "Coffre", accent: "var(--casino-copper)", image: slotChestImg },
+  COIN: { emoji: "🪙", label: "Piastres", accent: "var(--casino-sun)", image: slotCoinImg },
+  BAT: { emoji: "🦇", label: "Chauve-souris", accent: "var(--casino-rose)", image: slotBatImg },
+  BLUNDERBUSS: { emoji: "🔫", label: "Canon court", accent: "var(--casino-fire)", image: slotBlunderbussImg },
+  MAP: { emoji: "🗺️", label: "Carte", accent: "var(--casino-sea)", image: slotMapImg },
+  PARROT: { emoji: "🦜", label: "Perroquet 777", accent: "var(--casino-lime)", image: slot777ParrotImg },
+  SOLDAT: { emoji: "🛡️", label: "Spartiate", accent: "var(--casino-silver)", image: slotSoldatImg },
+  ELEPHANT: { emoji: "🐘", label: "Elephant royal", accent: "var(--casino-ice)", image: slotElephantImg },
+  JOKER: { emoji: "🃏", label: "Joker royal", accent: "var(--casino-violet)", image: slotJokerImg },
 };
+
+const SLOT_SYMBOL_DISPLAY_ALIASES: Record<string, string> = {};
+
+export function getSlotDisplaySymbolId(symbolId: string) {
+  const normalized = String(symbolId || "").trim().toUpperCase();
+  return SLOT_SYMBOL_DISPLAY_ALIASES[normalized] || normalized || "COIN";
+}
+
+export function getSlotSymbolMeta(symbolId: string) {
+  return SYMBOL_META[getSlotDisplaySymbolId(symbolId)] || SYMBOL_META.COIN;
+}
 
 export const PAYOUT_TABLE = [
   { symbol: "PIRATE", three: "x12", four: "x28", five: "x75" },

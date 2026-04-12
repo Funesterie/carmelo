@@ -49,17 +49,14 @@ export default function MiniTreasureGame({
   const [working, setWorking] = useState(false);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [activeInfoSection, setActiveInfoSection] = useState<"apercu" | "recompenses" | "salves">("apercu");
+  const [foundPrizeCount, setFoundPrizeCount] = useState(0);
   const canonAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const opaleAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const rubisAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const saphirAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const activeAudiosRef = React.useRef<Set<HTMLAudioElement>>(new Set());
 
   const phase = state?.phase || "idle";
-  const revealedPrizes = useMemo(
-    () => (state?.board || []).filter((tile) => tile.revealed && (tile.reward || 0) > 0),
-    [state],
-  );
-  const lastDelta = phase === "resolved" ? (state?.reward || 0) - ROOM_COST : 0;
 
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
     if (!mediaReady) return;
@@ -67,18 +64,32 @@ export default function MiniTreasureGame({
       ref.current = new Audio(src);
       ref.current.preload = "auto";
     }
-    ref.current.pause();
-    try {
-      ref.current.currentTime = 0;
-    } catch {
-      // ignore
-    }
-    ref.current.volume = volume;
-    void ref.current.play().catch(() => undefined);
+
+    const audio = ref.current.cloneNode(true) as HTMLAudioElement;
+    audio.preload = "auto";
+    audio.volume = volume;
+    activeAudiosRef.current.add(audio);
+
+    const release = () => {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      activeAudiosRef.current.delete(audio);
+    };
+
+    audio.onended = release;
+    audio.onerror = release;
+    void audio.play().catch(() => {
+      release();
+    });
   }
 
   React.useEffect(() => {
     return () => {
+      activeAudiosRef.current.forEach((audio) => {
+        audio.pause();
+      });
+      activeAudiosRef.current.clear();
       canonAudioRef.current?.pause();
       opaleAudioRef.current?.pause();
       rubisAudioRef.current?.pause();
@@ -92,6 +103,7 @@ export default function MiniTreasureGame({
     try {
       const result = await startTreasureHunt();
       setState(result.state);
+      setFoundPrizeCount((result.state.board || []).filter((tile) => tile.revealed && (tile.reward || 0) > 0).length);
       setStatus(result.state.message);
       if (result.profile) {
         onProfileChange(result.profile);
@@ -113,6 +125,7 @@ export default function MiniTreasureGame({
       setStatus(result.state.message);
       const revealedTile = result.state.board.find((tile) => tile.id === tileId);
       const reward = Number(revealedTile?.reward || 0);
+      setFoundPrizeCount((current) => current + (reward > 0 ? 1 : 0));
       if (reward >= 520) {
         playCue(opaleAudioRef, opaleSound, 0.84);
       } else if (reward >= 320) {
@@ -135,7 +148,7 @@ export default function MiniTreasureGame({
   return (
     <SceneHost
       template="template-b"
-      className="casino-table-layout"
+      className="casino-table-layout casino-table-layout--hunt"
       main={(
         <div className="casino-stage">
           <div
@@ -239,10 +252,6 @@ export default function MiniTreasureGame({
             </div>
 
             <div className="casino-reel-shell casino-room-shell casino-room-shell--table-compact">
-              <div className="casino-reel-shell__header">
-                <p>{phase === "resolved" ? `Delta manche: ${lastDelta >= 0 ? "+" : ""}${formatCredits(lastDelta)}` : status}</p>
-              </div>
-
               <div className="casino-treasure-hunt">
                 <div className="casino-boat-grid">
                   {(state?.board || Array.from({ length: 9 }, (_, id) => ({ id, revealed: false, reward: null }))).map((tile) => {
@@ -259,8 +268,10 @@ export default function MiniTreasureGame({
                           <img src={marineImg} alt="Navire" />
                         ) : prizeMeta ? (
                           <div className="casino-boat-tile__treasure">
-                            <img src={prizeMeta.art} alt={prizeMeta.label} />
-                            <strong>{formatCredits(prizeMeta.reward)}</strong>
+                            <div className="casino-boat-tile__treasure-media">
+                              <img src={prizeMeta.art} alt={prizeMeta.label} />
+                              <strong className="casino-boat-tile__payout">+{formatCredits(prizeMeta.reward)}</strong>
+                            </div>
                           </div>
                         ) : (
                           <div className="casino-boat-tile__miss">
@@ -273,19 +284,19 @@ export default function MiniTreasureGame({
                   })}
                 </div>
 
-                <div className="casino-action-row">
-                  <div className="casino-chip-row">
-                    <span className="casino-chip">Tirs restants: {state?.shotsLeft ?? 0}</span>
-                    <span className="casino-chip">Pierres relevees: {revealedPrizes.length}</span>
-                  </div>
+                <div className="casino-action-row casino-action-row--hunt">
                   <button
                     type="button"
-                    className="casino-primary-button"
+                    className="casino-primary-button casino-primary-button--hunt"
                     onClick={() => void handleStartRound()}
                     disabled={phase === "playing" || working}
                   >
                     {phase === "playing" ? "Expedition en cours" : `Lancer une expedition - ${formatCredits(ROOM_COST)}`}
                   </button>
+                  <div className="casino-chip-row casino-chip-row--hunt">
+                    <span className="casino-chip">Tirs restants: {state?.shotsLeft ?? 0}</span>
+                    <span className="casino-chip">Pierres revelees: {foundPrizeCount}</span>
+                  </div>
                 </div>
               </div>
             </div>
