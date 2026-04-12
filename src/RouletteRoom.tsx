@@ -1166,6 +1166,16 @@ export default function RouletteRoom({
   }, [pendingBets]);
 
   useEffect(() => {
+    if (!selectedBet || pendingBets.length > 0) return;
+    const hasConcreteBet = displayBets.some(
+      (bet) => bet.betType === selectedBet.betType && bet.betValue === selectedBet.betValue,
+    );
+    if (!hasConcreteBet) {
+      setSelectedBet(null);
+    }
+  }, [displayBets, pendingBets.length, selectedBet]);
+
+  useEffect(() => {
     if (!pendingBets.length || working || tableHasServerActivity) return;
 
     const pendingSignature = pendingBets

@@ -75,7 +75,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     ambientVideoRef,
   }), [ambientVideoAudible, immersionLine, mediaReady, showImmersion, slotsIntroDelayActive]);
 
-  const shouldPlayHeaderVideo = profileLoaded && activeCasinoRoom !== "slots";
+  const shouldPlayHeaderVideo = profileLoaded;
 
   useEffect(() => {
     return () => {

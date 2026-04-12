@@ -88,31 +88,13 @@ function getOutcomeTone(result: string, delta: number) {
 }
 
 const BLACKJACK_REMOTE_LAYOUT = [
-  { x: "24%", y: "31%", align: "start", tag: "P1" },
-  { x: "50%", y: "20%", align: "center", tag: "P2" },
-  { x: "76%", y: "31%", align: "end", tag: "P3" },
-  { x: "18%", y: "56%", align: "start", tag: "P4" },
-  { x: "82%", y: "56%", align: "end", tag: "P5" },
+  { x: "15%", y: "55%", align: "start", tag: "P1" },
+  { x: "85%", y: "55%", align: "end", tag: "P2" },
 ] as const;
 
 function getBlackjackSeatLayout(count: number) {
   if (count <= 1) {
-    return [{ x: "50%", y: "29%", align: "center", tag: "P1" }] as const;
-  }
-
-  if (count === 2) {
-    return [
-      { x: "24%", y: "30%", align: "start", tag: "P1" },
-      { x: "76%", y: "30%", align: "end", tag: "P2" },
-    ] as const;
-  }
-
-  if (count === 3) {
-    return [
-      { x: "20%", y: "42%", align: "start", tag: "P1" },
-      { x: "50%", y: "22%", align: "center", tag: "P2" },
-      { x: "80%", y: "42%", align: "end", tag: "P3" },
-    ] as const;
+    return [{ x: "50%", y: "34%", align: "center", tag: "P1" }] as const;
   }
 
   return BLACKJACK_REMOTE_LAYOUT;
@@ -195,7 +177,7 @@ export default function BlackjackTableScene({
 }: BlackjackTableSceneProps) {
   void bet;
   const hands = getRenderableHands(state);
-  const remoteBindings = getRemoteBlackjackBindings(state, participants, currentUserId).slice(0, BLACKJACK_REMOTE_LAYOUT.length);
+  const remoteBindings = getRemoteBlackjackBindings(state, participants, currentUserId).slice(0, 2);
   const remoteSeatLayout = getBlackjackSeatLayout(remoteBindings.length);
   const selectedChipTotal = sumChipValues(betChips);
   const lockedWager = hands.reduce((sum, hand) => sum + (hand.wager || 0), 0) || state?.wager || 0;

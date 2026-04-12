@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ROOM_DEFINITIONS, SLOT_AMBIENT_MEDIA, type RoomId } from "../../casino/catalog";
+import { ROOM_DEFINITIONS, type RoomId } from "../../casino/catalog";
 import type { MutableRefObject, ReactNode } from "react";
 import icoSlotsImg from "../../../images/icomachine.png";
 import icoMapImg from "../../../images/icochassetresor.png";
@@ -130,10 +130,7 @@ export default function CasinoGameScreen({
   void mediaReady;
   const showHeaderAmbient = true;
 
-  const headerVideoSrc =
-    activeCasinoRoom === "slots"
-      ? SLOT_AMBIENT_MEDIA.video
-      : freshVideo;
+  const headerVideoSrc = freshVideo;
 
   React.useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -225,7 +222,6 @@ export default function CasinoGameScreen({
               ambientPanel
             ) : (
               <video
-                key={`${activeCasinoRoom}-${headerVideoSrc}`}
                 ref={ambientVideoRef}
                 className="casino-account-bar__ambient-video"
                 src={headerVideoSrc}

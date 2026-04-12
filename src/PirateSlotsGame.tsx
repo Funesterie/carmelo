@@ -89,6 +89,7 @@ function SlotsRoom({
   const SLOT_EPIC_RAIN_MS = 6_000;
 
   type SlotCelebrationTone = "win" | "big" | "epic";
+  type SlotHighlightTone = "standard" | "strong" | "epic" | "wild";
 
   type PendingBonusFlow = {
     holdDurationMs: number;
@@ -116,6 +117,11 @@ function SlotsRoom({
     scale: string;
     asset: string;
     kind: "lingot" | "diamond";
+  };
+  type SlotCellHighlight = {
+    accent: string;
+    tone: SlotHighlightTone;
+    priority: number;
   };
 
   const [bet, setBet] = useState<number | undefined>(20);
@@ -173,28 +179,43 @@ function SlotsRoom({
     };
   }, []);
 
-  const highlightedIndexes = useMemo(() => {
-    if (!lastSpin?.wins?.length) return new Set<number>();
-    const flattenedIndexes = lastSpin.wins.reduce<number[]>((accumulator, entry) => {
-      accumulator.push(...entry.indexes);
-      return accumulator;
-    }, []);
-    return new Set(flattenedIndexes);
-  }, [lastSpin]);
-  const highlightedWildIndexes = useMemo(() => {
-    const wildIndexes = new Set<number>();
-    if (!lastSpin?.wins?.length) return wildIndexes;
+  const highlightedCells = useMemo(() => {
+    const highlighted = new Map<number, SlotCellHighlight>();
+    if (!lastSpin?.wins?.length) return highlighted;
 
     lastSpin.wins.forEach((entry) => {
-      if (entry.symbol === "JOKER") return;
+      const accent = getSlotSymbolMeta(entry.symbol).accent;
+      const baseTone: SlotHighlightTone =
+        entry.symbol === "JOKER" || entry.matchCount >= 5
+          ? "epic"
+          : entry.matchCount >= 4
+            ? "strong"
+            : "standard";
+
       entry.indexes.forEach((index) => {
-        if (getSlotGridSymbolAtIndex(lastSpin.grid, lastSpin.reelCount, index) === "JOKER") {
-          wildIndexes.add(index);
+        const resolvedSymbol = getSlotGridSymbolAtIndex(lastSpin.grid, lastSpin.reelCount, index);
+        const tone = resolvedSymbol === "JOKER" && entry.symbol !== "JOKER" ? "wild" : baseTone;
+        const priority =
+          tone === "wild"
+            ? 4
+            : tone === "epic"
+              ? 3
+              : tone === "strong"
+                ? 2
+                : 1;
+        const previous = highlighted.get(index);
+
+        if (!previous || priority >= previous.priority) {
+          highlighted.set(index, {
+            accent: tone === "wild" ? getSlotSymbolMeta("JOKER").accent : accent,
+            tone,
+            priority,
+          });
         }
       });
     });
 
-    return wildIndexes;
+    return highlighted;
   }, [lastSpin]);
 
   const canSpin = spinState !== "spinning" && !busy && bet !== undefined && profile.wallet.balance >= bet;
@@ -712,15 +733,20 @@ function SlotsRoom({
     const effectiveSymbolId = Number(bonusHeldTurns[cellIndex] || 0) > 0 ? "JOKER" : symbolId;
     const displaySymbolId = getSlotDisplaySymbolId(effectiveSymbolId);
     const meta = getSlotSymbolMeta(effectiveSymbolId);
-    const isHighlighted = highlightedIndexes.has(cellIndex);
+    const highlight = highlightedCells.get(cellIndex);
+    const isHighlighted = Boolean(highlight);
     const isHeldJoker = Number(bonusHeldTurns[cellIndex] || 0) > 0;
-    const isWildHighlight = highlightedWildIndexes.has(cellIndex) && effectiveSymbolId === "JOKER";
+    const highlightTone = highlight?.tone || null;
+    const isWildHighlight = highlightTone === "wild" && effectiveSymbolId === "JOKER";
 
     return (
       <div
         key={key}
-        className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${isHeldJoker ? "is-bonus-held" : ""} ${isWildHighlight ? "is-wild-highlight" : ""}`}
-        style={{ ["--cell-accent" as string]: meta.accent }}
+        className={`casino-reel-cell ${isHighlighted ? "is-highlighted" : ""} ${highlightTone ? `is-highlighted--${highlightTone}` : ""} ${isHeldJoker ? "is-bonus-held" : ""} ${isWildHighlight ? "is-wild-highlight" : ""}`}
+        style={{
+          ["--cell-accent" as string]: meta.accent,
+          ["--win-accent" as string]: highlight?.accent || meta.accent,
+        }}
       >
         <img className={`casino-reel-cell__art casino-reel-cell__art--${displaySymbolId.toLowerCase()}`} src={meta.image} alt="" aria-hidden="true" />
         {isWildHighlight ? <span className="casino-reel-cell__badge">Wild</span> : null}

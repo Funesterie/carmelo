@@ -458,7 +458,11 @@ export default function BlackjackRoom({
         onProfileChange(result.profile);
       }
     } catch (error_) {
-      onError(error_ instanceof Error ? error_.message : "La donne n'a pas pu commencer.");
+      if (error_ instanceof Error && error_.message.trim().toLowerCase() === "table_full") {
+        onError("Cette table blackjack est deja complete. Maximum 3 joueurs en plus du croupier.");
+      } else {
+        onError(error_ instanceof Error ? error_.message : "La donne n'a pas pu commencer.");
+      }
     } finally {
       setWorking(false);
     }
@@ -479,7 +483,7 @@ export default function BlackjackRoom({
       }
     } catch (error_) {
       if (error_ instanceof Error && error_.message.trim().toLowerCase() === "invalid_action") {
-        onError("Action refusee par Railway pour cette main. Le backend n'autorise pas encore ce bouton sur ce tour.");
+        onError("Cette action n'est pas autorisee pour la main active. Verifie les regles de double ou de split sur ce tour.");
       } else {
         onError(error_ instanceof Error ? error_.message : "La table n'a pas accepte cette action.");
       }
