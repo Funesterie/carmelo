@@ -96,6 +96,7 @@ const ROULETTE_CELEBRATION_FLASH_MS = 3_200;
 const ROULETTE_BIG_WIN_RAIN_MS = 4_600;
 const ROULETTE_SYNC_ROOM_ID = "ats-live";
 const ROULETTE_SYNC_LEAD_MS = 0;
+const ROULETTE_KICKOFF_DELAY_MS = 1_800;
 // Validation automatique des jetons 15 secondes avant le tirage
 const ROULETTE_AUTO_SUBMIT_THRESHOLD_MS = 15_000;
 const ROULETTE_PORT_ORDER = ["http", "https", "app", "ssh"] as const;
@@ -222,6 +223,7 @@ export default function RouletteRoom({
   const drawTimeoutRef = useRef<number | null>(null);
   const celebrationTimeoutRef = useRef<number | null>(null);
   const prizeRainTimeoutRef = useRef<number | null>(null);
+  const kickoffTimeoutRef = useRef<number | null>(null);
   const lastDrawStartedAtRef = useRef(0);
   const pendingDrawRef = useRef<{
     winningNumber: number;
@@ -326,6 +328,10 @@ export default function RouletteRoom({
       if (prizeRainTimeoutRef.current) {
         window.clearTimeout(prizeRainTimeoutRef.current);
         prizeRainTimeoutRef.current = null;
+      }
+      if (kickoffTimeoutRef.current) {
+        window.clearTimeout(kickoffTimeoutRef.current);
+        kickoffTimeoutRef.current = null;
       }
     };
   }, []);
@@ -1158,6 +1164,28 @@ export default function RouletteRoom({
     if (pendingBets.length) return;
     lastAutoSubmitKeyRef.current = "";
   }, [pendingBets]);
+
+  useEffect(() => {
+    if (kickoffTimeoutRef.current) {
+      window.clearTimeout(kickoffTimeoutRef.current);
+      kickoffTimeoutRef.current = null;
+    }
+
+    if (!pendingBets.length || working || tableHasServerActivity) return undefined;
+
+    kickoffTimeoutRef.current = window.setTimeout(() => {
+      kickoffTimeoutRef.current = null;
+      if (!mountedRef.current || working || tableHasServerActivity || !pendingBets.length) return;
+      void submitPendingBets("manual");
+    }, ROULETTE_KICKOFF_DELAY_MS);
+
+    return () => {
+      if (kickoffTimeoutRef.current) {
+        window.clearTimeout(kickoffTimeoutRef.current);
+        kickoffTimeoutRef.current = null;
+      }
+    };
+  }, [pendingBets, tableHasServerActivity, working]);
 
   useEffect(() => {
     if (!selectedBet || pendingBets.length > 0) return;
