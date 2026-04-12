@@ -15389,6 +15389,11 @@ button {
     top: 80.5% !important;
   }
 
+  .casino-stage--cards--blackjack .casino-oval-seat--blackjack-player {
+    min-height: 206px !important;
+    padding-bottom: 50px !important;
+  }
+
   .casino-stage--cards--blackjack .casino-card-row--dealer .pirate-card,
   .casino-stage--cards--blackjack .casino-card-row--compact .pirate-card {
     width: 42px !important;
@@ -15403,6 +15408,11 @@ button {
   .casino-stage--cards--blackjack .casino-card-row--player,
   .casino-stage--cards--blackjack .casino-card-row--dealer {
     gap: 4px !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-player-banner {
+    min-width: min(186px, calc(100% - 96px)) !important;
+    bottom: 6px !important;
   }
 }
 
@@ -17027,11 +17037,17 @@ button {
 }
 
 .casino-stage--cards--blackjack .casino-blackjack-player-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 4;
   display: inline-grid;
   justify-items: center;
   justify-content: center;
   min-height: 42px;
-  margin: 8px auto 0;
+  min-width: min(210px, calc(100% - 112px));
+  margin: 0;
   padding: 6px 14px;
   border-radius: 18px;
   border: 1px solid rgba(25, 215, 230, 0.24);
@@ -17840,7 +17856,9 @@ button {
   justify-items: center;
   gap: 10px;
   padding-right: 82px;
-  padding-bottom: 8px;
+  padding-bottom: 54px;
+  min-height: 228px;
+  align-content: start;
 }
 
 .casino-seat-chip-stack {
@@ -18146,7 +18164,42 @@ button {
     padding: 7px 12px;
   }
 
-  .casino-table-stat-pill strong {
-    font-size: 0.86rem;
+.casino-table-stat-pill strong {
+  font-size: 0.86rem;
+  }
+}
+
+.casino-account-bar--without-ambient {
+  grid-template-columns: minmax(140px, auto) auto auto auto !important;
+  grid-template-areas: "identity menu coins clock" !important;
+}
+
+.casino-account-bar--without-ambient .casino-account-bar__menu {
+  justify-self: start;
+}
+
+.casino-account-bar--without-ambient .casino-account-bar__coins,
+.casino-account-bar--without-ambient .casino-account-bar__clock {
+  justify-self: end;
+}
+
+@media (max-width: 700px) {
+  .casino-account-bar--without-ambient {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "identity clock"
+      "menu coins" !important;
+    align-items: center !important;
+  }
+
+  .casino-account-bar--without-ambient .casino-account-bar__coins {
+    align-self: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .casino-account-bar--without-ambient {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 8px 10px !important;
   }
 }

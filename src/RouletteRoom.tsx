@@ -1069,7 +1069,7 @@ export default function RouletteRoom({
     }
   }, [room]);
 
-  async function submitPendingBets(mode: "manual" | "auto" = "manual") {
+  async function submitPendingBets(mode: "manual" | "auto" | "kickoff" = "manual") {
     if (!pendingBets.length || working) return;
     onError("");
     setWorking(true);
@@ -1089,22 +1089,28 @@ export default function RouletteRoom({
       if (lastProfile) {
         onProfileChange(
           lastProfile,
-          mode === "auto"
+          mode === "kickoff"
             ? queue.length === 1
-              ? `Mise auto-validee sur ${queue[0].label} avant le tirage.`
-              : `${queue.length} mises auto-validees avant le tirage.`
-            : queue.length === 1
-              ? `Mise placee sur ${queue[0].label}.`
-              : `${queue.length} mises placees sur le tapis.`,
+              ? `Mise placee sur ${queue[0].label}. Le tour Railway demarre.`
+              : `${queue.length} mises placees. Le tour Railway demarre.`
+            : mode === "auto"
+              ? queue.length === 1
+                ? `Mise auto-validee sur ${queue[0].label} avant le tirage.`
+                : `${queue.length} mises auto-validees avant le tirage.`
+              : queue.length === 1
+                ? `Mise placee sur ${queue[0].label}.`
+                : `${queue.length} mises placees sur le tapis.`,
         );
       }
     } catch (error_) {
       if (lastProfile) {
         onProfileChange(
           lastProfile,
-          mode === "auto"
-            ? `${placedCount} mise${placedCount > 1 ? "s" : ""} auto-validee${placedCount > 1 ? "s" : ""}, le reste attend encore.`
-            : `${placedCount} mise${placedCount > 1 ? "s" : ""} envoyee${placedCount > 1 ? "s" : ""}, le reste attend encore.`,
+          mode === "kickoff"
+            ? `${placedCount} mise${placedCount > 1 ? "s" : ""} envoyee${placedCount > 1 ? "s" : ""}, le tour vient d'etre reveille.`
+            : mode === "auto"
+              ? `${placedCount} mise${placedCount > 1 ? "s" : ""} auto-validee${placedCount > 1 ? "s" : ""}, le reste attend encore.`
+              : `${placedCount} mise${placedCount > 1 ? "s" : ""} envoyee${placedCount > 1 ? "s" : ""}, le reste attend encore.`,
         );
       }
       const fallbackMessage = "La mise roulette a echoue.";
@@ -1123,6 +1129,19 @@ export default function RouletteRoom({
     if (pendingBets.length) return;
     lastAutoSubmitKeyRef.current = "";
   }, [pendingBets]);
+
+  useEffect(() => {
+    if (!pendingBets.length || working || tableHasServerActivity) return;
+
+    const pendingSignature = pendingBets
+      .map((bet) => `${bet.betType}:${bet.betValue}:${bet.amount}`)
+      .join("|");
+    const kickoffKey = `kickoff::${pendingSignature}`;
+    if (lastAutoSubmitKeyRef.current === kickoffKey) return;
+
+    lastAutoSubmitKeyRef.current = kickoffKey;
+    void submitPendingBets("kickoff");
+  }, [pendingBets, tableHasServerActivity, working]);
 
   // Maintient la validation automatique à l'approche du tirage (timer)
   useEffect(() => {

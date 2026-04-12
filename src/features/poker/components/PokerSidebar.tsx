@@ -11,6 +11,14 @@ const STREET_LABELS = {
   showdown: { title: "Showdown" },
 } as const;
 
+function getStreetTitle(stage: PokerState["stage"] | "idle" | string | null | undefined) {
+  const normalizedStage = String(stage || "").trim().toLowerCase();
+  const knownStage = STREET_LABELS[normalizedStage as keyof typeof STREET_LABELS];
+  if (knownStage?.title) return knownStage.title;
+  if (!normalizedStage || normalizedStage === "idle") return "En attente";
+  return normalizedStage.charAt(0).toUpperCase() + normalizedStage.slice(1);
+}
+
 type PokerSidebarProps = {
   profile: CasinoProfile;
   state: PokerState | null;
@@ -242,7 +250,7 @@ export default function PokerSidebar({
               <div className="casino-metric-list">
                 <div>
                   <span>Street</span>
-                  <strong>{stage === "idle" ? "En attente" : STREET_LABELS[state?.stage || "preflop"].title}</strong>
+                  <strong>{getStreetTitle(stage === "idle" ? "idle" : state?.stage)}</strong>
                 </div>
                 <div>
                   <span>Pot courant</span>

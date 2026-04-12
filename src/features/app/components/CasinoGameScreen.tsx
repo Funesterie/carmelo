@@ -1,6 +1,5 @@
 import * as React from "react";
-import { SLOT_AMBIENT_MEDIA } from "../../casino/catalog";
-import { ROOM_DEFINITIONS, type RoomId } from "../../casino/catalog";
+import { ROOM_DEFINITIONS, ROOM_LAYOUT_CONFIG, SLOT_AMBIENT_MEDIA, type RoomId } from "../../casino/catalog";
 import type { MutableRefObject, ReactNode } from "react";
 import icoSlotsImg from "../../../images/icomachine.png";
 import icoMapImg from "../../../images/icochassetresor.png";
@@ -129,6 +128,9 @@ export default function CasinoGameScreen({
   const profileMenuRef = React.useRef<HTMLDivElement | null>(null);
 
   void mediaReady;
+  const roomLayout = ROOM_LAYOUT_CONFIG[activeCasinoRoom];
+  const roomSupportsAmbient = roomLayout?.ambient !== "none";
+  const showHeaderAmbient = Boolean(ambientPanel) || roomSupportsAmbient;
 
   const headerVideoSrc =
     activeCasinoRoom === "slots"
@@ -172,7 +174,7 @@ export default function CasinoGameScreen({
   }, []);
 
   return (
-    <div className={`casino-game-shell ${activeCasinoRoom !== "slots" ? "casino-game-shell--with-ambient" : ""}`}>
+    <div className={`casino-game-shell ${showHeaderAmbient ? "casino-game-shell--with-ambient" : ""}`}>
 
       {showImmersion ? (
         <div
@@ -213,28 +215,30 @@ export default function CasinoGameScreen({
         </div>
       ) : null}
 
-      <header className="casino-account-bar">
+      <header className={`casino-account-bar ${showHeaderAmbient ? "" : "casino-account-bar--without-ambient"}`}>
         <div className="casino-account-bar__identity">
           <span className="casino-eyebrow">Salle privee</span>
           <h1>{displayName}</h1>
         </div>
 
-        <div className={`casino-account-bar__ambient ${ambientPanel ? "is-custom-ambient" : ""}`}>
-          {ambientPanel ? (
-            ambientPanel
-          ) : (
-            <video
-              ref={ambientVideoRef}
-              className="casino-account-bar__ambient-video"
-              src={headerVideoSrc}
-              autoPlay
-              loop
-              playsInline
-              muted={!ambientVideoAudible}
-              preload="metadata"
-            />
-          )}
-        </div>
+        {showHeaderAmbient ? (
+          <div className={`casino-account-bar__ambient ${ambientPanel ? "is-custom-ambient" : ""}`}>
+            {ambientPanel ? (
+              ambientPanel
+            ) : (
+              <video
+                ref={ambientVideoRef}
+                className="casino-account-bar__ambient-video"
+                src={headerVideoSrc}
+                autoPlay
+                loop
+                playsInline
+                muted={!ambientVideoAudible}
+                preload="metadata"
+              />
+            )}
+          </div>
+        ) : null}
 
         <div
           ref={profileMenuRef}
