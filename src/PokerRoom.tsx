@@ -463,37 +463,20 @@ export default function PokerRoom({
     }
   }
 
-  async function handleCheckOrCall() {
-    if (working) return;
-    if (canCheck) {
-      playCheck();
-      await act("check");
-      return;
-    }
-    if (canCall) {
-      await act("call");
-    }
+  async function handleCheck() {
+    if (working || !canCheck) return;
+    playCheck();
+    await act("check");
   }
 
-  async function handleCheckOrFold() {
-    if (working || stage === "idle" || stage === "waiting" || stage === "showdown") return;
-    if (canCheck) {
-      playCheck();
-      await act("check");
-      return;
-    }
-    await act("fold");
+  async function handleCall() {
+    if (working || !canCall) return;
+    await act("call");
   }
 
   async function handleAggression() {
     if (working || !(canBet || canRaise) || !normalizedBetTarget) return;
     await act(canRaise ? "raise" : "bet", normalizedBetTarget);
-  }
-
-  async function handleAllIn() {
-    if (working || !(canBet || canRaise) || !aggressionMax) return;
-    setBetTarget(aggressionMax);
-    await act(canRaise ? "raise" : "bet", aggressionMax);
   }
 
   function resetTableVisualState() {
@@ -702,10 +685,9 @@ export default function PokerRoom({
               onRoomChange={handleRoomChange}
               onBetTargetChange={setBetTarget}
               onFold={() => void act("fold")}
-              onCheckOrCall={() => void handleCheckOrCall()}
-              onCheckOrFold={() => void handleCheckOrFold()}
-              onAggression={() => void handleAggression()}
-              onAllIn={() => void handleAllIn()}
+              onCheck={() => void handleCheck()}
+              onCall={() => void handleCall()}
+              onRaise={() => void handleAggression()}
               onJoin={() => void joinHand()}
             />
           </div>

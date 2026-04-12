@@ -10180,14 +10180,17 @@ button {
 .casino-table-layout--slots .casino-reel-cell.is-highlighted {
   border-color: color-mix(in srgb, var(--win-accent, var(--cell-accent)) 52%, rgba(255, 255, 255, 0.1));
   background:
-    radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--win-accent, var(--cell-accent)) 34%, transparent), transparent 42%),
-    linear-gradient(180deg, color-mix(in srgb, var(--win-accent, var(--cell-accent)) 22%, rgba(255, 255, 255, 0.06)), rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at 22% 18%, color-mix(in srgb, var(--win-accent-secondary, var(--win-accent, var(--cell-accent))) 34%, transparent), transparent 40%),
+    radial-gradient(circle at 78% 82%, color-mix(in srgb, var(--win-accent, var(--cell-accent)) 38%, transparent), transparent 46%),
+    linear-gradient(145deg, color-mix(in srgb, var(--win-accent-secondary, var(--win-accent, var(--cell-accent))) 18%, rgba(255, 255, 255, 0.04)), color-mix(in srgb, var(--win-accent, var(--cell-accent)) 24%, rgba(255, 255, 255, 0.02))),
     rgba(8, 14, 21, 0.98);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 0 0 1px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 56%, transparent),
-    0 0 24px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 28%, transparent),
+    0 0 18px color-mix(in srgb, var(--win-accent-secondary, var(--win-accent, var(--cell-accent))) 24%, transparent),
+    0 0 30px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 30%, transparent),
     0 14px 28px rgba(0, 0, 0, 0.24);
+  transform: translateY(-2px) scale(1.03);
 }
 
 .casino-table-layout--slots .casino-reel-cell.is-highlighted--strong {
@@ -10196,6 +10199,7 @@ button {
     0 0 0 1px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 64%, transparent),
     0 0 34px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 34%, transparent),
     0 16px 32px rgba(0, 0, 0, 0.26);
+  transform: translateY(-3px) scale(1.04);
 }
 
 .casino-table-layout--slots .casino-reel-cell.is-highlighted--epic,
@@ -10205,6 +10209,20 @@ button {
     0 0 0 1px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 72%, transparent),
     0 0 44px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 42%, transparent),
     0 18px 36px rgba(0, 0, 0, 0.28);
+  transform: translateY(-4px) scale(1.06);
+}
+
+.casino-table-layout--slots .casino-reel-cell.is-highlighted::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 24px;
+  pointer-events: none;
+  border: 2px solid color-mix(in srgb, var(--win-accent, var(--cell-accent)) 74%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--win-accent-secondary, var(--win-accent, var(--cell-accent))) 30%, transparent),
+    0 0 22px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 36%, transparent);
+  opacity: 0.98;
 }
 
 .casino-table-layout--slots .casino-reel-cell__art {
@@ -10218,6 +10236,14 @@ button {
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 10px 18px rgba(0, 0, 0, 0.24);
   object-fit: contain;
+}
+
+.casino-table-layout--slots .casino-reel-cell.is-highlighted .casino-reel-cell__art {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 20px rgba(0, 0, 0, 0.26),
+    0 0 18px color-mix(in srgb, var(--win-accent, var(--cell-accent)) 30%, transparent);
+  filter: saturate(1.16);
 }
 
 .casino-table-layout--slots .casino-reel-cell__art--pirate,
@@ -11784,6 +11810,16 @@ button {
   object-position: center;
 }
 
+.casino-account-bar__ambient-video.is-underlay {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.casino-account-bar__ambient-overlay {
+  position: absolute;
+  inset: 0;
+}
+
 .casino-account-bar__ambient.is-custom-ambient {
   width: min(100%, 620px);
   height: clamp(220px, 28vw, 340px);
@@ -11801,6 +11837,76 @@ button {
 .casino-account-bar__ambient .casino-roulette-stage-view {
   width: 100%;
   height: 100%;
+}
+
+.casino-slot-ambient-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #05080d;
+}
+
+.casino-slot-ambient-panel__video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  transition: opacity 80ms linear;
+}
+
+.casino-slot-ambient-panel__video.is-visible {
+  opacity: 1;
+}
+
+.casino-slot-ambient-panel__video--ambient {
+  z-index: 0;
+}
+
+.casino-slot-ambient-panel__video--feature {
+  z-index: 1;
+}
+
+.casino-slot-ambient-panel__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 16, 0.12), rgba(6, 10, 16, 0.72)),
+    radial-gradient(circle at top left, rgba(255, 200, 87, 0.18), transparent 28%);
+}
+
+.casino-slot-ambient-panel__copy {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: grid;
+  gap: 2px;
+  z-index: 1;
+}
+
+.casino-slot-ambient-panel__copy strong,
+.casino-slot-ambient-panel__copy span {
+  display: block;
+}
+
+.casino-slot-ambient-panel__copy strong {
+  color: #f8f0de;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.casino-slot-ambient-panel__copy span {
+  color: rgba(246, 239, 224, 0.78);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .casino-account-bar__ambient .casino-roulette-visual--cinematic {
@@ -16840,6 +16946,17 @@ button {
   min-height: 42px;
 }
 
+.casino-command-dock--poker .casino-command-dock__actions--poker-decision-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px;
+}
+
+.casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-primary-button,
+.casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-ghost-button {
+  min-height: 42px;
+  width: 100%;
+}
+
 @media (max-width: 780px) {
   .casino-room-hud__utility-stack {
     gap: 6px;
@@ -16861,6 +16978,17 @@ button {
 
   .casino-command-dock--poker .casino-poker-betbox__actions .casino-primary-button,
   .casino-command-dock--poker .casino-poker-betbox__actions .casino-ghost-button {
+    font-size: 0.76rem;
+    padding-inline: 8px;
+  }
+
+  .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px;
+  }
+
+  .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-primary-button,
+  .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-ghost-button {
     font-size: 0.76rem;
     padding-inline: 8px;
   }
@@ -16897,6 +17025,66 @@ button {
   border-color: rgba(255, 124, 112, 0.36);
   color: #ffd0ca;
   background: rgba(56, 18, 18, 0.82);
+}
+
+/* Final poker action row lock: always keep Fold / Check / Call / Raise on one line. */
+.casino-stage-sidebar--cards-sheet .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row,
+.casino-command-dock--poker .casino-command-dock__actions--poker-decision-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+.casino-stage-sidebar--cards-sheet .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-poker-action-button,
+.casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-poker-action-button {
+  grid-column: auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  padding: 0 6px !important;
+  font-size: 0.74rem !important;
+  letter-spacing: 0.02em;
+}
+
+.casino-command-dock--poker .casino-poker-action-button--fold {
+  background: linear-gradient(180deg, #b8483c, #7f241d) !important;
+  border-color: rgba(255, 167, 147, 0.24) !important;
+  color: #fff2ef !important;
+}
+
+.casino-command-dock--poker .casino-poker-action-button--check {
+  background: linear-gradient(180deg, #4ea96a, #256d40) !important;
+  border-color: rgba(173, 241, 191, 0.24) !important;
+  color: #effff4 !important;
+}
+
+.casino-command-dock--poker .casino-poker-action-button--call {
+  background: linear-gradient(180deg, #86652c, #5a4318) !important;
+  border-color: rgba(255, 223, 153, 0.2) !important;
+  color: #fff4d7 !important;
+}
+
+.casino-command-dock--poker .casino-poker-action-button--raise {
+  background: linear-gradient(180deg, #4dd8ff, #197ea8) !important;
+  border-color: rgba(145, 236, 255, 0.28) !important;
+  color: #031b23 !important;
+  box-shadow:
+    0 10px 22px rgba(34, 177, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+@media (max-width: 780px) {
+  .casino-stage-sidebar--cards-sheet .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row,
+  .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row {
+    gap: 5px !important;
+  }
+
+  .casino-stage-sidebar--cards-sheet .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-poker-action-button,
+  .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-poker-action-button {
+    min-height: 40px !important;
+    font-size: 0.72rem !important;
+    padding: 0 4px !important;
+  }
 }
 
 .casino-stage--cards--poker .casino-oval-seat--poker-peer {
@@ -17104,6 +17292,9 @@ button {
   gap: 6px;
   padding: 10px 11px;
   background: rgba(4, 11, 16, 0.62);
+  justify-items: center;
+  align-items: center;
+  text-align: center;
 }
 
 .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer.is-active {
@@ -17114,7 +17305,14 @@ button {
 }
 
 .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer header {
+  width: 100%;
   gap: 6px;
+  justify-content: center;
+  text-align: center;
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer .casino-seat-role-row {
+  display: none !important;
 }
 
 .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer header strong,
@@ -17140,6 +17338,8 @@ button {
   justify-content: center;
   gap: 3px;
   min-height: 58px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card {
@@ -18275,7 +18475,9 @@ button {
   display: grid;
   gap: 10px;
   justify-items: center;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 
 .casino-blackjack-hand-stack.is-split {
@@ -18286,7 +18488,8 @@ button {
   display: grid;
   gap: 6px;
   justify-items: center;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -18305,12 +18508,96 @@ button {
 
 .casino-stage--cards--blackjack .casino-card-row--fan-player {
   justify-content: center;
+  margin: 0 auto;
 }
 
 .casino-stage--cards--blackjack .casino-blackjack-hand-meta,
 .casino-stage--cards--blackjack .casino-blackjack-player-banner,
 .casino-stage--cards--blackjack .casino-blackjack-seat-outcome {
   justify-self: center;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-core {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-core .casino-blackjack-hand-meta--player {
+  display: none !important;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-dealer-layer,
+.casino-stage--cards--blackjack .casino-blackjack-player-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-dealer-layer {
+  top: 0;
+  padding-top: clamp(18px, 4.2svh, 34px);
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-layer {
+  bottom: 0;
+  padding: 0 clamp(10px, 2.8vw, 18px) clamp(14px, 3.4svh, 26px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-layer .casino-oval-seat--blackjack-player,
+.casino-stage--cards--blackjack .casino-blackjack-dealer-layer .casino-blackjack-dealer-rail {
+  pointer-events: auto;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-layer .casino-oval-seat--blackjack-player {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  margin: 0 auto !important;
+  width: min(94%, 390px) !important;
+  padding: 0 !important;
+  min-height: auto !important;
+  display: grid !important;
+  justify-items: center !important;
+  align-items: end !important;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-dealer-layer .casino-blackjack-dealer-rail {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  margin: 0 auto !important;
+  width: min(94%, 360px) !important;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-core .casino-blackjack-player-banner {
+  position: static !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  min-width: 0 !important;
+  width: max-content;
+  max-width: min(100%, 240px);
+  margin: 0 auto !important;
+}
+
+.casino-stage--cards--blackjack .casino-seat-chip-stack {
+  right: 8px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
 }
 
 .casino-command-dock--blackjack .casino-command-dock__betline {
@@ -18452,5 +18739,152 @@ button {
   .casino-account-bar--without-ambient {
     grid-template-columns: minmax(0, 1fr) auto !important;
     gap: 8px 10px !important;
+  }
+}
+
+/* Final final mobile poker row override. */
+.casino-stage-sidebar--cards-sheet .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row,
+.casino-stage--cards--poker .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+
+.casino-stage-sidebar--cards-sheet .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-poker-action-button,
+.casino-stage--cards--poker .casino-command-dock--poker .casino-command-dock__actions--poker-decision-row .casino-poker-action-button {
+  grid-column: auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 0 4px !important;
+  font-size: 0.72rem !important;
+}
+
+/* Blackjack anchor pass: dealer on top, peers on the sides, hero bottom center. */
+.casino-stage--cards--blackjack .casino-blackjack-dealer-layer {
+  inset: 18px 0 auto;
+  padding: 0 12px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-dealer-layer .casino-blackjack-dealer-rail {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  margin: 0 auto !important;
+  width: min(92%, 292px) !important;
+  padding: 0 !important;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-layer {
+  position: absolute !important;
+  inset: auto 0 12px;
+  min-height: 164px;
+  padding: 0 12px !important;
+  pointer-events: none;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-layer .casino-oval-seat--blackjack-player {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: 0 !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: calc(100% - 112px) !important;
+  min-height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  pointer-events: auto;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-core {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-hand-stack,
+.casino-stage--cards--blackjack .casino-blackjack-player-hand,
+.casino-stage--cards--blackjack .casino-card-row--fan-player {
+  width: max-content !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+}
+
+.casino-stage--cards--blackjack .casino-blackjack-player-core .casino-blackjack-player-banner {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: max-content !important;
+  min-width: 174px !important;
+  max-width: min(100%, 240px) !important;
+  margin: 0 auto !important;
+}
+
+.casino-stage--cards--blackjack .casino-seat-chip-stack {
+  position: absolute !important;
+  right: 8px !important;
+  top: auto !important;
+  bottom: 10px !important;
+  transform: none !important;
+  pointer-events: auto;
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
+  width: clamp(96px, 18vw, 132px) !important;
+  min-height: 122px;
+  z-index: 6 !important;
+  background: rgba(4, 11, 16, 0.88) !important;
+  border-color: rgba(25, 215, 230, 0.18) !important;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.28) !important;
+  justify-items: center !important;
+  align-content: center !important;
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer .casino-card-row--fan-peer {
+  width: max-content;
+  max-width: 100%;
+}
+
+@media (max-width: 520px) {
+  .casino-stage--cards--blackjack .casino-blackjack-player-layer {
+    inset: auto 0 10px;
+    min-height: 148px;
+    padding: 0 10px !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-player-layer .casino-oval-seat--blackjack-player {
+    max-width: calc(100% - 96px) !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-seat-chip-stack {
+    right: 4px !important;
+    bottom: 8px !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-player-core .casino-blackjack-player-banner {
+    min-width: 154px !important;
+    max-width: min(100%, 212px) !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
+    width: min(24vw, 90px) !important;
+    min-height: 110px;
+    padding: 6px !important;
   }
 }

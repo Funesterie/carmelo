@@ -129,6 +129,9 @@ export default function CasinoGameScreen({
 
   void mediaReady;
   const showHeaderAmbient = true;
+  const usesDedicatedAmbient = activeCasinoRoom === "slots" || activeCasinoRoom === "roulette";
+  const showSharedAmbientVideo = !usesDedicatedAmbient;
+  const showDedicatedAmbientPanel = usesDedicatedAmbient && Boolean(ambientPanel);
 
   const headerVideoSrc = freshVideo;
 
@@ -217,10 +220,8 @@ export default function CasinoGameScreen({
         </div>
 
         {showHeaderAmbient ? (
-          <div className={`casino-account-bar__ambient ${ambientPanel ? "is-custom-ambient" : ""}`}>
-            {ambientPanel ? (
-              ambientPanel
-            ) : (
+          <div className={`casino-account-bar__ambient ${usesDedicatedAmbient ? "is-custom-ambient" : ""}`}>
+            {showSharedAmbientVideo ? (
               <video
                 ref={ambientVideoRef}
                 className="casino-account-bar__ambient-video"
@@ -231,6 +232,10 @@ export default function CasinoGameScreen({
                 muted={!ambientVideoAudible}
                 preload="metadata"
               />
+            ) : showDedicatedAmbientPanel ? (
+              ambientPanel
+            ) : (
+              <div className="casino-account-bar__ambient--placeholder" aria-hidden="true" />
             )}
           </div>
         ) : null}

@@ -47,18 +47,88 @@ function sumChipValues(chips: number[]) {
   return chips.reduce((total, chip) => total + chip, 0);
 }
 
-function getRenderableHands(state: BlackjackState | null) {
+function resolveBlackjackScore(
+  primary: BlackjackState["playerScore"] | BlackjackSeat["score"] | undefined,
+  fallback: BlackjackSeat["score"] | undefined,
+  cardCount: number,
+) {
+  if (primary && (cardCount === 0 || primary.total > 0 || primary.isBlackjack || primary.isBust)) {
+    return primary;
+  }
+
+  return fallback || primary || {
+    total: 0,
+    isSoft: false,
+    isBlackjack: false,
+    isBust: false,
+  };
+}
+
+function findBlackjackSelfSeat(
+  state: BlackjackState | null,
+  currentUserId: string,
+  playerName: string,
+) {
+  const normalizedSelfSeatId = normalizeBlackjackIdentity(state?.selfSeatId);
+  const normalizedCurrentUserId = normalizeBlackjackIdentity(currentUserId);
+  const normalizedPlayerName = normalizeBlackjackIdentity(playerName);
+  const candidates = [...(state?.seats || []), ...(state?.aiSeats || [])];
+
+  const explicitSeat = candidates.find((seat) => {
+      const seatId = normalizeBlackjackIdentity(seat.id);
+      const seatUserId = normalizeBlackjackIdentity(seat.userId);
+      const seatName = normalizeBlackjackIdentity(seat.name || seat.username);
+      return Boolean(
+        seat.isSelf
+        || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
+        || (normalizedCurrentUserId && (seatId === normalizedCurrentUserId || seatUserId === normalizedCurrentUserId))
+        || (normalizedPlayerName && seatName === normalizedPlayerName),
+      );
+    }) || null;
+
+  if (explicitSeat) return explicitSeat;
+
+  const playerAlreadyHasCards = Boolean(
+    state?.playerCards.length
+    || state?.playerHands?.some((hand) => Boolean(hand.cards?.length)),
+  );
+  if (playerAlreadyHasCards) return null;
+
+  const normalizedActiveSeatId = normalizeBlackjackIdentity(state?.activeSeatId);
+  const activeSeat =
+    candidates.find((seat) => {
+      const seatId = normalizeBlackjackIdentity(seat.id);
+      return Boolean(
+        (normalizedActiveSeatId && seatId === normalizedActiveSeatId)
+        || seat.isActive,
+      );
+    }) || null;
+
+  if (activeSeat?.cards?.length) {
+    return activeSeat;
+  }
+
+  const seatsWithCards = candidates.filter((seat) => seat.cards?.length);
+  return seatsWithCards.length === 1 ? seatsWithCards[0] : null;
+}
+
+function getRenderableHands(state: BlackjackState | null, selfSeat: BlackjackSeat | null) {
   if (!state) return [];
+
+  const fallbackCards = state.playerCards.length ? state.playerCards : selfSeat?.cards || [];
+  const fallbackScore = resolveBlackjackScore(state.playerScore, selfSeat?.score, fallbackCards.length);
+  const fallbackWager = state.wager || selfSeat?.wager || 0;
+  const fallbackDelta = state.lastDelta || selfSeat?.lastDelta || 0;
 
   if (state.playerHands?.length) {
     const activeIndex = Math.max(0, Math.min(state.playerHands.length - 1, state.activeHandIndex || 0));
     return state.playerHands.map((hand, index) => ({
       id: hand.id || `hand-${index}`,
-      cards: hand.cards || [],
-      wager: hand.wager || state.wager,
-      score: hand.score || state.playerScore,
+      cards: hand.cards?.length ? hand.cards : fallbackCards,
+      wager: hand.wager || fallbackWager,
+      score: resolveBlackjackScore(hand.score, selfSeat?.score, hand.cards?.length || 0),
       result: hand.result || "",
-      lastDelta: hand.lastDelta ?? 0,
+      lastDelta: hand.lastDelta ?? fallbackDelta,
       isActive: hand.isActive ?? index === activeIndex,
     }));
   }
@@ -66,11 +136,11 @@ function getRenderableHands(state: BlackjackState | null) {
   return [
     {
       id: "hand-0",
-      cards: state.playerCards,
-      wager: state.wager,
-      score: state.playerScore,
+      cards: fallbackCards,
+      wager: fallbackWager,
+      score: fallbackScore,
       result: "",
-      lastDelta: state.lastDelta || 0,
+      lastDelta: fallbackDelta,
       isActive: true,
     },
   ];
@@ -92,11 +162,7 @@ const BLACKJACK_REMOTE_LAYOUT = [
   { x: "85%", y: "55%", align: "end", tag: "P2" },
 ] as const;
 
-function getBlackjackSeatLayout(count: number) {
-  if (count <= 1) {
-    return [{ x: "50%", y: "34%", align: "center", tag: "P1" }] as const;
-  }
-
+function getBlackjackSeatLayout() {
   return BLACKJACK_REMOTE_LAYOUT;
 }
 
@@ -128,10 +194,28 @@ function getRemoteBlackjackBindings(
   state: BlackjackState | null,
   participants: CasinoTableRoomParticipant[],
   currentUserId: string,
+  playerName: string,
 ) {
-  const seats = [...(state?.aiSeats || [])];
+  const selfSeat = findBlackjackSelfSeat(state, currentUserId, playerName);
+  const normalizedSelfSeatId = normalizeBlackjackIdentity(selfSeat?.id || selfSeat?.userId);
+  const normalizedSelfSeatName = normalizeBlackjackIdentity(selfSeat?.name || selfSeat?.username);
+  const seats = [...(state?.aiSeats || [])].filter((seat) => {
+    const seatId = normalizeBlackjackIdentity(seat.id || seat.userId);
+    const seatName = normalizeBlackjackIdentity(seat.name || seat.username);
+    return !(
+      seat.isSelf
+      || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
+      || (normalizedSelfSeatName && seatName === normalizedSelfSeatName)
+    );
+  });
+  const normalizedCurrentUserId = normalizeBlackjackIdentity(currentUserId);
+  const normalizedPlayerName = normalizeBlackjackIdentity(playerName);
   const remoteParticipants = participants.filter(
-    (participant) => normalizeBlackjackIdentity(participant.userId) !== normalizeBlackjackIdentity(currentUserId),
+    (participant) => {
+      const participantId = normalizeBlackjackIdentity(participant.userId);
+      const participantName = normalizeBlackjackIdentity(participant.username);
+      return participantId !== normalizedCurrentUserId && participantName !== normalizedPlayerName;
+    },
   );
 
   const participantBindings = remoteParticipants.map((participant) => {
@@ -159,7 +243,20 @@ function getRemoteBlackjackBindings(
     waiting: false,
   }));
 
-  return [...participantBindings, ...orphanSeats];
+  const bindings = [...participantBindings, ...orphanSeats].slice(0, BLACKJACK_REMOTE_LAYOUT.length);
+
+  while (bindings.length < BLACKJACK_REMOTE_LAYOUT.length) {
+    const slotNumber = bindings.length + 1;
+    bindings.push({
+      key: `blackjack-empty-${slotNumber}`,
+      label: `Place ${slotNumber}`,
+      participant: null,
+      seat: null,
+      waiting: true,
+    });
+  }
+
+  return bindings;
 }
 
 export default function BlackjackTableScene({
@@ -176,9 +273,10 @@ export default function BlackjackTableScene({
   onBetChipRemove,
 }: BlackjackTableSceneProps) {
   void bet;
-  const hands = getRenderableHands(state);
-  const remoteBindings = getRemoteBlackjackBindings(state, participants, currentUserId).slice(0, 2);
-  const remoteSeatLayout = getBlackjackSeatLayout(remoteBindings.length);
+  const selfSeat = findBlackjackSelfSeat(state, currentUserId, playerName);
+  const hands = getRenderableHands(state, selfSeat);
+  const remoteBindings = getRemoteBlackjackBindings(state, participants, currentUserId, playerName);
+  const remoteSeatLayout = getBlackjackSeatLayout();
   const selectedChipTotal = sumChipValues(betChips);
   const lockedWager = hands.reduce((sum, hand) => sum + (hand.wager || 0), 0) || state?.wager || 0;
   const totalWager = betLocked ? lockedWager || selectedChipTotal : selectedChipTotal;
@@ -203,25 +301,27 @@ export default function BlackjackTableScene({
   return (
     <div className={`casino-card-felt casino-card-felt--blackjack casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
       <div className={`casino-felt-table casino-felt-table--blackjack ${isDecisionPhase ? "is-decision-phase" : ""}`}>
-        <section className="casino-blackjack-dealer-rail">
-          <div className="casino-blackjack-player-banner casino-blackjack-player-banner--dealer" aria-label="Main du croupier">
-            <strong>Croupier</strong>
-            <span>{state?.dealerHidden ? "Main cachee" : `${state?.dealerScore.total || 0} points`}</span>
-          </div>
-          <div className="casino-card-row casino-card-row--dealer casino-card-row--fan casino-card-row--fan-dealer">
-            {(state?.dealerCards || []).length ? (
-              (state?.dealerCards || []).map((card, index) => (
-                <PiratePlayingCardView
-                  key={`dealer-${card.id}-${index}`}
-                  card={card}
-                  hidden={Boolean(state?.dealerHidden && index === 1)}
-                  dealt={Boolean(dealtCardDelays[`dealer-${card.id}-${index}`] !== undefined)}
-                  dealDelayMs={dealtCardDelays[`dealer-${card.id}-${index}`] || 0}
-                />
-              ))
-            ) : null}
-          </div>
-        </section>
+        <div className="casino-blackjack-dealer-layer">
+          <section className="casino-blackjack-dealer-rail">
+            <div className="casino-blackjack-player-banner casino-blackjack-player-banner--dealer" aria-label="Main du croupier">
+              <strong>Croupier</strong>
+              <span>{state?.dealerHidden ? "Main cachee" : `${state?.dealerScore.total || 0} points`}</span>
+            </div>
+            <div className="casino-card-row casino-card-row--dealer casino-card-row--fan casino-card-row--fan-dealer">
+              {(state?.dealerCards || []).length ? (
+                (state?.dealerCards || []).map((card, index) => (
+                  <PiratePlayingCardView
+                    key={`dealer-${card.id}-${index}`}
+                    card={card}
+                    hidden={Boolean(state?.dealerHidden && index === 1)}
+                    dealt={Boolean(dealtCardDelays[`dealer-${card.id}-${index}`] !== undefined)}
+                    dealDelayMs={dealtCardDelays[`dealer-${card.id}-${index}`] || 0}
+                  />
+                ))
+              ) : null}
+            </div>
+          </section>
+        </div>
 
         {remoteBindings.map(({ key, label, seat, waiting }, index) => {
           const layout = remoteSeatLayout[index] || BLACKJACK_REMOTE_LAYOUT[Math.min(index, BLACKJACK_REMOTE_LAYOUT.length - 1)];
@@ -283,72 +383,76 @@ export default function BlackjackTableScene({
           );
         })}
 
-        <article className={`casino-oval-seat casino-oval-seat--player casino-oval-seat--blackjack-player ${isDecisionPhase ? "is-focus" : ""}`}>
-          {playerOutcome ? (
-            <div className={`casino-blackjack-seat-outcome casino-blackjack-seat-outcome--hero is-${playerOutcome.tone}`} aria-live="polite">
-              <strong>{playerOutcome.label}</strong>
-              {playerOutcome.detail ? <span>{playerOutcome.detail}</span> : null}
+        <div className="casino-blackjack-player-layer">
+          <article className={`casino-oval-seat casino-oval-seat--player casino-oval-seat--blackjack-player ${isDecisionPhase ? "is-focus" : ""}`}>
+            <div className="casino-blackjack-player-core">
+              {playerOutcome ? (
+                <div className={`casino-blackjack-seat-outcome casino-blackjack-seat-outcome--hero is-${playerOutcome.tone}`} aria-live="polite">
+                  <strong>{playerOutcome.label}</strong>
+                  {playerOutcome.detail ? <span>{playerOutcome.detail}</span> : null}
+                </div>
+              ) : null}
+
+              <div className={`casino-blackjack-hand-stack ${hands.length > 1 ? "is-split" : ""}`}>
+                {hands.map((hand, handIndex) => {
+                  const tone = getOutcomeTone(hand.result, hand.lastDelta);
+                  const handOutcome =
+                    state?.stage === "resolved"
+                    && (hands.length > 1 || handIndex > 0)
+                    && tone
+                      ? {
+                          label: tone === "win" ? "WIN" : "LOSE",
+                          detail:
+                            hand.lastDelta > 0
+                              ? `+${formatCredits(hand.lastDelta)}`
+                              : hand.lastDelta < 0
+                                ? `-${formatCredits(Math.abs(hand.lastDelta))}`
+                                : hand.result,
+                          tone,
+                        }
+                      : null;
+
+                  return (
+                    <section
+                      key={hand.id}
+                      className={`casino-blackjack-player-hand ${hand.isActive ? "is-active" : ""} ${hands.length > 1 ? "is-split-hand" : ""}`}
+                    >
+                      <header className="casino-blackjack-hand-meta casino-blackjack-hand-meta--player">
+                        <span>{hands.length > 1 ? `Main ${handIndex + 1}` : "Joueur"}</span>
+                        <strong>{hand.score.total || 0} points</strong>
+                      </header>
+
+                      <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
+                        {hand.cards.length ? (
+                          hand.cards.map((card, index) => (
+                            <PiratePlayingCardView
+                              key={`${hand.id}-${card.id}-${index}`}
+                              card={card}
+                              emphasis="strong"
+                              dealt={Boolean(dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] !== undefined)}
+                              dealDelayMs={dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] || 0}
+                            />
+                          ))
+                        ) : null}
+                      </div>
+
+                      <div className="casino-blackjack-player-banner" aria-label={`Main de ${playerSeatName}`}>
+                        <strong>{hands.length > 1 ? `${playerSeatName} · Main ${handIndex + 1}` : playerSeatName}</strong>
+                        <span>{hand.score.total || 0} points</span>
+                      </div>
+
+                      {handOutcome ? (
+                        <div className={`casino-blackjack-seat-outcome is-${handOutcome.tone}`} aria-live="polite">
+                          <strong>{handOutcome.label}</strong>
+                          {handOutcome.detail ? <span>{handOutcome.detail}</span> : null}
+                        </div>
+                      ) : null}
+                    </section>
+                  );
+                })}
+              </div>
             </div>
-          ) : null}
-
-          <div className={`casino-blackjack-hand-stack ${hands.length > 1 ? "is-split" : ""}`}>
-            {hands.map((hand, handIndex) => {
-              const tone = getOutcomeTone(hand.result, hand.lastDelta);
-              const handOutcome =
-                state?.stage === "resolved"
-                && (hands.length > 1 || handIndex > 0)
-                && tone
-                  ? {
-                      label: tone === "win" ? "WIN" : "LOSE",
-                      detail:
-                        hand.lastDelta > 0
-                          ? `+${formatCredits(hand.lastDelta)}`
-                          : hand.lastDelta < 0
-                            ? `-${formatCredits(Math.abs(hand.lastDelta))}`
-                            : hand.result,
-                      tone,
-                    }
-                  : null;
-
-              return (
-                <section
-                  key={hand.id}
-                  className={`casino-blackjack-player-hand ${hand.isActive ? "is-active" : ""} ${hands.length > 1 ? "is-split-hand" : ""}`}
-                >
-                  <header className="casino-blackjack-hand-meta casino-blackjack-hand-meta--player">
-                    <span>{hands.length > 1 ? `Main ${handIndex + 1}` : "Joueur"}</span>
-                    <strong>{hand.score.total || 0} points</strong>
-                  </header>
-
-                  <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
-                    {hand.cards.length ? (
-                      hand.cards.map((card, index) => (
-                        <PiratePlayingCardView
-                          key={`${hand.id}-${card.id}-${index}`}
-                          card={card}
-                          emphasis="strong"
-                          dealt={Boolean(dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] !== undefined)}
-                          dealDelayMs={dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] || 0}
-                        />
-                      ))
-                    ) : null}
-                  </div>
-
-                  <div className="casino-blackjack-player-banner" aria-label={`Main de ${playerSeatName}`}>
-                    <strong>{hands.length > 1 ? `${playerSeatName} · Main ${handIndex + 1}` : playerSeatName}</strong>
-                    <span>{hand.score.total || 0} points</span>
-                  </div>
-
-                  {handOutcome ? (
-                    <div className={`casino-blackjack-seat-outcome is-${handOutcome.tone}`} aria-live="polite">
-                      <strong>{handOutcome.label}</strong>
-                      {handOutcome.detail ? <span>{handOutcome.detail}</span> : null}
-                    </div>
-                  ) : null}
-                </section>
-              );
-            })}
-          </div>
+          </article>
 
           <div className={`casino-seat-chip-stack ${betLocked ? "is-locked" : ""}`} aria-label={`Pile de mise ${formatCredits(totalWager)}`}>
             <div className="casino-seat-chip-stack__tokens">
@@ -368,7 +472,7 @@ export default function BlackjackTableScene({
             </div>
             <span className="casino-seat-chip-stack__total">{formatCredits(totalWager)}</span>
           </div>
-        </article>
+        </div>
       </div>
     </div>
   );

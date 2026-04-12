@@ -64,7 +64,27 @@ export const SYMBOL_META: Record<string, { emoji: string; label: string; accent:
   JOKER: { emoji: "🃏", label: "Joker royal", accent: "var(--casino-violet)", image: slotJokerImg },
 };
 
-const SLOT_SYMBOL_DISPLAY_ALIASES: Record<string, string> = {};
+const SLOT_SYMBOL_DISPLAY_ALIASES: Record<string, string> = {
+  BLUNDERBUS: "BLUNDERBUSS",
+  CANNON: "BLUNDERBUSS",
+  CANON: "BLUNDERBUSS",
+  GUN: "BLUNDERBUSS",
+  SPARTA: "SOLDAT",
+  SPARTAN: "SOLDAT",
+  SOLDIER: "SOLDAT",
+  JOKER_LINE: "JOKER",
+  JOKER_CROSS: "JOKER",
+  JOKER_FULL: "JOKER",
+};
+
+const SLOT_BONUS_FEATURE_ALIASES: Record<string, "joker_line" | "joker_cross" | "joker_full"> = {
+  "joker-line": "joker_line",
+  "joker-cross": "joker_cross",
+  "joker-full": "joker_full",
+  jokerline: "joker_line",
+  jokercross: "joker_cross",
+  jokerfull: "joker_full",
+};
 
 export function getSlotDisplaySymbolId(symbolId: string) {
   const normalized = String(symbolId || "").trim().toUpperCase();
@@ -364,6 +384,12 @@ export function getSlotGridSymbolAtIndex(grid: string[][], reelCount: number, in
   return grid[rowIndex]?.[columnIndex] || null;
 }
 
+function normalizeBonusFeatureKey(feature: CasinoSpin["bonus"]["feature"] | string | null | undefined) {
+  const normalized = String(feature || "").trim().toLowerCase();
+  if (!normalized) return "";
+  return SLOT_BONUS_FEATURE_ALIASES[normalized] || normalized;
+}
+
 export function buildGoldRainDrops(totalPayout: number, bet: number) {
   const ratio = totalPayout / Math.max(1, bet);
   const count = Math.max(0, Math.min(40, Math.round(ratio * 4)));
@@ -378,7 +404,7 @@ export function buildGoldRainDrops(totalPayout: number, bet: number) {
 }
 
 export function getSlotFeatureForBonusFeature(feature: CasinoSpin["bonus"]["feature"] | null | undefined): SlotFeatureKey {
-  switch (feature) {
+  switch (normalizeBonusFeatureKey(feature)) {
     case "joker_cross":
       return "joker-cross";
     case "joker_full":
@@ -432,18 +458,20 @@ export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
   }
 
   const strongestWin = [...spin.wins].sort((left, right) => right.payout - left.payout)[0];
-  if (strongestWin?.symbol === "ELEPHANT") return "elephant";
-  if (strongestWin?.symbol === "SOLDAT") return "soldat";
-  if (strongestWin?.symbol === "BAT") return "bat";
-  if (strongestWin?.symbol === "BLUNDERBUSS") return "gun";
+  const strongestWinSymbol = getSlotDisplaySymbolId(strongestWin?.symbol || "");
+  if (strongestWinSymbol === "ELEPHANT") return "elephant";
+  if (strongestWinSymbol === "SOLDAT") return "soldat";
+  if (strongestWinSymbol === "BAT") return "bat";
+  if (strongestWinSymbol === "BLUNDERBUSS") return "gun";
   return "idle";
 }
 
 export function getBonusNarration(spin: CasinoSpin) {
-  if (spin.bonus?.feature === "joker_full") {
+  const normalizedBonusFeature = normalizeBonusFeatureKey(spin.bonus?.feature);
+  if (normalizedBonusFeature === "joker_full") {
     return "Full joker verrouille. Toute la grille bascule sous le ranger.";
   }
-  if (spin.bonus?.feature === "joker_cross") {
+  if (normalizedBonusFeature === "joker_cross") {
     return "Croix joker detectee. Les diagonales sont tenues.";
   }
   if (spin.bonus?.triggered) {

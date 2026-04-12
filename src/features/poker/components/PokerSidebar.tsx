@@ -49,10 +49,9 @@ type PokerSidebarProps = {
   onRoomChange: (roomId: string) => void;
   onBetTargetChange: (value: number) => void;
   onFold: () => void;
-  onCheckOrCall: () => void;
-  onCheckOrFold: () => void;
-  onAggression: () => void;
-  onAllIn: () => void;
+  onCheck: () => void;
+  onCall: () => void;
+  onRaise: () => void;
   onJoin: () => void;
 };
 
@@ -116,10 +115,9 @@ export default function PokerSidebar({
   onRoomChange,
   onBetTargetChange,
   onFold,
-  onCheckOrCall,
-  onCheckOrFold,
-  onAggression,
-  onAllIn,
+  onCheck,
+  onCall,
+  onRaise,
   onJoin,
 }: PokerSidebarProps) {
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
@@ -181,40 +179,14 @@ export default function PokerSidebar({
                 onChange={(event) => onBetTargetChange(Number(event.target.value))}
                 disabled={working || !(canBet || canRaise)}
               />
-              <div className="casino-poker-betbox__actions">
-                <button
-                  type="button"
-                  className="casino-ghost-button casino-ghost-button--danger"
-                  onClick={onCheckOrFold}
-                  disabled={working || stage === "idle" || stage === "showdown"}
-                >
-                  Check / Fold
-                </button>
-                <button
-                  type="button"
-                  className="casino-primary-button casino-primary-button--cyan"
-                  onClick={onAggression}
-                  disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
-                >
-                  {canRaise ? "Raise" : "Miser"}
-                </button>
-                <button
-                  type="button"
-                  className="casino-primary-button"
-                  onClick={onAllIn}
-                  disabled={working || (!(canBet || canRaise)) || !aggressionMax}
-                >
-                  Tapis
-                </button>
-              </div>
             </div>
           ) : null}
 
           {!canJoin ? (
-            <div className="casino-command-dock__actions casino-command-dock__actions--poker-decision">
+            <div className="casino-command-dock__actions casino-command-dock__actions--poker-decision-row">
               <button
                 type="button"
-                className="casino-ghost-button casino-ghost-button--danger"
+                className="casino-ghost-button casino-ghost-button--danger casino-poker-action-button casino-poker-action-button--fold"
                 onClick={onFold}
                 disabled={stage === "idle" || stage === "showdown" || working}
               >
@@ -222,11 +194,27 @@ export default function PokerSidebar({
               </button>
               <button
                 type="button"
-                className="casino-ghost-button casino-ghost-button--steady"
-                onClick={onCheckOrCall}
-                disabled={working || (!canCheck && !canCall)}
+                className="casino-ghost-button casino-poker-action-button casino-poker-action-button--check"
+                onClick={onCheck}
+                disabled={working || !canCheck}
               >
-                Check / Call
+                Check
+              </button>
+              <button
+                type="button"
+                className="casino-ghost-button casino-poker-action-button casino-poker-action-button--call"
+                onClick={onCall}
+                disabled={working || !canCall}
+              >
+                Call
+              </button>
+              <button
+                type="button"
+                className="casino-primary-button casino-primary-button--cyan casino-poker-action-button casino-poker-action-button--raise"
+                onClick={onRaise}
+                disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
+              >
+                Raise
               </button>
             </div>
           ) : null}
