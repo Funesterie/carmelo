@@ -1,0 +1,293 @@
+{
+  "results": {
+    "Slots": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollHeight": 844,
+      "docScrollHeight": 844,
+      "bodyOverflowY": "auto",
+      "docOverflowY": "hidden",
+      "account": {
+        "top": 8,
+        "bottom": 110,
+        "height": 102,
+        "width": 374
+      },
+      "game": {
+        "top": 8,
+        "bottom": 852,
+        "height": 844,
+        "width": 374
+      },
+      "table": {
+        "top": 208,
+        "bottom": 748,
+        "height": 540,
+        "width": 390
+      },
+      "stage": {
+        "top": 208,
+        "bottom": 738,
+        "height": 530,
+        "width": 390
+      },
+      "fused": {
+        "top": 208,
+        "bottom": 730,
+        "height": 522,
+        "width": 390
+      },
+      "bottomActions": {
+        "top": 533,
+        "bottom": 581,
+        "height": 48,
+        "width": 182
+      }
+    },
+    "Carte": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollHeight": 844,
+      "docScrollHeight": 844,
+      "bodyOverflowY": "auto",
+      "docOverflowY": "hidden",
+      "account": {
+        "top": 8,
+        "bottom": 110,
+        "height": 102,
+        "width": 374
+      },
+      "game": {
+        "top": 8,
+        "bottom": 852,
+        "height": 844,
+        "width": 374
+      },
+      "table": {
+        "top": 118,
+        "bottom": 601,
+        "height": 482,
+        "width": 374
+      },
+      "stage": {
+        "top": 118,
+        "bottom": 593,
+        "height": 474,
+        "width": 390
+      },
+      "fused": {
+        "top": 118,
+        "bottom": 593,
+        "height": 474,
+        "width": 390
+      },
+      "bottomActions": {
+        "top": 511,
+        "bottom": 569,
+        "height": 58,
+        "width": 340
+      }
+    },
+    "Chasse": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollHeight": 844,
+      "docScrollHeight": 844,
+      "bodyOverflowY": "auto",
+      "docOverflowY": "hidden",
+      "account": {
+        "top": 8,
+        "bottom": 110,
+        "height": 102,
+        "width": 374
+      },
+      "game": {
+        "top": 8,
+        "bottom": 852,
+        "height": 844,
+        "width": 374
+      },
+      "table": {
+        "top": 118,
+        "bottom": 874,
+        "height": 756,
+        "width": 374
+      },
+      "stage": {
+        "top": 118,
+        "bottom": 866,
+        "height": 748,
+        "width": 390
+      },
+      "fused": {
+        "top": 118,
+        "bottom": 866,
+        "height": 748,
+        "width": 390
+      },
+      "bottomActions": null
+    },
+    "Blackjack": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollHeight": 844,
+      "docScrollHeight": 844,
+      "bodyOverflowY": "auto",
+      "docOverflowY": "hidden",
+      "account": {
+        "top": 8,
+        "bottom": 110,
+        "height": 102,
+        "width": 374
+      },
+      "game": {
+        "top": 8,
+        "bottom": 852,
+        "height": 844,
+        "width": 374
+      },
+      "table": {
+        "top": 118,
+        "bottom": 954,
+        "height": 836,
+        "width": 390
+      },
+      "stage": {
+        "top": 118,
+        "bottom": 1021,
+        "height": 903,
+        "width": 390
+      },
+      "fused": {
+        "top": 118,
+        "bottom": 1021,
+        "height": 903,
+        "width": 390
+      },
+      "bottomActions": {
+        "top": 854,
+        "bottom": 896,
+        "height": 42,
+        "width": 167
+      }
+    },
+    "Poker": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollHeight": 844,
+      "docScrollHeight": 844,
+      "bodyOverflowY": "auto",
+      "docOverflowY": "hidden",
+      "account": {
+        "top": 8,
+        "bottom": 110,
+        "height": 102,
+        "width": 374
+      },
+      "game": {
+        "top": 8,
+        "bottom": 852,
+        "height": 844,
+        "width": 374
+      },
+      "table": {
+        "top": 118,
+        "bottom": 929,
+        "height": 811,
+        "width": 390
+      },
+      "stage": {
+        "top": 118,
+        "bottom": 929,
+        "height": 811,
+        "width": 390
+      },
+      "fused": {
+        "top": 118,
+        "bottom": 929,
+        "height": 811,
+        "width": 390
+      },
+      "bottomActions": {
+        "top": 804,
+        "bottom": 846,
+        "height": 42,
+        "width": 168
+      }
+    },
+    "Roulette": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bodyScrollHeight": 844,
+      "docScrollHeight": 844,
+      "bodyOverflowY": "auto",
+      "docOverflowY": "hidden",
+      "account": {
+        "top": 8,
+        "bottom": 206,
+        "height": 198,
+        "width": 374
+      },
+      "game": {
+        "top": 8,
+        "bottom": 852,
+        "height": 844,
+        "width": 374
+      },
+      "table": {
+        "top": 214,
+        "bottom": 982,
+        "height": 768,
+        "width": 374
+      },
+      "stage": {
+        "top": 214,
+        "bottom": 972,
+        "height": 758,
+        "width": 374
+      },
+      "fused": {
+        "top": 214,
+        "bottom": 320,
+        "height": 106,
+        "width": 374
+      },
+      "bottomActions": {
+        "top": 0,
+        "bottom": 0,
+        "height": 0,
+        "width": 0
+      }
+    }
+  },
+  "logs": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    }
+  ]
+}

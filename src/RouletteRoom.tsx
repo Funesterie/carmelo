@@ -1,4 +1,6 @@
 import * as React from "react";
+import { playAudio } from "./audio/playAudio";
+import rireMp3 from "./audio/rire.mp3";
 import { useEffect, useMemo, useRef, useState } from "react";
 import PirateInspector from "./PirateInspector";
 import { ROOM_DEFINITIONS } from "./features/casino/catalog";
@@ -54,6 +56,7 @@ import {
   writeTableChannelSnapshot,
 } from "./lib/tableChannelSync";
 import {
+  fetchCasinoProfile,
   isCasinoSessionError,
   fetchRouletteRoom,
   placeRouletteBet,
@@ -80,22 +83,21 @@ type ActiveRouletteBet = {
   betValue: string;
   label: string;
   amount: number;
-  stackCount: number;
 };
 
-const ROULETTE_POLL_ACTIVE_INTERVAL_MS = 1200;
+
+
+const ROULETTE_POLL_NEAR_CLOSE_INTERVAL_MS = 1200;
+const ROULETTE_POLL_ACTIVE_INTERVAL_MS = 3000;
 const ROULETTE_POLL_IDLE_INTERVAL_MS = 15000;
-const DEFAULT_ROULETTE_DRAW_INTERVAL_MS = 0;
-const ROULETTE_DRAW_INTERVAL_STORAGE_KEY = "casino.roulette.drawIntervalMs";
-const ROULETTE_DRAW_INTERVAL_OPTIONS = [
-  { label: "Direct", value: 0 },
-  { label: "2 s", value: 2_000 },
-  { label: "5 s", value: 5_000 },
-] as const;
+// Intervalle de tirage numéro réglé à 2 minutes (120 000 ms)
+const ROULETTE_FALLBACK_DRAW_INTERVAL_MS = 120_000;
 const ROULETTE_CELEBRATION_FLASH_MS = 3_200;
 const ROULETTE_BIG_WIN_RAIN_MS = 4_600;
 const ROULETTE_SYNC_ROOM_ID = "ats-live";
-const ROULETTE_SYNC_LEAD_MS = 1_800;
+const ROULETTE_SYNC_LEAD_MS = 0;
+// Validation automatique des jetons 15 secondes avant le tirage
+const ROULETTE_AUTO_SUBMIT_THRESHOLD_MS = 15_000;
 const ROULETTE_PORT_ORDER = ["http", "https", "app", "ssh"] as const;
 const ROULETTE_PORT_TONES = ["red", "green", "amber", "blue"] as const;
 
@@ -186,6 +188,7 @@ export default function RouletteRoom({
   const [room, setRoom] = useState<RouletteRoom | null>(null);
   const [amount, setAmount] = useState(ROULETTE_AMOUNT_PRESETS[2]);
   const [selectedBet, setSelectedBet] = useState<{ betType: string; betValue: string; label: string } | null>(null);
+  const [pendingBets, setPendingBets] = useState<ActiveRouletteBet[]>([]);
   const [working, setWorking] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [infoTab, setInfoTab] = useState<"mises" | "participants" | "historique">("mises");
@@ -194,13 +197,8 @@ export default function RouletteRoom({
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [celebration, setCelebration] = useState<RouletteCelebration | null>(null);
   const [prizeRain, setPrizeRain] = useState<RoulettePrizeRainItem[]>([]);
-  const [drawIntervalMs, setDrawIntervalMs] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_ROULETTE_DRAW_INTERVAL_MS;
-    const stored = Number(window.localStorage.getItem(ROULETTE_DRAW_INTERVAL_STORAGE_KEY));
-    return ROULETTE_DRAW_INTERVAL_OPTIONS.some((option) => option.value === stored)
-      ? stored
-      : DEFAULT_ROULETTE_DRAW_INTERVAL_MS;
-  });
+  const [lastResolvedPayout, setLastResolvedPayout] = useState(0);
+  const [roomTimingSyncedAt, setRoomTimingSyncedAt] = useState(() => Date.now());
   const [isDocumentVisible, setIsDocumentVisible] = useState(() => {
     if (typeof document === "undefined") return true;
     return document.visibilityState !== "hidden";
@@ -234,6 +232,7 @@ export default function RouletteRoom({
   const documentVisibleRef = useRef(isDocumentVisible);
   const latestAppliedSyncAtRef = useRef(0);
   const skipNextSyncPublishRef = useRef(false);
+  const lastAutoSubmitKeyRef = useRef("");
 
   function applySyncedRouletteRoom(nextRoom: RouletteRoom | null, syncedAt: number) {
     if (!nextRoom) return;
@@ -246,7 +245,11 @@ export default function RouletteRoom({
   function getRoulettePollDelay(nextRoom: RouletteRoom | null) {
     const participantCount = Number(nextRoom?.round.playerCount || 0);
     const hasMyBets = Boolean(nextRoom?.round.myBets?.length);
-    return participantCount > 0 || hasMyBets
+    const remainingMs = Math.max(0, Number(nextRoom?.round.remainingMs || 0));
+    if (remainingMs > 0 && remainingMs <= 10_000) {
+      return ROULETTE_POLL_NEAR_CLOSE_INTERVAL_MS;
+    }
+    return participantCount > 0 || hasMyBets || Number(nextRoom?.round.id || 0) > 0
       ? ROULETTE_POLL_ACTIVE_INTERVAL_MS
       : ROULETTE_POLL_IDLE_INTERVAL_MS;
   }
@@ -373,7 +376,9 @@ export default function RouletteRoom({
         if (!mounted) return;
         nextRoom = result.room;
         setRoom(result.room);
-        syncProfileIfChanged(result.profile);
+        if (result.profile) {
+          syncProfileIfChanged(result.profile);
+        }
       } catch (error_) {
         if (!mounted) return;
         onErrorRef.current(
@@ -425,18 +430,32 @@ export default function RouletteRoom({
     });
   }, [room]);
 
+  useEffect(() => {
+    if (!room) return;
+    setRoomTimingSyncedAt(Date.now());
+  }, [room?.round.id, room?.round.remainingMs, room?.round.closesAt, room?.round.playerCount, room?.latestResolved?.id]);
+
+  const tableHasServerActivity = Number(room?.round.playerCount || 0) > 0 || Number(room?.round.myBets?.length || 0) > 0;
   const remainingMs = useMemo(() => {
+    if (!tableHasServerActivity) return 0;
+
+    const serverRemainingMs = Math.max(0, Number(room?.round.remainingMs || 0));
+    if (serverRemainingMs > 0) {
+      return Math.max(0, serverRemainingMs - Math.max(0, nowTick - roomTimingSyncedAt));
+    }
+
     const closesAt = room?.round.closesAt ? new Date(room.round.closesAt).getTime() : 0;
     if (!closesAt) return 0;
     return Math.max(0, closesAt - nowTick);
-  }, [nowTick, room?.round.closesAt]);
+  }, [nowTick, room?.round.closesAt, room?.round.remainingMs, roomTimingSyncedAt, tableHasServerActivity]);
   const countdownLabel = useMemo(() => {
+    if (!tableHasServerActivity) return "En attente";
     if (remainingMs <= 0) return "Fermee";
     const totalSeconds = Math.ceil(remainingMs / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
-  }, [remainingMs]);
+  }, [remainingMs, tableHasServerActivity]);
 
   const wheelPockets = useMemo(
     () =>
@@ -486,30 +505,52 @@ export default function RouletteRoom({
   }, [room?.round.id]);
   const activeBets = useMemo<ActiveRouletteBet[]>(() => {
     const nextActiveBets: ActiveRouletteBet[] = [];
-    const activeBetAmounts = new Map<string, { amount: number; stackCount: number }>();
+    const activeBetAmounts = new Map<string, number>();
 
     for (const bet of room?.round.myBets || []) {
       const key = `${bet.betType}::${bet.betValue}`;
-      const current = activeBetAmounts.get(key) || { amount: 0, stackCount: 0 };
-      activeBetAmounts.set(key, {
-        amount: current.amount + bet.amount,
-        stackCount: current.stackCount + 1,
-      });
+      activeBetAmounts.set(key, (activeBetAmounts.get(key) || 0) + bet.amount);
     }
 
-    for (const [key, aggregate] of activeBetAmounts.entries()) {
+    for (const [key, totalAmount] of activeBetAmounts.entries()) {
       const [betType, betValue] = key.split("::");
       nextActiveBets.push({
         betType,
         betValue,
         label: getBetLabel(betType, betValue),
-        amount: aggregate.amount,
-        stackCount: aggregate.stackCount,
+        amount: totalAmount,
       });
     }
 
     return nextActiveBets;
   }, [room?.round.myBets]);
+  const pendingTotal = useMemo(
+    () => pendingBets.reduce((sum, bet) => sum + bet.amount, 0),
+    [pendingBets],
+  );
+  const displayBets = useMemo(() => {
+    const merged = new Map<string, ActiveRouletteBet>();
+
+    for (const bet of activeBets) {
+      merged.set(`${bet.betType}::${bet.betValue}`, { ...bet });
+    }
+
+    for (const bet of pendingBets) {
+      const key = `${bet.betType}::${bet.betValue}`;
+      const current = merged.get(key);
+      if (current) {
+        merged.set(key, {
+          ...current,
+          amount: current.amount + bet.amount,
+        });
+        continue;
+      }
+
+      merged.set(key, { ...bet });
+    }
+
+    return [...merged.values()];
+  }, [activeBets, pendingBets]);
   const portOccupants = useMemo<RoulettePortOccupant[]>(() => {
     const participants = room?.round.participants || [];
     return participants.slice(0, 4).map((participant, index) => ({
@@ -524,6 +565,29 @@ export default function RouletteRoom({
   }, [profile.user.id, room?.round.participants]);
   const selfPortTone = portOccupants.find((entry) => entry.isSelf)?.tone || "amber";
   const activeTotal = activeBets.reduce((sum, bet) => sum + bet.amount, 0);
+  const hasPendingBets = pendingBets.length > 0;
+  const betsLocked = tableHasServerActivity && remainingMs <= ROULETTE_AUTO_SUBMIT_THRESHOLD_MS;
+  const displayedGainTotal = celebration?.payoutTotal || lastResolvedPayout;
+  const rouletteSummaryTitle = hasPendingBets
+    ? `${pendingBets.length} mise${pendingBets.length > 1 ? "s" : ""} en attente`
+    : selectedBet
+      ? `Cible: ${selectedBet.label}`
+      : joinedSalon.title;
+  const rouletteStatusCopy = betsLocked
+    ? activeBets.length
+      ? `${activeBets.length} mise${activeBets.length > 1 ? "s" : ""} verrouillee${activeBets.length > 1 ? "s" : ""} jusqu'au tirage.`
+      : "Mises verrouillees jusqu'au tirage."
+    : !tableHasServerActivity
+      ? hasPendingBets
+        ? "Jetons poses. Le prochain tour Railway s'ouvrira des qu'un joueur sera actif sur la table."
+        : "Le prochain tirage de 2 minutes s'ouvrira quand quelqu'un activera la table."
+    : hasPendingBets
+      ? `${pendingBets.length} mise${pendingBets.length > 1 ? "s" : ""} posee${pendingBets.length > 1 ? "s" : ""} sur le tapis.`
+      : activeBets.length
+        ? `${activeBets.length} mise${activeBets.length > 1 ? "s" : ""} confirmee${activeBets.length > 1 ? "s" : ""} sur ce tour.`
+        : selectedBet
+          ? `Cible prete: ${selectedBet.label}.`
+          : "Pose simplement tes jetons sur le tapis.";
   const latestResult = room?.recentResults?.[0] || null;
   const latestResolvedResult = room?.latestResolved || latestResult;
 
@@ -565,35 +629,6 @@ export default function RouletteRoom({
             <div>
               <span>Cloture</span>
               <strong>{remainingMs > 0 ? `${Math.ceil(remainingMs / 1000)}s` : "Fermee"}</strong>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "cadence",
-        label: "Cadence",
-        content: (
-          <div className="casino-topdeck__info-stack">
-            <div className="casino-topdeck__info-meta">
-              <span>Tirage roulette</span>
-              <span>Cadence locale d'affichage</span>
-            </div>
-            <p className="casino-topdeck__info-copy">
-              Regle le delai local de secours si aucun horodatage de tir n'est disponible. Quand le serveur renvoie
-              son heure de resolution, le depart de l'animation se cale dessus pour garder les appareils ensemble.
-            </p>
-            <div className="casino-topdeck__info-buttons" role="group" aria-label="Cadence des tirages">
-              {ROULETTE_DRAW_INTERVAL_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`casino-topdeck__info-button ${drawIntervalMs === option.value ? "is-active" : ""}`}
-                  aria-pressed={drawIntervalMs === option.value}
-                  onClick={() => setDrawIntervalMs(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
             </div>
           </div>
         ),
@@ -705,7 +740,6 @@ export default function RouletteRoom({
     ],
     [
       infoTab,
-      drawIntervalMs,
       joinedSalon.title,
       latestResult,
       remainingMs,
@@ -737,12 +771,18 @@ export default function RouletteRoom({
     [latestResolvedResult, sequencePhase],
   );
 
+
+  // Active automatiquement l'onglet 'mises' si une mise est posée et qu'il y a du crédit en jeu
   useEffect(() => {
-    setActiveRouletteInfoSectionId((currentId) =>
-      rouletteInfoSections.some((section) => section.id === currentId)
-        ? currentId
-        : (rouletteInfoSections[0]?.id ?? "salle"));
-  }, [rouletteInfoSections]);
+    if (activeBets.length > 0 && profile.wallet.balance > 0) {
+      setActiveRouletteInfoSectionId("mises");
+    } else {
+      setActiveRouletteInfoSectionId((currentId) =>
+        rouletteInfoSections.some((section) => section.id === currentId)
+          ? currentId
+          : (rouletteInfoSections[0]?.id ?? "salle"));
+    }
+  }, [activeBets.length, profile.wallet.balance, rouletteInfoSections]);
 
   useEffect(() => {
     onAmbientPanelChange?.(ambientRoulettePanel);
@@ -751,11 +791,6 @@ export default function RouletteRoom({
     };
   }, [ambientRoulettePanel, onAmbientPanelChange]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(ROULETTE_DRAW_INTERVAL_STORAGE_KEY, String(drawIntervalMs));
-  }, [drawIntervalMs]);
-
   function cancelSpinAnimation() {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -763,7 +798,7 @@ export default function RouletteRoom({
     }
   }
 
-  async function playWheelAnimation(winningNumber: number, token: number) {
+  async function playWheelAnimation(winningNumber: number, token: number, syncStartAt?: number) {
     cancelSpinAnimation();
     const currentWheel = animationRef.current.wheelRotation;
     const winningIndex = getPocketIndex(winningNumber);
@@ -774,7 +809,8 @@ export default function RouletteRoom({
     const counterClockwiseDelta = normalizeAngle(currentNormalized - targetNormalized);
     const wheelTarget = currentWheel - (7 * 360 + counterClockwiseDelta);
     const ballTravel = 8 * 360 + normalizeAngle(BALL_TARGET_ANGLE - BALL_START_ANGLE);
-    const startedAt = performance.now();
+    const catchupMs = syncStartAt ? Math.max(0, Date.now() - syncStartAt) : 0;
+    const startedAt = performance.now() - Math.min(catchupMs, SPIN_DURATION_MS);
 
     await new Promise<void>((resolve) => {
       const tick = (now: number) => {
@@ -812,7 +848,10 @@ export default function RouletteRoom({
           return;
         }
 
-        const settled = buildSettledAnimation(winningNumber);
+        const settled = {
+          ...buildSettledAnimation(winningNumber),
+          wheelRotation: wheelTarget,
+        };
         animationRef.current = settled;
         setAnimation(settled);
         animationFrameRef.current = null;
@@ -825,11 +864,15 @@ export default function RouletteRoom({
 
   async function runSpinSequence(
     winningNumber: number,
-    context: { roundId: number; resultId: number },
+    context: { roundId: number; resultId: number; startAt?: number },
   ) {
     const token = ++sequenceTokenRef.current;
     const introVideo = introVideoRef.current;
     const reloadVideo = reloadVideoRef.current;
+    const syncStartAt = context.startAt;
+    const catchupMs = syncStartAt ? Math.max(0, Date.now() - syncStartAt) : 0;
+    const shouldSkipIntro = catchupMs > 250;
+    const shouldSkipReload = catchupMs > SPIN_DURATION_MS;
 
     onRouletteEventRef.current?.({
       type: "spin",
@@ -839,32 +882,36 @@ export default function RouletteRoom({
       canonDelayMs: ROULETTE_TIRAGE_CANNON_DELAY_MS,
     });
 
-    await waitForMs(ROULETTE_ANNOUNCE_LEAD_IN_MS);
-    if (!mountedRef.current || token !== sequenceTokenRef.current) return;
+    if (!shouldSkipIntro) {
+      await waitForMs(ROULETTE_ANNOUNCE_LEAD_IN_MS);
+      if (!mountedRef.current || token !== sequenceTokenRef.current) return;
+    }
 
-    if (introVideo) {
+    if (introVideo && !shouldSkipIntro) {
       setSequencePhase("intro");
       await playVideoForward(introVideo, 2200);
       if (!mountedRef.current || token !== sequenceTokenRef.current) return;
     }
 
     setSequencePhase("spin");
-    await playWheelAnimation(winningNumber, token);
+    await playWheelAnimation(winningNumber, token, syncStartAt);
     if (!mountedRef.current || token !== sequenceTokenRef.current) return;
 
-    setSequencePhase("hold");
-    await waitForMs(HOLD_DURATION_MS);
-    if (!mountedRef.current || token !== sequenceTokenRef.current) return;
+    const elapsedSinceSpinStart = syncStartAt ? Math.max(0, Date.now() - syncStartAt) : SPIN_DURATION_MS;
+    const holdElapsedMs = Math.max(0, elapsedSinceSpinStart - SPIN_DURATION_MS);
+    const holdRemainingMs = Math.max(0, HOLD_DURATION_MS - holdElapsedMs);
+    if (holdRemainingMs > 0) {
+      setSequencePhase("hold");
+      await waitForMs(holdRemainingMs);
+      if (!mountedRef.current || token !== sequenceTokenRef.current) return;
+    }
 
-    if (reloadVideo) {
+    if (reloadVideo && !shouldSkipReload) {
       setSequencePhase("reload");
       await playVideoReverse(reloadVideo, token, () => mountedRef.current && token === sequenceTokenRef.current);
       if (!mountedRef.current || token !== sequenceTokenRef.current) return;
     }
 
-    const settled = buildSettledAnimation(winningNumber);
-    animationRef.current = settled;
-    setAnimation(settled);
     setSequencePhase("idle");
   }
 
@@ -877,6 +924,7 @@ export default function RouletteRoom({
     void runSpinSequence(nextDraw.winningNumber, {
       roundId: nextDraw.roundId,
       resultId: nextDraw.resultId,
+      startAt: nextDraw.startAt,
     });
   }
 
@@ -900,20 +948,37 @@ export default function RouletteRoom({
     }, waitMs);
   }
 
+
+
+  // Import util at top level
+
+
   function triggerCelebration(nextCelebration: RouletteCelebration) {
     setCelebration(nextCelebration);
     if (celebrationTimeoutRef.current) {
-      window.clearTimeout(celebrationTimeoutRef.current);
+      clearTimeout(celebrationTimeoutRef.current);
     }
     celebrationTimeoutRef.current = window.setTimeout(() => {
       setCelebration((current) => (current?.resultId === nextCelebration.resultId ? null : current));
       celebrationTimeoutRef.current = null;
     }, ROULETTE_CELEBRATION_FLASH_MS);
 
+    // Joue le son rire.mp3 si le gain est sur un numéro plein (pas couleur, pair, etc)
+    // On considère qu'un "numéro" est gagné si le betType de la mise gagnante est "straight" (à adapter si besoin)
+    if (nextCelebration.payoutTotal > 0 && nextCelebration.winningNumber >= 0) {
+      const myBets = room?.round.myBets || [];
+      const hasStraightWin = myBets.some(
+        (bet) => bet.payout > 0 && bet.betType === "straight" && Number(bet.betValue) === nextCelebration.winningNumber,
+      );
+      if (hasStraightWin) {
+        playAudio(rireMp3);
+      }
+    }
+
     if (nextCelebration.tone === "win") {
       setPrizeRain([]);
       if (prizeRainTimeoutRef.current) {
-        window.clearTimeout(prizeRainTimeoutRef.current);
+        clearTimeout(prizeRainTimeoutRef.current);
         prizeRainTimeoutRef.current = null;
       }
       return;
@@ -922,22 +987,13 @@ export default function RouletteRoom({
     const rain = buildRoulettePrizeRain(nextCelebration.payoutTotal, nextCelebration.tone);
     setPrizeRain(rain);
     if (prizeRainTimeoutRef.current) {
-      window.clearTimeout(prizeRainTimeoutRef.current);
+      clearTimeout(prizeRainTimeoutRef.current);
     }
     prizeRainTimeoutRef.current = window.setTimeout(() => {
       setPrizeRain([]);
       prizeRainTimeoutRef.current = null;
     }, ROULETTE_BIG_WIN_RAIN_MS);
   }
-
-  useEffect(() => {
-    if (!pendingDrawRef.current) return;
-    if (drawTimeoutRef.current) {
-      window.clearTimeout(drawTimeoutRef.current);
-      drawTimeoutRef.current = null;
-    }
-    scheduleDraw(pendingDrawRef.current);
-  }, [drawIntervalMs]);
 
   useEffect(() => {
     if (!room) return;
@@ -978,6 +1034,14 @@ export default function RouletteRoom({
       latestResolvedIdRef.current = resolvedId;
       const payoutTotal = (room.round.myBets || []).reduce((sum, bet) => sum + Math.max(0, Number(bet.payout || 0)), 0);
       const wageredTotal = (room.round.myBets || []).reduce((sum, bet) => sum + Math.max(0, Number(bet.amount || 0)), 0);
+      setLastResolvedPayout(payoutTotal);
+      void fetchCasinoProfile()
+        .then((nextProfile) => {
+          if (nextProfile) {
+            onProfileChangeRef.current(nextProfile);
+          }
+        })
+        .catch(() => {});
       if (payoutTotal > 0 && typeof resolved?.winningNumber === "number") {
         const tone = getRouletteCelebrationTone(payoutTotal, wageredTotal);
         triggerCelebration({
@@ -994,7 +1058,7 @@ export default function RouletteRoom({
         const resolvedAtMs = resolved.resolvedAt ? new Date(resolved.resolvedAt).getTime() : Number.NaN;
         const syncedStartAt = Number.isFinite(resolvedAtMs)
           ? resolvedAtMs + ROULETTE_SYNC_LEAD_MS
-          : Date.now() + Math.max(0, drawIntervalMs);
+          : Date.now();
         scheduleDraw({
           winningNumber: resolved.winningNumber,
           roundId: room.round.id,
@@ -1003,26 +1067,115 @@ export default function RouletteRoom({
         });
       }
     }
-  }, [drawIntervalMs, room]);
+  }, [room]);
 
-  async function submitBet() {
-    if (!selectedBet || working || profile.wallet.balance < amount) return;
+  async function submitPendingBets(mode: "manual" | "auto" = "manual") {
+    if (!pendingBets.length || working) return;
     onError("");
     setWorking(true);
+    const queue = [...pendingBets];
+    let placedCount = 0;
+    let lastProfile: CasinoProfile | null = null;
     try {
-      const result = await placeRouletteBet(selectedBet.betType, selectedBet.betValue, amount);
-      setRoom(result.room);
-      onProfileChange(result.profile, `Mise placee sur ${selectedBet.label}.`);
+      for (const [index, bet] of queue.entries()) {
+        const result = await placeRouletteBet(bet.betType, bet.betValue, bet.amount);
+        placedCount = index + 1;
+        lastProfile = result.profile || lastProfile;
+        setRoom(result.room);
+        setPendingBets(queue.slice(index + 1));
+      }
+
+      setSelectedBet(null);
+      if (lastProfile) {
+        onProfileChange(
+          lastProfile,
+          mode === "auto"
+            ? queue.length === 1
+              ? `Mise auto-validee sur ${queue[0].label} avant le tirage.`
+              : `${queue.length} mises auto-validees avant le tirage.`
+            : queue.length === 1
+              ? `Mise placee sur ${queue[0].label}.`
+              : `${queue.length} mises placees sur le tapis.`,
+        );
+      }
     } catch (error_) {
-      onError(error_ instanceof Error ? error_.message : "La mise roulette a echoue.");
+      if (lastProfile) {
+        onProfileChange(
+          lastProfile,
+          mode === "auto"
+            ? `${placedCount} mise${placedCount > 1 ? "s" : ""} auto-validee${placedCount > 1 ? "s" : ""}, le reste attend encore.`
+            : `${placedCount} mise${placedCount > 1 ? "s" : ""} envoyee${placedCount > 1 ? "s" : ""}, le reste attend encore.`,
+        );
+      }
+      const fallbackMessage = "La mise roulette a echoue.";
+      const detail = error_ instanceof Error ? error_.message : fallbackMessage;
+      onError(
+        placedCount
+          ? `${detail} Les mises restantes sont encore sur le tapis.`
+          : detail,
+      );
     } finally {
       setWorking(false);
     }
   }
 
+  useEffect(() => {
+    if (pendingBets.length) return;
+    lastAutoSubmitKeyRef.current = "";
+  }, [pendingBets]);
+
+  // Maintient la validation automatique à l'approche du tirage (timer)
+  useEffect(() => {
+    if (!room?.round.id || !pendingBets.length || working) return;
+    if (remainingMs <= 0 || remainingMs > ROULETTE_AUTO_SUBMIT_THRESHOLD_MS) return;
+
+    const pendingSignature = pendingBets
+      .map((bet) => `${bet.betType}:${bet.betValue}:${bet.amount}`)
+      .join("|");
+    const autoSubmitKey = `${room.round.id}::${pendingSignature}`;
+    if (lastAutoSubmitKeyRef.current === autoSubmitKey) return;
+
+    lastAutoSubmitKeyRef.current = autoSubmitKey;
+    void submitPendingBets("auto");
+  }, [pendingBets, remainingMs, room?.round.id, tableHasServerActivity, working]);
+
   function clearPendingBets() {
-    if (working) return;
+    if (working || betsLocked) return;
+    lastAutoSubmitKeyRef.current = "";
     setSelectedBet(null);
+    setPendingBets([]);
+  }
+
+  async function handleBoardBetChange(nextBet: { betType: string; betValue: string; label: string }) {
+    if (working || betsLocked) {
+      onError("Les mises sont verrouillees jusqu'au tirage.");
+      return;
+    }
+    setSelectedBet(nextBet);
+
+    if (pendingTotal + amount > profile.wallet.balance) {
+      onError("Solde insuffisant pour ajouter cette mise.");
+      return;
+    }
+
+    onError("");
+    setPendingBets((current) => {
+      const existingIndex = current.findIndex(
+        (entry) => entry.betType === nextBet.betType && entry.betValue === nextBet.betValue,
+      );
+
+      if (existingIndex === -1) {
+        return [...current, { ...nextBet, amount }];
+      }
+
+      const nextPendingBets = [...current];
+      nextPendingBets[existingIndex] = {
+        ...nextPendingBets[existingIndex],
+        amount: nextPendingBets[existingIndex].amount + amount,
+      };
+      return nextPendingBets;
+    });
+
   }
 
   return (
@@ -1069,33 +1222,40 @@ export default function RouletteRoom({
             </div>
           ) : null}
 
-          <div className="casino-roulette-fused-stage__header">
-            <div className="casino-topdeck__chip-row">
-              <span className="casino-chip">{rouletteRoomMeta?.chip || "ATS live"}</span>
-              <div className="casino-room-hud__utility-stack casino-room-hud__utility-stack--roulette">
-                <button
-                  type="button"
-                  className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
-                  onClick={() => setShowRoomInfo((value) => !value)}
-                  aria-label="Informations roulette"
-                  aria-expanded={showRoomInfo}
-                >
-                  <span className="casino-button-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M4 7h16" />
-                      <path d="M4 12h16" />
-                      <path d="M4 17h16" />
-                    </svg>
-                  </span>
-                </button>
-                <span
-                  className={`casino-roulette-topdeck__timer ${remainingMs <= 0 ? "is-closed" : ""}`}
-                  aria-label={remainingMs > 0 ? `Cloture des mises dans ${countdownLabel}` : "Mises fermees"}
-                >
-                  {countdownLabel}
-                </span>
+
+          <div className="casino-roulette-fused-stage__header" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8}}>
+            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start'}}>
+              <div className="casino-topdeck__chip-row">
+                <span className="casino-chip">{rouletteRoomMeta?.chip || "ATS live"}</span>
+                {/* Sous-titre supprimé pour éviter le doublon */}
               </div>
+              <span style={{fontSize: '1.1em', fontWeight: 700, marginTop: 2, marginLeft: 2}}>ROULETTE MULTIJOUEUR</span>
             </div>
+            <div className="casino-room-hud__utility-stack casino-room-hud__utility-stack--roulette" style={{display: 'flex', alignItems: 'center', gap: 8}}>
+              <span
+                className={`casino-roulette-topdeck__timer ${remainingMs <= 0 ? "is-closed" : ""}`}
+                aria-label={remainingMs > 0 ? `Cloture des mises dans ${countdownLabel}` : "Mises fermees"}
+                style={{fontSize: '1.1em', fontWeight: 600}}
+              >
+                {countdownLabel}
+              </span>
+              <button
+                type="button"
+                className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
+                onClick={() => setShowRoomInfo((value) => !value)}
+                aria-label="Informations roulette"
+                aria-expanded={showRoomInfo}
+              >
+                <span className="casino-button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 7h16" />
+                    <path d="M4 12h16" />
+                    <path d="M4 17h16" />
+                  </svg>
+                </span>
+              </button>
+            </div>
+          </div>
 
             {showRoomInfo ? (
               <article className="casino-topdeck__info-panel" aria-label="Informations roulette">
@@ -1118,8 +1278,7 @@ export default function RouletteRoom({
                   {activeRouletteInfoSection?.content}
                 </div>
               </article>
-              ) : null}
-            </div>
+            ) : null}
 
           <div className="casino-roulette-fused-stage__body">
             <div className="casino-roulette-fused-stage__left">
@@ -1131,19 +1290,18 @@ export default function RouletteRoom({
                   onAmountChange={setAmount}
                   selectedBet={selectedBet}
                   selectedBetTone={selfPortTone}
-                  placedBets={activeBets.map((bet) => ({
+                  placedBets={displayBets.map((bet) => ({
                     betType: bet.betType,
                     betValue: bet.betValue,
                     amount: bet.amount,
-                    stackCount: bet.stackCount,
                     tone: selfPortTone,
                   }))}
-                  onBetChange={setSelectedBet}
+                  onBetChange={handleBoardBetChange}
+                  onClearBets={clearPendingBets}
+                  clearDisabled={betsLocked || (!hasPendingBets && !selectedBet)}
                   portOccupants={portOccupants}
-                  onPortClick={(port) => {
-                    void port;
-                  }}
-                  disabled={working}
+                  onPortClick={() => {}}
+                  disabled={working || betsLocked}
                 />
               </div>
 
@@ -1154,7 +1312,7 @@ export default function RouletteRoom({
                     type="button"
                     className={`casino-bet-pill casino-bet-pill--dubloon casino-bet-pill--roulette ${amount === preset ? "is-active" : ""}`}
                     onClick={() => setAmount(preset)}
-                    disabled={working}
+                    disabled={working || betsLocked}
                   >
                     <img src={rouletteVisualAssets.chip} alt="" aria-hidden="true" />
                     <span className="casino-bet-pill__content">
@@ -1224,7 +1382,8 @@ export default function RouletteRoom({
 
                 <div className="casino-roulette-console__summary">
                   <span className="casino-chip">{joinedSalon.eyebrow}</span>
-                  <strong>{selectedBet ? `Cible: ${selectedBet.label}` : joinedSalon.title}</strong>
+                  <strong>{joinedSalon.title}</strong>
+                  <p>{rouletteStatusCopy}</p>
                   <div className="casino-roulette-console__stats">
                     <span>
                       <small>Dernier tir</small>
@@ -1236,63 +1395,15 @@ export default function RouletteRoom({
                       <small>Joueurs</small>
                       <b>{room?.round.playerCount || 0}</b>
                     </span>
+                    <span>
+                      <small>Gains</small>
+                      <b className={displayedGainTotal > 0 ? "is-gain" : ""}>
+                        {displayedGainTotal > 0 ? `+${formatCredits(displayedGainTotal)}` : formatCredits(0)}
+                      </b>
+                    </span>
                   </div>
                 </div>
               </div>
-
-              <div
-                className="casino-roulette-actions-felt"
-                style={{ ["--roulette-actions-felt" as string]: `url("${rouletteVisualAssets.felt}")` }}
-              >
-                <div className="casino-command-dock__actions casino-command-dock__actions--roulette">
-                  <button
-                    type="button"
-                    className="casino-primary-button"
-                    onClick={() => void submitBet()}
-                    disabled={!Boolean(selectedBet) || working || profile.wallet.balance < amount}
-                  >
-                    Miser {selectedBet ? `sur ${selectedBet.label}` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    className="casino-ghost-button"
-                    onClick={clearPendingBets}
-                    disabled={working || !selectedBet}
-                  >
-                    Effacer les mises
-                  </button>
-                </div>
-
-                <div className="casino-chip-row">
-                  <span className="casino-chip casino-chip--token"><img src={rouletteVisualAssets.chip} alt="" />Pot {formatCredits(room?.round.totalPot || 0)}</span>
-                  <span className="casino-chip">Joueurs {room?.round.playerCount || 0}</span>
-                  <span className="casino-chip">{selectedBet ? selectedBet.label : "Aucune cible"}</span>
-                </div>
-              </div>
-
-              <div className="casino-roulette-bet-recap" aria-live="polite">
-                <div className="casino-roulette-bet-recap__header">
-                  <span className="casino-chip">Mises actives</span>
-                  <strong>{activeBets.length ? `${activeBets.length} position(s)` : "Aucune mise"}</strong>
-                </div>
-                <div className="casino-roulette-bet-recap__list">
-                  {activeBets.length ? (
-                    activeBets.map((bet) => (
-                      <article key={`${bet.betType}-${bet.betValue}`} className="casino-roulette-bet-recap__entry">
-                        <span>{bet.label}</span>
-                        <strong>{formatCredits(bet.amount)}</strong>
-                      </article>
-                    ))
-                  ) : (
-                    <p className="casino-history-empty">Ajoute des mises depuis le tapis.</p>
-                  )}
-                </div>
-                <div className="casino-roulette-bet-recap__footer">
-                  <span>Total</span>
-                  <strong>{formatCredits(activeTotal)}</strong>
-                </div>
-              </div>
-
             </div>
           </div>
         </div>

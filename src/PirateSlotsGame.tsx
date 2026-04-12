@@ -118,7 +118,7 @@ function SlotsRoom({
     kind: "lingot" | "diamond";
   };
 
-  const [bet, setBet] = useState(() => Math.max(profile.wallet.minBet, BET_PRESETS[1]));
+  const [bet, setBet] = useState<number | undefined>(20);
   const [displayGrid, setDisplayGrid] = useState<string[][]>(() => buildPlaceholderGrid());
   const [spinState, setSpinState] = useState<"idle" | "spinning" | "bonus">("idle");
   const [lastSpin, setLastSpin] = useState<CasinoSpin | null>(null);
@@ -152,11 +152,14 @@ function SlotsRoom({
   const powerFeaturePlayedForBonusRef = useRef(false);
 
   useEffect(() => {
-    setBet((current) => {
-      if (current < profile.wallet.minBet) return profile.wallet.minBet;
-      if (current > profile.wallet.maxBet) return profile.wallet.maxBet;
-      return current;
-    });
+    if (bet !== undefined) {
+      setBet((current) => {
+        if (current === undefined) return undefined;
+        if (current < profile.wallet.minBet) return profile.wallet.minBet;
+        if (current > profile.wallet.maxBet) return profile.wallet.maxBet;
+        return current;
+      });
+    }
   }, [profile.wallet.maxBet, profile.wallet.minBet]);
 
   useEffect(() => {
@@ -194,7 +197,7 @@ function SlotsRoom({
     return wildIndexes;
   }, [lastSpin]);
 
-  const canSpin = spinState !== "spinning" && !busy && profile.wallet.balance >= bet;
+  const canSpin = spinState !== "spinning" && !busy && bet !== undefined && profile.wallet.balance >= bet;
 
   const netChangeTone = useMemo(() => {
     if (!lastSpin) return "neutral";
@@ -333,7 +336,7 @@ function SlotsRoom({
 
   useEffect(() => {
     if (!autoSpinActive || spinState !== "idle" || busy) return;
-    if (profile.wallet.balance < bet) {
+    if (bet === undefined || profile.wallet.balance < bet) {
       setAutoSpinCount(0);
       return;
     }
@@ -529,6 +532,12 @@ function SlotsRoom({
     const bonus = result.spin.bonus;
 
     if (bonus?.triggered) {
+      // Stop autospin immediately if a bonus is triggered
+      setAutoSpinCount(0);
+      if (autoSpinTimeoutRef.current) {
+        window.clearTimeout(autoSpinTimeoutRef.current);
+        autoSpinTimeoutRef.current = null;
+      }
       setDisplayGrid(bonus.openingGrid);
       setBonusHeldTurns(
         getJokerIndexes(bonus.openingGrid).reduce<BonusHeldTurns>((accumulator, index) => {
@@ -659,6 +668,7 @@ function SlotsRoom({
 
       setPendingBonusFlow(null);
       setBonusHeldTurns({});
+      if (bet === undefined) return;
       const result = await spinCasinoSlots(bet);
       let step = 0;
       intervalRef.current = window.setInterval(() => {
@@ -853,7 +863,7 @@ function SlotsRoom({
             </div>
           </div>
 
-          {profile.wallet.balance < bet ? (
+          {bet !== undefined && profile.wallet.balance < bet ? (
             <div className="casino-low-balance">
               Ton solde est trop bas pour cette mise. Baisse la mise ou recupere ton bonus journalier.
             </div>

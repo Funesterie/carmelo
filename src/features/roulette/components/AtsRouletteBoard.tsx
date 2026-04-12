@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./AtsRouletteBoard.css";
 import { ROULETTE_AMOUNT_PRESETS } from "../model";
 
@@ -24,7 +25,6 @@ export type RoulettePlacedBet = {
   betType: string;
   betValue: string;
   amount: number;
-  stackCount: number;
   tone: "red" | "green" | "amber" | "blue";
 };
 
@@ -37,6 +37,8 @@ type AtsRouletteBoardProps = {
   selectedBetTone?: "red" | "green" | "amber" | "blue";
   placedBets?: RoulettePlacedBet[];
   onBetChange: (bet: NonNullable<SelectedBet>) => void;
+  onClearBets?: () => void;
+  clearDisabled?: boolean;
   portOccupants?: RoulettePortOccupant[];
   onPortClick?: (port: PortAction) => void;
   disabled?: boolean;
@@ -66,7 +68,7 @@ const ATS_OUTSIDE = [
   { betType: "lowhigh", betValue: "low", label: "1 - 18", tone: "neutral" },
   { betType: "parity", betValue: "even", label: "EVEN", tone: "neutral" },
   { betType: "color", betValue: "red", label: "", tone: "red-diamond" },
-  { betType: "color", betValue: "black", label: "", tone: "black-skull" },
+  { betType: "color", betValue: "black", label: "", tone: "black-diamond" },
   { betType: "parity", betValue: "odd", label: "ODD", tone: "neutral" },
   { betType: "lowhigh", betValue: "high", label: "19 - 36", tone: "neutral" },
 ] as const;
@@ -96,6 +98,22 @@ function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
+function getBetKey(betType: string, betValue: string) {
+  return `${betType}::${betValue}`;
+}
+
+function getChipVariant(amount: number) {
+  if (amount <= 10) return "v10";
+  if (amount <= 50) return "v50";
+  if (amount <= 200) return "v200";
+  return "v500";
+}
+
+type RouletteBetAnchor = {
+  left: number;
+  top: number;
+};
+
 export default function AtsRouletteBoard({
   feltImageSrc,
   chipImageSrc,
@@ -105,12 +123,68 @@ export default function AtsRouletteBoard({
   selectedBetTone = "amber",
   placedBets = [],
   onBetChange,
+  onClearBets,
+  clearDisabled = false,
   portOccupants = [],
   onPortClick,
   disabled = false,
   debug = false,
   className = "",
 }: AtsRouletteBoardProps) {
+  void chipImageSrc;
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const targetRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [betAnchors, setBetAnchors] = useState<Record<string, RouletteBetAnchor>>({});
+
+  const measureBetAnchors = useCallback(() => {
+    const board = boardRef.current;
+    if (!board) return;
+
+    const boardRect = board.getBoundingClientRect();
+    const nextAnchors: Record<string, RouletteBetAnchor> = {};
+
+    targetRefs.current.forEach((node, key) => {
+      const rect = node.getBoundingClientRect();
+      nextAnchors[key] = {
+        left: rect.left - boardRect.left + rect.width / 2,
+        top: rect.top - boardRect.top + rect.height / 2,
+      };
+    });
+
+    setBetAnchors(nextAnchors);
+  }, []);
+
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+
+    const rafId = window.requestAnimationFrame(measureBetAnchors);
+    const resizeObserver = new ResizeObserver(() => {
+      measureBetAnchors();
+    });
+
+    resizeObserver.observe(board);
+    window.addEventListener("resize", measureBetAnchors);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measureBetAnchors);
+    };
+  }, [measureBetAnchors]);
+
+  const registerBetTarget = useCallback(
+    (betType: string, betValue: string) => (node: HTMLButtonElement | null) => {
+      const key = getBetKey(betType, betValue);
+      if (node) {
+        targetRefs.current.set(key, node);
+      } else {
+        targetRefs.current.delete(key);
+      }
+    },
+    [],
+  );
+
   function isSelectedBet(betType: string, betValue: string) {
     return selectedBet?.betType === betType && selectedBet?.betValue === betValue;
   }
@@ -119,48 +193,43 @@ export default function AtsRouletteBoard({
     return portOccupants.find((entry) => entry.port === portId) || null;
   }
 
-  function getPlacedBet(betType: string, betValue: string) {
-    return placedBets.find((entry) => entry.betType === betType && entry.betValue === betValue) || null;
-  }
+  const visualStacks = useMemo(() => {
+    const stackMap = new Map<
+      string,
+      {
+        betType: string;
+        betValue: string;
+        amount: number;
+        tone: "red" | "green" | "amber" | "blue";
+        isPreview: boolean;
+      }
+    >();
 
-  function renderBetStack(
-    betType: string,
-    betValue: string,
-    placement: "corner" | "center" = "corner",
-  ) {
-    const placedBet = getPlacedBet(betType, betValue);
-    const isPreview = !placedBet && isSelectedBet(betType, betValue);
-    const stackCount = Math.max(1, Math.min(4, placedBet?.stackCount || (isPreview ? 1 : 0)));
-    const totalAmount = placedBet?.amount || (isPreview ? amount : 0);
-    const tone = placedBet?.tone || selectedBetTone;
-    if (!stackCount || !totalAmount) return null;
+    placedBets.forEach((bet) => {
+      stackMap.set(getBetKey(bet.betType, bet.betValue), {
+        betType: bet.betType,
+        betValue: bet.betValue,
+        amount: bet.amount,
+        tone: bet.tone,
+        isPreview: false,
+      });
+    });
 
-    return (
-      <span
-        className={cx(
-          "ats-roulette-cell__stack",
-          `ats-roulette-cell__stack--${tone}`,
-          placement === "center" && "ats-roulette-cell__stack--center",
-          isPreview && "is-preview",
-        )}
-        aria-hidden="true"
-      >
-        {Array.from({ length: stackCount }, (_, index) => (
-          <span
-            key={`${betType}-${betValue}-${index}`}
-            className="ats-roulette-cell__stack-chip"
-            style={{ ["--stack-offset" as string]: `${index * 3}px` }}
-          >
-            <img src={chipImageSrc} alt="" />
-          </span>
-        ))}
-        <b>{totalAmount}</b>
-      </span>
-    );
-  }
+    if (selectedBet && !stackMap.has(getBetKey(selectedBet.betType, selectedBet.betValue))) {
+      stackMap.set(getBetKey(selectedBet.betType, selectedBet.betValue), {
+        betType: selectedBet.betType,
+        betValue: selectedBet.betValue,
+        amount,
+        tone: selectedBetTone,
+        isPreview: true,
+      });
+    }
+
+    return [...stackMap.values()];
+  }, [amount, placedBets, selectedBet, selectedBetTone]);
 
   return (
-    <div className={cx("ats-roulette-board", debug && "is-debug", className)}>
+    <div ref={boardRef} className={cx("ats-roulette-board", debug && "is-debug", className)}>
       <img className="ats-roulette-board__felt" src={feltImageSrc} alt="" aria-hidden="true" />
 
       <div className="casino-roulette-board__stake-overlay" role="group" aria-label="Montant de mise">
@@ -173,7 +242,15 @@ export default function AtsRouletteBoard({
             disabled={disabled}
             aria-pressed={amount === preset}
           >
-            <img src={chipImageSrc} alt="" aria-hidden="true" />
+            <span
+              className={cx(
+                "casino-roulette-stake-chip__coin",
+                "roulette-coin",
+                `roulette-coin--${selectedBetTone}`,
+                `roulette-coin--${getChipVariant(preset)}`,
+              )}
+              aria-hidden="true"
+            />
             <strong>{preset}</strong>
           </button>
         ))}
@@ -184,6 +261,7 @@ export default function AtsRouletteBoard({
           const isActive = isSelectedBet("straight", "0");
           return (
         <button
+          ref={registerBetTarget("straight", "0")}
           type="button"
           className={cx(
             "ats-roulette-cell",
@@ -199,7 +277,6 @@ export default function AtsRouletteBoard({
           disabled={disabled}
         >
           <span>0</span>
-          {renderBetStack("straight", "0", "center")}
         </button>
           );
         })()}
@@ -212,6 +289,7 @@ export default function AtsRouletteBoard({
                 return (
                   <button
                     key={value}
+                    ref={registerBetTarget("straight", String(value))}
                     type="button"
                     role="gridcell"
                     className={cx(
@@ -231,7 +309,6 @@ export default function AtsRouletteBoard({
                     disabled={disabled}
                   >
                     <span>{value}</span>
-                    {renderBetStack("straight", String(value), "center")}
                   </button>
                 );
               })}
@@ -245,6 +322,7 @@ export default function AtsRouletteBoard({
             return (
               <button
                 key={`${bet.betType}-${bet.betValue}`}
+                ref={registerBetTarget(bet.betType, bet.betValue)}
                 type="button"
                 className={cx(
                   "ats-roulette-cell",
@@ -257,7 +335,6 @@ export default function AtsRouletteBoard({
                 disabled={disabled}
               >
                 <span>{bet.label}</span>
-                {renderBetStack(bet.betType, bet.betValue)}
               </button>
             );
           })}
@@ -270,6 +347,7 @@ export default function AtsRouletteBoard({
           return (
             <button
               key={`${bet.betType}-${bet.betValue}`}
+              ref={registerBetTarget(bet.betType, bet.betValue)}
               type="button"
               className={cx(
                 "ats-roulette-cell",
@@ -283,7 +361,6 @@ export default function AtsRouletteBoard({
               disabled={disabled}
             >
               <span>{bet.label}</span>
-              {renderBetStack(bet.betType, bet.betValue)}
             </button>
           );
         })}
@@ -302,6 +379,7 @@ export default function AtsRouletteBoard({
           return (
             <button
               key={`${bet.betType}-${bet.betValue}`}
+              ref={registerBetTarget(bet.betType, bet.betValue)}
               type="button"
               className={cx(
                 "ats-roulette-cell",
@@ -321,10 +399,57 @@ export default function AtsRouletteBoard({
               disabled={disabled}
             >
               {bet.tone === "red-diamond" ? <span className="ats-shape ats-shape--diamond" /> : null}
-              {bet.tone === "black-skull" ? <span className="ats-shape ats-shape--skull">☠</span> : null}
+              {bet.tone === "black-diamond" ? <span className="ats-shape ats-shape--diamond ats-shape--diamond-black" /> : null}
               {bet.label ? <span>{bet.label}</span> : null}
-              {renderBetStack(bet.betType, bet.betValue)}
             </button>
+          );
+        })}
+      </div>
+
+
+
+      <div className="ats-roulette-board__clear">
+        <button
+          type="button"
+          className="ats-roulette-cell ats-roulette-cell--outside ats-roulette-cell--outside-clear"
+          onClick={() => onClearBets?.()}
+          aria-label="Effacer les mises"
+          disabled={disabled || clearDisabled}
+        >
+          <span className="ats-shape ats-shape--skull">☠</span>
+        </button>
+      </div>
+
+      <div className="ats-roulette-board__bet-overlay" aria-hidden="true">
+        {visualStacks.map((stack) => {
+          const anchor = betAnchors[getBetKey(stack.betType, stack.betValue)];
+          if (!anchor) return null;
+
+          const coinVariant = getChipVariant(stack.amount);
+
+          return (
+            <span
+              key={`${stack.betType}-${stack.betValue}`}
+              className={cx(
+                "ats-roulette-cell__stack",
+                `ats-roulette-cell__stack--${stack.tone}`,
+                stack.isPreview && "is-preview",
+              )}
+              style={{
+                left: `${anchor.left}px`,
+                top: `${anchor.top}px`,
+              }}
+            >
+              <span
+                className={cx(
+                  "ats-roulette-cell__stack-chip",
+                  "roulette-coin",
+                  `roulette-coin--${stack.tone}`,
+                  `roulette-coin--${coinVariant}`,
+                )}
+              />
+              <b>{stack.amount}</b>
+            </span>
           );
         })}
       </div>

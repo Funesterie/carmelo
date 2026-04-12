@@ -80,7 +80,6 @@ export default function RouletteGameplayDock({
     });
   }
   const activeTotal = activeBets.reduce((sum, bet) => sum + bet.amount, 0);
-  const hasActiveBets = activeBets.length > 0;
 
   return (
     <div className="casino-stage-sidebar casino-stage-sidebar--roulette">
@@ -193,24 +192,7 @@ export default function RouletteGameplayDock({
               <span className="casino-chip">{selectedBet ? selectedBet.label : "Aucune cible"}</span>
             </div>
 
-            <div className="casino-command-dock__actions casino-command-dock__actions--roulette">
-              <button
-                type="button"
-                className="casino-primary-button"
-                onClick={onSubmitBet}
-                disabled={!canSubmitBet}
-              >
-                Miser {selectedBet ? `sur ${selectedBet.label}` : ""}
-              </button>
-              <button
-                type="button"
-                className="casino-ghost-button"
-                onClick={onClearBets}
-                disabled={working || !hasActiveBets}
-              >
-                Effacer
-              </button>
-            </div>
+
 
             <PirateInspector
               title="Carnet de tir"

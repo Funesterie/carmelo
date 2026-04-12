@@ -359,6 +359,27 @@ export type BlackjackSeat = {
   result: string;
 };
 
+export type BlackjackScore = {
+  total: number;
+  isSoft: boolean;
+  isBlackjack: boolean;
+  isBust: boolean;
+};
+
+export type BlackjackAction = "hit" | "stand" | "double" | "split";
+
+export type BlackjackHand = {
+  id?: string;
+  cards: PiratePlayingCard[];
+  wager: number;
+  score: BlackjackScore;
+  result?: string;
+  lastDelta?: number;
+  isActive?: boolean;
+  canDouble?: boolean;
+  canSplit?: boolean;
+};
+
 export type BlackjackState = {
   token: string | null;
   roomId?: string | null;
@@ -368,18 +389,11 @@ export type BlackjackState = {
   playerCards: PiratePlayingCard[];
   dealerCards: PiratePlayingCard[];
   aiSeats: BlackjackSeat[];
-  playerScore: {
-    total: number;
-    isSoft: boolean;
-    isBlackjack: boolean;
-    isBust: boolean;
-  };
-  dealerScore: {
-    total: number;
-    isSoft: boolean;
-    isBlackjack: boolean;
-    isBust: boolean;
-  };
+  playerScore: BlackjackScore;
+  dealerScore: BlackjackScore;
+  playerHands?: BlackjackHand[];
+  activeHandIndex?: number;
+  legalActions?: BlackjackAction[];
   lastDelta: number;
   message: string;
   payoutAmount: number;
@@ -517,7 +531,7 @@ type PokerResponse = {
 type RouletteResponse = {
   ok: boolean;
   room: RouletteRoom;
-  profile: CasinoProfile;
+  profile?: CasinoProfile;
   error?: string;
 };
 
@@ -589,7 +603,7 @@ export async function startBlackjackRound(bet: number, roomId?: string) {
   return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/start", { bet, roomId });
 }
 
-export async function actBlackjackRound(token: string, action: "hit" | "stand") {
+export async function actBlackjackRound(token: string, action: BlackjackAction) {
   return postCasinoAuthed<BlackjackResponse>("/api/casino/blackjack/action", { token, action });
 }
 
@@ -620,11 +634,11 @@ export async function fetchPokerRoomState(roomId: string) {
 }
 
 export async function fetchRouletteRoom() {
-  return getCasinoAuthed<RouletteResponse>("/api/casino/roulette/state");
+  return getCasinoAuthed<RouletteResponse>("/api/casino/roulette/state?view=compact&includeProfile=0");
 }
 
 export async function placeRouletteBet(betType: string, betValue: string, amount: number) {
-  return postCasinoAuthed<RouletteResponse>("/api/casino/roulette/bet", { betType, betValue, amount });
+  return postCasinoAuthed<RouletteResponse>("/api/casino/roulette/bet?view=compact&includeProfile=1", { betType, betValue, amount });
 }
 
 export async function joinBlackjackRoom(roomId: string) {

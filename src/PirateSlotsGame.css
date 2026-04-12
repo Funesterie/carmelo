@@ -4764,6 +4764,12 @@ button {
   grid-template-columns: minmax(0, 1fr) !important;
 }
 
+.casino-command-dock--poker .casino-command-dock__actions--poker-join .casino-primary-button {
+  min-height: 58px;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
 .casino-command-dock--poker .casino-poker-betbox__actions .casino-primary-button:last-child {
   grid-column: auto !important;
 }
@@ -14684,7 +14690,7 @@ button {
 }
 
 .casino-table-layout--roulette .casino-roulette-console__wheel-shell {
-  max-width: 304px !important;
+  max-width: 332px !important;
 }
 
 .casino-table-layout--roulette .casino-roulette-console__wheel {
@@ -14872,7 +14878,7 @@ button {
   }
 
   .casino-table-layout--roulette .casino-roulette-console__wheel-shell {
-    max-width: 248px !important;
+    max-width: 264px !important;
   }
 
   .casino-roulette-win-overlay__card {
@@ -14888,7 +14894,7 @@ button {
   }
 
   .casino-table-layout--roulette .casino-roulette-console__wheel-shell {
-    max-width: 210px !important;
+    max-width: 224px !important;
   }
 
   .casino-roulette-history-preview {
@@ -17637,17 +17643,17 @@ button {
   }
 
   .casino-table-layout--roulette .casino-roulette-console {
-    grid-template-columns: minmax(96px, 0.58fr) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(112px, 0.68fr) minmax(0, 1fr) !important;
     gap: 10px !important;
     align-items: center !important;
   }
 
   .casino-table-layout--roulette .casino-roulette-console__wheel-shell {
-    max-width: 118px !important;
+    max-width: 136px !important;
   }
 
   .casino-table-layout--roulette .casino-roulette-console__wheel {
-    width: 82% !important;
+    width: 90% !important;
   }
 
   .casino-table-layout--roulette .casino-roulette-console__chip-stack {

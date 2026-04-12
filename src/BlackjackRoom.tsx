@@ -10,11 +10,14 @@ import {
   fetchBlackjackRoomState,
   joinBlackjackRoom,
   startBlackjackRound,
+  type BlackjackAction,
+  type BlackjackHand,
   type BlackjackState,
   type CasinoTableRoom,
   type CasinoProfile,
 } from "./lib/casinoApi";
 import { formatCredits } from "./lib/casinoRoomState";
+import { getBlackjackScore } from "./lib/pirateCards";
 import {
   readTableChannelSnapshot,
   readSyncedTableSelection,
@@ -25,12 +28,69 @@ import {
 } from "./lib/tableChannelSync";
 import { BLACKJACK_SALONS } from "./lib/tableSalons";
 
-const PLAYER_BETS = [50, 100, 200, 400];
+const PLAYER_BETS = [10, 20, 50, 200];
 const TABLE_DEAL_STEP_MS = 96;
 const LIVE_MIN_PLAYERS = 2;
 const BLACKJACK_RESULT_FLASH_MS = 1800;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
 const LIVE_TURN_LIMIT_MS = 90_000;
+
+function getNormalizedBlackjackHands(state: BlackjackState | null): BlackjackHand[] {
+  if (!state) return [];
+
+  if (state.playerHands?.length) {
+    const activeIndex = Math.max(0, Math.min(state.playerHands.length - 1, state.activeHandIndex || 0));
+    return state.playerHands.map((hand, index) => ({
+      ...hand,
+      id: hand.id || `hand-${index}`,
+      wager: hand.wager || state.wager,
+      score: hand.score || state.playerScore,
+      cards: hand.cards || [],
+      isActive: hand.isActive ?? index === activeIndex,
+    }));
+  }
+
+  return [
+    {
+      id: "hand-0",
+      cards: state.playerCards,
+      wager: state.wager,
+      score: state.playerScore,
+      isActive: true,
+    },
+  ];
+}
+
+function getBlackjackLegalActions(state: BlackjackState | null) {
+  return getBlackjackLegalActionsForBalance(state, Number.POSITIVE_INFINITY);
+}
+
+function getBlackjackLegalActionsForBalance(state: BlackjackState | null, walletBalance: number) {
+  if (!state || state.stage !== "player-turn") return [] as BlackjackAction[];
+
+  const actionSet = new Set<BlackjackAction>(state.legalActions?.length ? state.legalActions : ["hit", "stand"]);
+  getNormalizedBlackjackHands(state)
+    .filter((hand) => hand.isActive)
+    .forEach((hand) => {
+      const cards = hand.cards || [];
+      const [firstCard, secondCard] = cards;
+      const handScore = hand.score || getBlackjackScore(cards);
+      const handWager = Math.max(0, hand.wager || state.wager || 0);
+      const canFundExtraWager = walletBalance >= handWager;
+      const isInitialTwoCardHand = cards.length === 2 && !handScore.isBust && !handScore.isBlackjack;
+      const isPair = Boolean(firstCard && secondCard && firstCard.rank === secondCard.rank);
+
+      if (hand.canDouble === true || (isInitialTwoCardHand && canFundExtraWager)) {
+        actionSet.add("double");
+      }
+
+      if (hand.canSplit === true || (isInitialTwoCardHand && isPair && canFundExtraWager)) {
+        actionSet.add("split");
+      }
+    });
+
+  return [...actionSet];
+}
 
 function getBlackjackCardKeys(state: BlackjackState | null) {
   const keys: string[] = [];
@@ -45,8 +105,11 @@ function getBlackjackCardKeys(state: BlackjackState | null) {
     });
   });
 
-  state?.playerCards.forEach((card, index) => {
-    keys.push(`player-${card.id}-${index}`);
+  const normalizedHands = getNormalizedBlackjackHands(state);
+  normalizedHands.forEach((hand, handIndex) => {
+    hand.cards.forEach((card, index) => {
+      keys.push(`player-${handIndex}-${card.id}-${index}`);
+    });
   });
 
   return keys;
@@ -54,6 +117,7 @@ function getBlackjackCardKeys(state: BlackjackState | null) {
 
 function buildBlackjackSyncSignature(state: BlackjackState | null) {
   if (!state?.token) return "";
+  const normalizedHands = getNormalizedBlackjackHands(state);
   return JSON.stringify({
     token: state.token,
     roomId: state.roomId || null,
@@ -67,6 +131,14 @@ function buildBlackjackSyncSignature(state: BlackjackState | null) {
       wager: seat.wager,
       result: seat.result,
     })),
+    playerHands: normalizedHands.map((hand) => ({
+      id: hand.id || "",
+      cards: hand.cards.map((card) => card.id),
+      wager: hand.wager,
+      total: hand.score.total,
+      active: Boolean(hand.isActive),
+    })),
+    legalActions: getBlackjackLegalActions(state),
     playerTotal: state.playerScore.total,
     dealerTotal: state.dealerScore.total,
     payoutAmount: state.payoutAmount,
@@ -97,7 +169,7 @@ export default function BlackjackRoom({
   onError,
 }: BlackjackRoomProps) {
   const blackjackRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "blackjack");
-  const [bet, setBet] = useState(PLAYER_BETS[1]);
+  const [betChips, setBetChips] = useState<number[]>([PLAYER_BETS[1]]);
   const [state, setState] = useState<BlackjackState | null>(null);
   const [working, setWorking] = useState(false);
   const [roomId, setRoomId] = useState(() => readSyncedTableSelection("blackjack") || BLACKJACK_SALONS[0].id);
@@ -126,16 +198,22 @@ export default function BlackjackRoom({
       aiSeats: [],
     };
   }, [state]);
+  const bet = useMemo(() => betChips.reduce((total, chip) => total + chip, 0), [betChips]);
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
   const roomSwitchLocked = stage === "player-turn";
+  const betLocked = roomSwitchLocked || working;
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const activePlayerCount = activeRoom?.playerCount || 0;
   const autoLiveMode = activePlayerCount >= LIVE_MIN_PLAYERS;
   const currentRoundIsLive = Boolean(state?.roomId);
   const shouldSyncLiveRoom = currentRoundIsLive || (stage !== "player-turn" && autoLiveMode);
   const isDecisionPhase = stage === "player-turn";
+  const legalActions = useMemo(
+    () => getBlackjackLegalActionsForBalance(state, profile.wallet.balance),
+    [profile.wallet.balance, state],
+  );
   const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
   const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "1:30";
 
@@ -354,6 +432,10 @@ export default function BlackjackRoom({
   }, [displayState]);
 
   async function startRound() {
+    if (!bet) {
+      onError("Pose au moins un jeton avant de lancer la donne.");
+      return;
+    }
     onError("");
     clearQueuedAudio();
     previousCardKeysRef.current = [];
@@ -376,10 +458,10 @@ export default function BlackjackRoom({
     }
   }
 
-  async function act(action: "hit" | "stand") {
+  async function act(action: BlackjackAction) {
     if (!state?.token || stage !== "player-turn" || working) return;
     onError("");
-    if (action === "hit") {
+    if (action === "hit" || action === "double" || action === "split") {
       playCheck();
     }
     setWorking(true);
@@ -390,7 +472,11 @@ export default function BlackjackRoom({
         onProfileChange(result.profile);
       }
     } catch (error_) {
-      onError(error_ instanceof Error ? error_.message : "La table n'a pas accepte cette action.");
+      if (error_ instanceof Error && error_.message.trim().toLowerCase() === "invalid_action") {
+        onError("Action refusee par Railway pour cette main. Le backend n'autorise pas encore ce bouton sur ce tour.");
+      } else {
+        onError(error_ instanceof Error ? error_.message : "La table n'a pas accepte cette action.");
+      }
     } finally {
       setWorking(false);
     }
@@ -418,6 +504,23 @@ export default function BlackjackRoom({
     setState(null);
     setRoomId(nextRoomId);
     writeSyncedTableSelection("blackjack", nextRoomId);
+  }
+
+  function handleBetChipAdd(chipValue: number) {
+    if (betLocked) return;
+    setBetChips((current) => {
+      const currentTotal = current.reduce((total, chip) => total + chip, 0);
+      if (currentTotal + chipValue > profile.wallet.balance) {
+        onError("Le total des jetons depasse ton solde disponible.");
+        return current;
+      }
+      return [...current, chipValue];
+    });
+  }
+
+  function handleBetChipRemove() {
+    if (betLocked) return;
+    setBetChips((current) => current.slice(0, -1));
   }
 
   return (
@@ -565,26 +668,33 @@ export default function BlackjackRoom({
               state={displayState}
               playerName={playerName}
               bet={bet}
+              betChips={betChips}
+              betLocked={betLocked}
               isDecisionPhase={isDecisionPhase}
               dealtCardDelays={dealtCardDelays}
               resultFlash={resultFlash}
+              onBetChipRemove={handleBetChipRemove}
             />
 
             <BlackjackSidebar
               profile={profile}
               state={displayState}
               bet={bet}
+              betChips={betChips}
               working={working}
               roomId={roomId}
               rooms={rooms}
               infoTab={infoTab}
               isDecisionPhase={isDecisionPhase}
               roomSwitchLocked={roomSwitchLocked}
-              onBetChange={setBet}
+              legalActions={legalActions}
+              onBetChipAdd={handleBetChipAdd}
               onInfoTabChange={setInfoTab}
               onRoomChange={handleRoomChange}
               onHit={() => void act("hit")}
               onStand={() => void act("stand")}
+              onDouble={() => void act("double")}
+              onSplit={() => void act("split")}
               onDeal={() => void startRound()}
             />
           </div>

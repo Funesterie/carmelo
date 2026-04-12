@@ -26,11 +26,12 @@ import {
 } from "./lib/tableChannelSync";
 import { POKER_SALONS } from "./lib/tableSalons";
 
-const ANTE_PRESETS = [60, 120, 200, 320];
 const TABLE_DEAL_STEP_MS = 92;
-const LIVE_MIN_PLAYERS = 2;
+const LIVE_MIN_OPPONENTS = 1;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
 const LIVE_TURN_LIMIT_MS = 90_000;
+const POKER_MAX_PLAYERS = 6;
+const LIVE_PARTICIPANT_STALE_MS = 95_000;
 
 type PokerAction = "reveal" | "showdown" | "check" | "call" | "bet" | "raise" | "fold";
 
@@ -69,27 +70,6 @@ function normalizeAggressionTarget(rawValue: number, minValue: number, maxValue:
   return Math.max(minValue, Math.min(maxValue, snapped));
 }
 
-function buildAggressionPresets(state: PokerState | null, blindUnit: number) {
-  if (!state) return [];
-  const minValue = state.legalActions.includes("raise") ? state.minRaiseTo : state.minBet;
-  const maxValue = state.playerStreetCommitted + state.playerChips;
-  if (!minValue || !maxValue || maxValue < minValue) return [];
-
-  const referencePot = Math.max(state.pot + state.toCall, minValue);
-  const rawCandidates = [
-    minValue,
-    referencePot * 0.5,
-    referencePot * 0.75,
-    referencePot,
-    maxValue,
-  ];
-
-  return rawCandidates
-    .map((value) => normalizeAggressionTarget(value, minValue, maxValue, blindUnit))
-    .filter((value, index, array) => value >= minValue && value <= maxValue && array.indexOf(value) === index)
-    .slice(0, 5);
-}
-
 function buildPokerSyncSignature(state: PokerState | null) {
   if (!state?.token) return "";
   return JSON.stringify({
@@ -122,6 +102,35 @@ function formatTurnClock(remainingMs: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function normalizeIdentity(value: string | number | null | undefined) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function isPokerParticipantSelf(
+  participant: Pick<CasinoTableRoomParticipant, "userId" | "username">,
+  profile: CasinoProfile,
+  playerName: string,
+) {
+  const participantId = normalizeIdentity(participant.userId);
+  const participantName = normalizeIdentity(participant.username);
+  const selfId = normalizeIdentity(profile.user.id);
+  const selfUsername = normalizeIdentity(profile.user.username);
+  const selfDisplayName = normalizeIdentity(playerName);
+
+  return Boolean(
+    (participantId && participantId === selfId)
+    || (participantName && participantName === selfUsername)
+    || (participantName && participantName === selfDisplayName),
+  );
+}
+
+function isParticipantFresh(updatedAt: string | null) {
+  if (!updatedAt) return true;
+  const heartbeatAt = Date.parse(updatedAt);
+  if (Number.isNaN(heartbeatAt)) return true;
+  return Date.now() - heartbeatAt <= LIVE_PARTICIPANT_STALE_MS;
+}
+
 export default function PokerRoom({
   playerName,
   profile,
@@ -130,7 +139,7 @@ export default function PokerRoom({
   onError,
 }: PokerRoomProps) {
   const pokerRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "poker");
-  const [ante, setAnte] = useState(ANTE_PRESETS[1]);
+  const [ante] = useState(20);
   const [state, setState] = useState<PokerState | null>(null);
   const [working, setWorking] = useState(false);
   const [roomId, setRoomId] = useState(() => readSyncedTableSelection("poker") || POKER_SALONS[0].id);
@@ -144,10 +153,7 @@ export default function PokerRoom({
   const [nowTick, setNowTick] = useState(() => Date.now());
   const displayState = useMemo<PokerState | null>(() => {
     if (!state) return null;
-    return {
-      ...state,
-      aiSeats: [],
-    };
+    return state;
   }, [state]);
 
   const previousCardKeysRef = useRef<string[]>([]);
@@ -166,14 +172,18 @@ export default function PokerRoom({
     const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
 
     (activeRoom?.participants || []).forEach((participant) => {
-      deduped.set(participant.userId, {
+      const dedupeKey = normalizeIdentity(participant.userId) || normalizeIdentity(participant.username);
+      const isSelf = isPokerParticipantSelf(participant, profile, playerName);
+      deduped.set(dedupeKey, {
         ...participant,
-        isSelf: participant.userId === profile.user.id,
+        isSelf,
       });
     });
 
-    if (!deduped.has(profile.user.id)) {
-      deduped.set(profile.user.id, {
+    const selfKey = normalizeIdentity(profile.user.id) || normalizeIdentity(playerName) || normalizeIdentity(profile.user.username);
+
+    if (!deduped.has(selfKey)) {
+      deduped.set(selfKey, {
         userId: profile.user.id,
         username: String(playerName || profile.user.username || "Toi").trim(),
         updatedAt: null,
@@ -183,11 +193,15 @@ export default function PokerRoom({
 
     return [...deduped.values()];
   }, [activeRoom?.participants, playerName, profile.user.id, profile.user.username]);
-  const activePlayerCount = activeRoom?.playerCount || 0;
-  const isLiveMultiplayerReady = activePlayerCount >= LIVE_MIN_PLAYERS;
+  const activePlayerCount = activeRoom?.playerCount || tableParticipants.length;
+  const connectedOpponentCount = tableParticipants.filter(
+    (participant) => !participant.isSelf && isParticipantFresh(participant.updatedAt),
+  ).length;
+  const isLiveMultiplayerReady = connectedOpponentCount >= LIVE_MIN_OPPONENTS;
+  const isTableFull = Boolean(activeRoom && activePlayerCount >= POKER_MAX_PLAYERS && !activeRoom.hasSelf);
   const activeAnte = state?.ante || ante;
   const smallBlind = Math.max(10, Math.round(activeAnte / 2));
-  const blindUnit = Math.max(10, Math.round(activeAnte / 2));
+  const blindUnit = Math.max(20, Math.round(activeAnte));
   const communityCards = state?.communityCards || [];
   const toCall = state?.toCall || 0;
   const isDecisionPhase = Boolean(state && stage !== "showdown" && !state.playerFolded);
@@ -200,7 +214,6 @@ export default function PokerRoom({
   const canRaise = Boolean(state?.legalActions.includes("raise"));
   const aggressionMin = canRaise ? state?.minRaiseTo || 0 : canBet ? state?.minBet || 0 : 0;
   const aggressionMax = state ? playerStreetCommitted + playerChips : 0;
-  const aggressionPresets = buildAggressionPresets(state, blindUnit);
   const normalizedBetTarget =
     canBet || canRaise ? normalizeAggressionTarget(betTarget || aggressionMin, aggressionMin, aggressionMax, blindUnit) : 0;
   const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
@@ -343,13 +356,9 @@ export default function PokerRoom({
     if (!signature || turnDeadlineAt > nowTick || lastTimedOutSignatureRef.current === signature) return;
 
     lastTimedOutSignatureRef.current = signature;
-    onError(
-      canCheck
-        ? "Temps ecoule: la table check automatiquement."
-        : "Temps ecoule: la table couche automatiquement la main.",
-    );
-    void act(canCheck ? "check" : "fold");
-  }, [act, canCheck, nowTick, onError, stage, state, turnDeadlineAt, working]);
+    onError("Temps ecoule: la main est automatiquement couchee.");
+    void act("fold");
+  }, [act, nowTick, onError, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     return () => {
@@ -397,8 +406,7 @@ export default function PokerRoom({
       return;
     }
 
-    const suggested =
-      aggressionPresets[1] || aggressionPresets[0] || normalizeAggressionTarget(aggressionMin, aggressionMin, aggressionMax, blindUnit);
+    const suggested = normalizeAggressionTarget(aggressionMin, aggressionMin, aggressionMax, blindUnit);
 
     setBetTarget((current) => {
       if (current >= aggressionMin && current <= aggressionMax) {
@@ -406,11 +414,15 @@ export default function PokerRoom({
       }
       return suggested;
     });
-  }, [aggressionMax, aggressionMin, aggressionPresets, blindUnit, canBet, canRaise]);
+  }, [aggressionMax, aggressionMin, blindUnit, canBet, canRaise]);
 
   async function joinHand() {
     if (!isLiveMultiplayerReady) {
-      onError("En attente d'au moins un autre joueur sur ce salon avant de rejoindre la table.");
+      onError("Il faut au moins 2 joueurs humains sur ce salon pour lancer une main de poker.");
+      return;
+    }
+    if (isTableFull) {
+      onError("La table est pleine: 6 joueurs maximum.");
       return;
     }
     onError("");
@@ -586,19 +598,19 @@ export default function PokerRoom({
                 <div className="casino-topdeck__info-body" role="tabpanel">
                   {activeHeaderInfo === "structure" ? (
                     <div className="casino-rule-list">
-                      <p>Texas hold'em rapide avec preflop, flop, turn, river et showdown.</p>
-                      <p>Le backend gere les vraies decisions de check, call, bet, raise et fold.</p>
-                      <p>Le journal detaille et la lecture du spot restent disponibles dans le dock de table, sans rajout visuel de bots cote front.</p>
+                      <p>Texas hold'em 6-max uniquement, avec 5 places adverses visibles autour de toi et aucun bot affiche cote front.</p>
+                      <p>Le backend gere les vraies decisions de check, call, bet, raise et fold, tour par tour.</p>
+                      <p>Si le timer arrive a zero, la main est consideree comme fold automatiquement.</p>
                     </div>
                   ) : null}
                   {activeHeaderInfo === "mises" ? (
                     <div className="casino-metric-list">
                       <div>
-                        <span>Ante presets</span>
-                        <strong>60 / 120 / 200 / 320</strong>
+                        <span>Blindes</span>
+                        <strong>{formatCredits(smallBlind)} / {formatCredits(activeAnte)}</strong>
                       </div>
                       <div>
-                        <span>Blind unit</span>
+                        <span>Pas de mise</span>
                         <strong>{formatCredits(blindUnit)}</strong>
                       </div>
                       <div>
@@ -613,10 +625,12 @@ export default function PokerRoom({
                   ) : null}
                   {activeHeaderInfo === "live" ? (
                     <div className="casino-rule-list">
-                      <p>Le salon doit compter au moins 2 joueurs pour rejoindre une main multijoueur.</p>
-                      <p>Le tour actif reste synchronise entre les joueurs du meme salon.</p>
+                      <p>Le salon doit compter au moins un autre joueur reel connecte pour rejoindre une main multijoueur.</p>
+                      <p>La table est limitee a 6 joueurs humains au total.</p>
+                      <p>Le tour actif reste synchronise entre les joueurs du meme salon et un timeout compte comme fold.</p>
                       <p>Table en cours: {activeRoom ? POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
                       <p>Joueurs presents: {activePlayerCount}</p>
+                      <p>Adversaires reels disponibles: {connectedOpponentCount}</p>
                     </div>
                   ) : null}
                 </div>
@@ -655,6 +669,8 @@ export default function PokerRoom({
               participants={tableParticipants}
               activeAnte={activeAnte}
               smallBlind={smallBlind}
+              heroCommitted={playerCommitted}
+              potTotal={state?.pot || 0}
               isDecisionPhase={isDecisionPhase}
               dealtCardDelays={dealtCardDelays}
             />
@@ -669,7 +685,7 @@ export default function PokerRoom({
               infoTab={infoTab}
               isDecisionPhase={isDecisionPhase}
               roomSwitchLocked={roomSwitchLocked}
-              ante={ante}
+              ante={activeAnte}
               playerChips={playerChips}
               playerCommitted={playerCommitted}
               playerStreetCommitted={playerStreetCommitted}
@@ -678,6 +694,8 @@ export default function PokerRoom({
               canCall={canCall}
               canBet={canBet}
               canRaise={canRaise}
+              isLiveMultiplayerReady={isLiveMultiplayerReady}
+              isTableFull={isTableFull}
               normalizedBetTarget={normalizedBetTarget}
               aggressionMin={aggressionMin}
               aggressionMax={aggressionMax}

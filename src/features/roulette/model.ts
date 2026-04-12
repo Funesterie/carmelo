@@ -25,7 +25,7 @@ export const BALL_INNER_RADIUS = 37.2;
 export const SPIN_DURATION_MS = 4100;
 export const HOLD_DURATION_MS = 30000;
 export const ROULETTE_TIRAGE_CANNON_DELAY_MS = 700;
-export const ROULETTE_ANNOUNCE_LEAD_IN_MS = 6200;
+export const ROULETTE_ANNOUNCE_LEAD_IN_MS = 900;
 
 export type RouletteSequencePhase = "idle" | "intro" | "spin" | "hold" | "reload";
 
@@ -94,7 +94,7 @@ export function buildSettledAnimation(winningNumber: number) {
   const pocketIndex = getPocketIndex(winningNumber);
   const ball = toBallCoordinates(BALL_TARGET_ANGLE, BALL_INNER_RADIUS, 0);
   return {
-    wheelRotation: -(pocketIndex * WHEEL_POCKET_ANGLE),
+    wheelRotation: pocketIndex === -1 ? 0 : -(pocketIndex * WHEEL_POCKET_ANGLE),
     ballAngle: BALL_TARGET_ANGLE,
     ballRadius: BALL_INNER_RADIUS,
     ballX: ball.x,
