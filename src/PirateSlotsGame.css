@@ -17011,6 +17011,83 @@ button {
   color: #c8f9ff;
 }
 
+.casino-stage--cards--blackjack .casino-blackjack-roster__chip.is-active {
+  background: rgba(255, 200, 87, 0.16);
+  border-color: rgba(255, 214, 137, 0.32);
+  color: #fff1c2;
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
+  width: clamp(108px, 15vw, 156px);
+  gap: 6px;
+  padding: 10px 11px;
+  background: rgba(4, 11, 16, 0.62);
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer.is-active {
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 137, 0.32),
+    0 0 0 6px rgba(255, 214, 137, 0.08),
+    0 18px 32px rgba(0, 0, 0, 0.2);
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer header {
+  gap: 6px;
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer header strong,
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer header span,
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer small {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.2;
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer header strong {
+  color: #f7edd2;
+  font-size: 0.8rem;
+}
+
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer header span,
+.casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer small {
+  font-size: 0.64rem;
+}
+
+.casino-stage--cards--blackjack .casino-card-row--fan-peer {
+  justify-content: center;
+  gap: 3px;
+  min-height: 58px;
+}
+
+.casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card {
+  width: 36px !important;
+  min-height: 54px !important;
+}
+
+.casino-stage--cards--blackjack .casino-empty-seat--blackjack-peer {
+  min-height: 60px;
+  padding: 7px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(25, 215, 230, 0.14);
+  background: rgba(5, 14, 20, 0.34);
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  text-align: center;
+}
+
+.casino-stage--cards--blackjack .casino-empty-seat--blackjack-peer strong {
+  color: #f6efe0;
+  font-size: 0.72rem;
+}
+
+.casino-stage--cards--blackjack .casino-empty-seat--blackjack-peer span {
+  color: var(--casino-muted);
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
+
 .casino-stage--cards--blackjack .casino-blackjack-dealer-rail,
 .casino-stage--cards--blackjack .casino-oval-seat--blackjack-player {
   overflow: visible !important;
@@ -17057,7 +17134,12 @@ button {
 }
 
 .casino-stage--cards--blackjack .casino-blackjack-player-banner--dealer {
-  margin: 0 auto 10px;
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: 5;
+  margin: 0 auto 14px;
   min-width: min(190px, 72%);
   border-color: rgba(255, 214, 137, 0.28);
 }
@@ -17174,6 +17256,21 @@ button {
     max-width: none;
   }
 
+  .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
+    width: min(27vw, 102px) !important;
+    padding: 7px 7px !important;
+    gap: 4px !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card {
+    width: 28px !important;
+    min-height: 42px !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-seat-role-row {
+    gap: 4px !important;
+  }
+
   .casino-stage--cards--blackjack .casino-blackjack-dealer-rail {
     top: 22% !important;
     width: min(94%, 360px) !important;
@@ -17202,8 +17299,57 @@ button {
 }
 
 @media (max-width: 420px) {
+  .casino-stage--cards--blackjack .casino-card-felt--table {
+    min-height: clamp(340px, 48svh, 420px);
+    padding: 10px;
+  }
+
+  .casino-stage--cards--blackjack .casino-felt-table--blackjack {
+    min-height: clamp(318px, 45svh, 392px);
+    border-radius: 28px;
+  }
+
   .casino-stage--cards--blackjack .casino-blackjack-counter {
     min-width: 0;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-counter strong {
+    font-size: 0.92rem;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-counter small {
+    font-size: 0.66rem;
+    line-height: 1.25;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-roster {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-roster__chip {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 0.72rem;
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-dealer-rail {
+    top: 21% !important;
+    width: min(96%, 334px) !important;
+    padding: 8px 10px !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
+    width: min(26vw, 92px) !important;
+    padding: 6px !important;
+  }
+
+  .casino-stage--cards--blackjack .casino-oval-seat--blackjack-player {
+    top: 79% !important;
+    width: min(96%, 346px) !important;
+    min-height: 190px !important;
+    padding: 8px 10px 44px !important;
+    padding-right: 68px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan .pirate-card {
@@ -17218,6 +17364,29 @@ button {
   .casino-stage--cards--blackjack .casino-card-row--player .pirate-card {
     width: 60px !important;
     min-height: 88px !important;
+  }
+
+  .casino-seat-chip-stack {
+    right: 8px;
+    bottom: 44px;
+    gap: 4px;
+  }
+
+  .casino-seat-chip-stack__tokens {
+    min-width: 44px;
+    min-height: 82px;
+  }
+
+  .casino-stack-chip--seat {
+    width: 44px;
+    height: 44px;
+    bottom: calc(var(--chip-index, 0) * 13px);
+  }
+
+  .casino-stage--cards--blackjack .casino-blackjack-player-banner {
+    bottom: 6px;
+    min-width: min(188px, calc(100% - 88px));
+    padding: 5px 12px;
   }
 }
 

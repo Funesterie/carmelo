@@ -351,12 +351,21 @@ export type TreasureHuntState = {
 
 export type BlackjackSeat = {
   id: string;
+  userId?: string;
   name: string;
+  username?: string;
   chips: number;
   wager: number;
   cards: PiratePlayingCard[];
+  score?: BlackjackScore;
+  status?: string;
   mood: string;
   result: string;
+  payoutAmount?: number;
+  lastDelta?: number;
+  position?: number;
+  isSelf?: boolean;
+  isActive?: boolean;
 };
 
 export type BlackjackScore = {
@@ -383,12 +392,19 @@ export type BlackjackHand = {
 export type BlackjackState = {
   token: string | null;
   roomId?: string | null;
-  stage: "player-turn" | "resolved";
+  stage: "waiting" | "player-turn" | "resolved";
+  waitingForPlayers?: boolean;
+  roomActive?: boolean;
+  roundId?: number;
   wager: number;
   dealerHidden: boolean;
   playerCards: PiratePlayingCard[];
   dealerCards: PiratePlayingCard[];
+  seats?: BlackjackSeat[];
   aiSeats: BlackjackSeat[];
+  selfSeatId?: string | null;
+  activeSeatId?: string | null;
+  pendingSeats?: CasinoTableRoomParticipant[];
   playerScore: BlackjackScore;
   dealerScore: BlackjackScore;
   playerHands?: BlackjackHand[];
@@ -416,7 +432,7 @@ export type PokerSeat = {
 export type PokerState = {
   token: string | null;
   roomId?: string | null;
-  stage: "preflop" | "flop" | "turn" | "river" | "showdown";
+  stage: "waiting" | "preflop" | "flop" | "turn" | "river" | "showdown";
   stageLabel: string;
   ante: number;
   pot: number;
@@ -457,6 +473,31 @@ export type RouletteParticipant = {
   betCount: number;
 };
 
+export type RouletteVisibleSpotPlayer = {
+  playerId: string;
+  displayName: string;
+  amount: number;
+};
+
+export type RouletteVisibleBetSpot = {
+  betType: string;
+  betValue: string;
+  totalAmount: number;
+  playerCount: number;
+  players: RouletteVisibleSpotPlayer[];
+};
+
+export type RouletteVisiblePlayerBets = {
+  playerId: string;
+  displayName: string;
+  totalAmount: number;
+  bets: Array<{
+    betType: string;
+    betValue: string;
+    amount: number;
+  }>;
+};
+
 export type RouletteResult = {
   id: number;
   winningNumber: number;
@@ -466,6 +507,8 @@ export type RouletteResult = {
 
 export type RouletteRoom = {
   id: string;
+  roomActive?: boolean;
+  nextClosesAt?: string | null;
   round: {
     id: number;
     opensAt: string | null;
@@ -475,6 +518,9 @@ export type RouletteRoom = {
     playerCount: number;
     participants: RouletteParticipant[];
     myBets: RouletteRoundBet[];
+    activeParticipants?: CasinoTableRoomParticipant[];
+    visibleBetsBySpot?: RouletteVisibleBetSpot[];
+    visibleBetsByPlayer?: RouletteVisiblePlayerBets[];
   };
   latestResolved: RouletteResult | null;
   recentResults: RouletteResult[];
@@ -634,11 +680,11 @@ export async function fetchPokerRoomState(roomId: string) {
 }
 
 export async function fetchRouletteRoom() {
-  return getCasinoAuthed<RouletteResponse>("/api/casino/roulette/state?view=compact&includeProfile=0");
+  return getCasinoAuthed<RouletteResponse>("/api/casino/roulette/state?includeProfile=0");
 }
 
 export async function placeRouletteBet(betType: string, betValue: string, amount: number) {
-  return postCasinoAuthed<RouletteResponse>("/api/casino/roulette/bet?view=compact&includeProfile=1", { betType, betValue, amount });
+  return postCasinoAuthed<RouletteResponse>("/api/casino/roulette/bet?includeProfile=1", { betType, betValue, amount });
 }
 
 export async function joinBlackjackRoom(roomId: string) {

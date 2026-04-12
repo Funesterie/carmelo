@@ -65,8 +65,20 @@ function getBlackjackLegalActions(state: BlackjackState | null) {
   return getBlackjackLegalActionsForBalance(state, Number.POSITIVE_INFINITY);
 }
 
+function isBlackjackSelfTurn(state: BlackjackState | null) {
+  if (!state || state.stage !== "player-turn" || !state.token) return false;
+
+  const selfSeatId = String(state.selfSeatId || "").trim();
+  const activeSeatId = String(state.activeSeatId || "").trim();
+  if (selfSeatId && activeSeatId) {
+    return selfSeatId === activeSeatId;
+  }
+
+  return !state.aiSeats.some((seat) => Boolean(seat?.isActive));
+}
+
 function getBlackjackLegalActionsForBalance(state: BlackjackState | null, walletBalance: number) {
-  if (!state || state.stage !== "player-turn") return [] as BlackjackAction[];
+  if (!state || state.stage !== "player-turn" || !isBlackjackSelfTurn(state)) return [] as BlackjackAction[];
 
   const actionSet = new Set<BlackjackAction>(state.legalActions?.length ? state.legalActions : ["hit", "stand"]);
   getNormalizedBlackjackHands(state)
@@ -122,6 +134,8 @@ function buildBlackjackSyncSignature(state: BlackjackState | null) {
     token: state.token,
     roomId: state.roomId || null,
     stage: state.stage,
+    selfSeatId: state.selfSeatId || null,
+    activeSeatId: state.activeSeatId || null,
     dealerHidden: state.dealerHidden,
     playerCards: state.playerCards.map((card) => card.id),
     dealerCards: state.dealerCards.map((card) => card.id),
@@ -190,14 +204,6 @@ export default function BlackjackRoom({
   const lastTurnSignatureRef = useRef("");
   const lastTimedOutSignatureRef = useRef("");
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
-
-  const displayState = useMemo<BlackjackState | null>(() => {
-    if (!state) return null;
-    return {
-      ...state,
-      aiSeats: [],
-    };
-  }, [state]);
   const bet = useMemo(() => betChips.reduce((total, chip) => total + chip, 0), [betChips]);
 
   const stage = state?.stage || "idle";
@@ -209,7 +215,7 @@ export default function BlackjackRoom({
   const autoLiveMode = activePlayerCount >= LIVE_MIN_PLAYERS;
   const currentRoundIsLive = Boolean(state?.roomId);
   const shouldSyncLiveRoom = currentRoundIsLive || (stage !== "player-turn" && autoLiveMode);
-  const isDecisionPhase = stage === "player-turn";
+  const isDecisionPhase = isBlackjackSelfTurn(state);
   const legalActions = useMemo(
     () => getBlackjackLegalActionsForBalance(state, profile.wallet.balance),
     [profile.wallet.balance, state],
@@ -348,7 +354,7 @@ export default function BlackjackRoom({
   }, [roomId, state, turnDeadlineAt]);
 
   useEffect(() => {
-    if (!currentRoundIsLive || !state?.token || stage !== "player-turn" || !turnDeadlineAt || working) return;
+    if (!currentRoundIsLive || !state?.token || stage !== "player-turn" || !turnDeadlineAt || working || !isBlackjackSelfTurn(state)) return;
 
     const signature = buildBlackjackSyncSignature(state);
     if (!signature || turnDeadlineAt > nowTick || lastTimedOutSignatureRef.current === signature) return;
@@ -400,7 +406,7 @@ export default function BlackjackRoom({
   }, [lastDelta, stage]);
 
   useEffect(() => {
-    const currentCardKeys = getBlackjackCardKeys(displayState);
+    const currentCardKeys = getBlackjackCardKeys(state);
     const previousCardKeys = new Set(previousCardKeysRef.current);
     const nextFreshKeys = currentCardKeys.filter((key) => !previousCardKeys.has(key));
     previousCardKeysRef.current = currentCardKeys;
@@ -429,7 +435,7 @@ export default function BlackjackRoom({
       });
       clearDealAnimationTimeoutRef.current = null;
     }, 1100 + nextFreshKeys.length * TABLE_DEAL_STEP_MS);
-  }, [displayState]);
+  }, [state]);
 
   async function startRound() {
     if (!bet) {
@@ -665,7 +671,9 @@ export default function BlackjackRoom({
 
           <div className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--blackjack">
             <BlackjackTableScene
-              state={displayState}
+              state={state}
+              participants={activeRoom?.participants || []}
+              currentUserId={profile.user.id}
               playerName={playerName}
               bet={bet}
               betChips={betChips}
@@ -678,7 +686,7 @@ export default function BlackjackRoom({
 
             <BlackjackSidebar
               profile={profile}
-              state={displayState}
+              state={state}
               bet={bet}
               betChips={betChips}
               working={working}

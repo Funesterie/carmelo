@@ -4,6 +4,7 @@ import { POKER_SALONS } from "../../../lib/tableSalons";
 import type { CasinoProfile, CasinoTableRoom, PokerState } from "../../../lib/casinoApi";
 
 const STREET_LABELS = {
+  waiting: { title: "Attente" },
   preflop: { title: "Preflop" },
   flop: { title: "Flop" },
   turn: { title: "Turn" },
@@ -57,6 +58,7 @@ type PokerSidebarProps = {
 
 function getDecisionHeadline(state: PokerState | null) {
   if (!state) return "Selectionne une structure puis rejoins.";
+  if (state.stage === "waiting") return "En attente d'un second joueur";
   if (state.playerFolded) return "Main couchee";
   if (state.stage === "showdown") return "Pot resolu";
   if (state.legalActions.includes("call")) return `Defense a ${formatCredits(state.toCall)}`;
@@ -69,6 +71,9 @@ function getDecisionHeadline(state: PokerState | null) {
 function getDecisionCaption(state: PokerState | null) {
   if (!state) {
     return "Le backend gere maintenant les vrais spots par street: check, call, bet, raise et fold avec sizing.";
+  }
+  if (state.stage === "waiting") {
+    return state.message || "Le salon garde ta place jusqu'a l'arrivee d'un second joueur humain.";
   }
   if (state.stage === "showdown") {
     return state.message;
@@ -118,7 +123,7 @@ export default function PokerSidebar({
   onJoin,
 }: PokerSidebarProps) {
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
-  const canJoin = stage === "idle" || stage === "showdown";
+  const canJoin = stage === "idle" || stage === "waiting" || stage === "showdown";
   const smallBlind = Math.max(10, Math.round(ante / 2));
 
   return (
@@ -134,16 +139,24 @@ export default function PokerSidebar({
             <>
               <div className="casino-command-dock__betline-meta casino-command-dock__betline-meta--poker">
                 <span>Blindes {formatCredits(smallBlind)} / {formatCredits(ante)}</span>
-                <span>{isTableFull ? "Table pleine" : isLiveMultiplayerReady ? "Table prete" : "2 joueurs mini"}</span>
+                <span>
+                  {isTableFull
+                    ? "Table pleine"
+                    : stage === "waiting"
+                      ? "Place reservee"
+                      : isLiveMultiplayerReady
+                        ? "Table prete"
+                        : "1 joueur en attente"}
+                </span>
               </div>
               <div className="casino-command-dock__actions casino-command-dock__actions--poker-join">
                 <button
                   type="button"
                   className="casino-primary-button"
                   onClick={onJoin}
-                  disabled={working || profile.wallet.balance < ante || !isLiveMultiplayerReady || isTableFull}
+                  disabled={working || profile.wallet.balance < ante || isTableFull}
                 >
-                  Rejoindre
+                  {stage === "waiting" ? "Pret" : "Rejoindre"}
                 </button>
               </div>
             </>

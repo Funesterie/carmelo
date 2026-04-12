@@ -32,6 +32,14 @@ type BlackjackSidebarProps = {
   onDeal: () => void;
 };
 
+function playerTurnLabel(state: BlackjackState | null, userId: string) {
+  if (!state?.activeSeatId) return "la table";
+  if (String(state.activeSeatId).trim() === String(state.selfSeatId || userId || "").trim()) {
+    return "toi";
+  }
+  return "un joueur";
+}
+
 export default function BlackjackSidebar({
   profile,
   state,
@@ -56,6 +64,10 @@ export default function BlackjackSidebar({
   const stage = state?.stage || "idle";
   const canDeal = stage !== "player-turn";
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const activeSeat = state?.activeSeatId
+    ? (state.seats || []).find((seat) => String(seat.id || seat.userId || "").trim() === String(state.activeSeatId || "").trim()) || null
+    : null;
+  const activeSeatName = activeSeat?.name || activeSeat?.username || playerTurnLabel(state, profile.user.id);
   const canHit = legalActions.includes("hit");
   const canStand = legalActions.includes("stand");
   const canDouble = legalActions.includes("double");
@@ -69,12 +81,24 @@ export default function BlackjackSidebar({
     <div className="casino-stage-sidebar">
       <div className={`casino-command-dock casino-command-dock--blackjack ${isDecisionPhase ? "is-attention" : ""}`}>
         <div className="casino-command-dock__copy">
-          <span className="casino-chip">{isDecisionPhase ? "Decision" : "Distribution"}</span>
-          <strong>{isDecisionPhase ? `Main a ${state?.playerScore.total || 0} points` : "Commandes de table"}</strong>
+          <span className="casino-chip">{isDecisionPhase ? "Decision" : stage === "player-turn" ? "Tour en cours" : "Distribution"}</span>
+          <strong>
+            {isDecisionPhase
+              ? `Main a ${state?.playerScore.total || 0} points`
+              : stage === "player-turn"
+                ? `Tour de ${activeSeatName}`
+                : state?.waitingForPlayers
+                  ? "En attente de joueurs"
+                  : "Commandes de table"}
+          </strong>
           <p>
             {isDecisionPhase
               ? "Concentre-toi sur ta main, la carte visible du croupier et les vraies options de blackjack ouvertes pour cette combinaison."
-              : "Le salon garde la meme table et se synchronise selon les joueurs presents."}
+              : stage === "player-turn"
+                ? "La table reste synchronisee: tu verras les autres jouer, puis la main passera automatiquement si leur chrono expire."
+                : state?.waitingForPlayers
+                  ? "Le salon reste synchro et garde les places en attente jusqu'a ce qu'une vraie main puisse partir."
+                  : "Le salon garde la meme table et se synchronise selon les joueurs presents."}
           </p>
         </div>
 

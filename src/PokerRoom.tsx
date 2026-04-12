@@ -138,6 +138,8 @@ export default function PokerRoom({
   onProfileChange,
   onError,
 }: PokerRoomProps) {
+  const isActivePokerHandStage = (value: string | null | undefined): value is Exclude<PokerState["stage"], "waiting" | "showdown"> =>
+    value === "preflop" || value === "flop" || value === "turn" || value === "river";
   const pokerRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "poker");
   const [ante] = useState(20);
   const [state, setState] = useState<PokerState | null>(null);
@@ -166,7 +168,7 @@ export default function PokerRoom({
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
-  const roomSwitchLocked = !(stage === "idle" || stage === "showdown");
+  const roomSwitchLocked = !(stage === "idle" || stage === "waiting" || stage === "showdown");
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const tableParticipants = useMemo<Array<CasinoTableRoomParticipant & { isSelf: boolean }>>(() => {
     const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
@@ -204,7 +206,7 @@ export default function PokerRoom({
   const blindUnit = Math.max(20, Math.round(activeAnte));
   const communityCards = state?.communityCards || [];
   const toCall = state?.toCall || 0;
-  const isDecisionPhase = Boolean(state && stage !== "showdown" && !state.playerFolded);
+  const isDecisionPhase = Boolean(state && isActivePokerHandStage(stage) && !state.playerFolded);
   const playerChips = state?.playerChips || 0;
   const playerCommitted = state?.playerCommitted || activeAnte;
   const playerStreetCommitted = state?.playerStreetCommitted || 0;
@@ -319,7 +321,7 @@ export default function PokerRoom({
     }
 
     const signature = buildPokerSyncSignature(state);
-    const isActionable = stage !== "showdown" && !state.playerFolded && Boolean(state.token);
+    const isActionable = isActivePokerHandStage(stage) && !state.playerFolded && Boolean(state.token);
     const shouldResetTurnClock = Boolean(
       isActionable && (!turnDeadlineAt || signature !== lastTurnSignatureRef.current || turnDeadlineAt <= Date.now()),
     );
@@ -350,7 +352,7 @@ export default function PokerRoom({
   }, [roomId, stage, state, turnDeadlineAt]);
 
   useEffect(() => {
-    if (!state?.token || stage === "showdown" || state.playerFolded || !turnDeadlineAt || working) return;
+    if (!state?.token || !isActivePokerHandStage(stage) || state.playerFolded || !turnDeadlineAt || working) return;
 
     const signature = buildPokerSyncSignature(state);
     if (!signature || turnDeadlineAt > nowTick || lastTimedOutSignatureRef.current === signature) return;
@@ -417,10 +419,6 @@ export default function PokerRoom({
   }, [aggressionMax, aggressionMin, blindUnit, canBet, canRaise]);
 
   async function joinHand() {
-    if (!isLiveMultiplayerReady) {
-      onError("Il faut au moins 2 joueurs humains sur ce salon pour lancer une main de poker.");
-      return;
-    }
     if (isTableFull) {
       onError("La table est pleine: 6 joueurs maximum.");
       return;
@@ -449,7 +447,7 @@ export default function PokerRoom({
   }
 
   async function act(action: PokerAction, amount?: number) {
-    if (!state?.token || stage === "showdown" || working) return;
+    if (!state?.token || !isActivePokerHandStage(stage) || working) return;
     onError("");
     setWorking(true);
     try {
@@ -478,7 +476,7 @@ export default function PokerRoom({
   }
 
   async function handleCheckOrFold() {
-    if (working || stage === "idle" || stage === "showdown") return;
+    if (working || stage === "idle" || stage === "waiting" || stage === "showdown") return;
     if (canCheck) {
       playCheck();
       await act("check");

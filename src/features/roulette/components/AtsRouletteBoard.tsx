@@ -26,6 +26,8 @@ export type RoulettePlacedBet = {
   betValue: string;
   amount: number;
   tone: "red" | "green" | "amber" | "blue";
+  playerId?: string;
+  isPreview?: boolean;
 };
 
 type AtsRouletteBoardProps = {
@@ -194,38 +196,45 @@ export default function AtsRouletteBoard({
   }
 
   const visualStacks = useMemo(() => {
-    const stackMap = new Map<
-      string,
-      {
-        betType: string;
-        betValue: string;
-        amount: number;
-        tone: "red" | "green" | "amber" | "blue";
-        isPreview: boolean;
-      }
-    >();
+    const visibleStacks = placedBets.map((bet) => ({
+      betType: bet.betType,
+      betValue: bet.betValue,
+      amount: bet.amount,
+      tone: bet.tone,
+      isPreview: bet.isPreview === true,
+      playerId: bet.playerId || `${bet.betType}:${bet.betValue}:${bet.tone}:${bet.amount}`,
+    }));
 
-    placedBets.forEach((bet) => {
-      stackMap.set(getBetKey(bet.betType, bet.betValue), {
-        betType: bet.betType,
-        betValue: bet.betValue,
-        amount: bet.amount,
-        tone: bet.tone,
-        isPreview: false,
-      });
-    });
-
-    if (selectedBet && !stackMap.has(getBetKey(selectedBet.betType, selectedBet.betValue))) {
-      stackMap.set(getBetKey(selectedBet.betType, selectedBet.betValue), {
+    if (
+      selectedBet
+      && !visibleStacks.some((stack) => stack.betType === selectedBet.betType && stack.betValue === selectedBet.betValue)
+    ) {
+      visibleStacks.push({
         betType: selectedBet.betType,
         betValue: selectedBet.betValue,
         amount,
         tone: selectedBetTone,
         isPreview: true,
+        playerId: `preview:${selectedBet.betType}:${selectedBet.betValue}`,
       });
     }
 
-    return [...stackMap.values()];
+    const stacksBySpot = new Map<string, typeof visibleStacks>();
+    visibleStacks.forEach((stack) => {
+      const key = getBetKey(stack.betType, stack.betValue);
+      const existing = stacksBySpot.get(key) || [];
+      existing.push(stack);
+      stacksBySpot.set(key, existing);
+    });
+
+    return [...stacksBySpot.entries()].flatMap(([spotKey, stacks]) =>
+      stacks.map((stack, stackIndex) => ({
+        ...stack,
+        spotKey,
+        stackIndex,
+        stackCount: stacks.length,
+      })),
+    );
   }, [amount, placedBets, selectedBet, selectedBetTone]);
 
   return (
@@ -426,18 +435,23 @@ export default function AtsRouletteBoard({
           if (!anchor) return null;
 
           const coinVariant = getChipVariant(stack.amount);
+          const spreadRadius = stack.stackCount > 1 ? Math.min(14, 6 + (stack.stackCount - 1) * 2) : 0;
+          const angle = stack.stackCount > 1 ? (-90 + (360 / stack.stackCount) * stack.stackIndex) * (Math.PI / 180) : 0;
+          const offsetX = stack.stackCount > 1 ? Math.cos(angle) * spreadRadius : 0;
+          const offsetY = stack.stackCount > 1 ? Math.sin(angle) * spreadRadius : 0;
 
           return (
             <span
-              key={`${stack.betType}-${stack.betValue}`}
+              key={`${stack.betType}-${stack.betValue}-${stack.playerId}-${stack.stackIndex}`}
               className={cx(
                 "ats-roulette-cell__stack",
                 `ats-roulette-cell__stack--${stack.tone}`,
+                stack.stackCount > 1 && "ats-roulette-cell__stack--clustered",
                 stack.isPreview && "is-preview",
               )}
               style={{
-                left: `${anchor.left}px`,
-                top: `${anchor.top}px`,
+                left: `${anchor.left + offsetX}px`,
+                top: `${anchor.top + offsetY}px`,
               }}
             >
               <span

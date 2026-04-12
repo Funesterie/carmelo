@@ -524,6 +524,17 @@ export default function RouletteRoom({
 
     return nextActiveBets;
   }, [room?.round.myBets]);
+  const participantToneByUserId = useMemo(() => {
+    const toneMap = new Map<string, typeof ROULETTE_PORT_TONES[number]>();
+    const orderedIds = (room?.round.participants || []).map((participant) => participant.userId);
+    orderedIds.forEach((userId, index) => {
+      toneMap.set(String(userId || ""), ROULETTE_PORT_TONES[index % ROULETTE_PORT_TONES.length] || "amber");
+    });
+    if (!toneMap.has(profile.user.id)) {
+      toneMap.set(profile.user.id, "amber");
+    }
+    return toneMap;
+  }, [profile.user.id, room?.round.participants]);
   const pendingTotal = useMemo(
     () => pendingBets.reduce((sum, bet) => sum + bet.amount, 0),
     [pendingBets],
@@ -564,6 +575,30 @@ export default function RouletteRoom({
     }));
   }, [profile.user.id, room?.round.participants]);
   const selfPortTone = portOccupants.find((entry) => entry.isSelf)?.tone || "amber";
+  const boardPlacedBets = useMemo(() => {
+    const visibleBySpot = room?.round.visibleBetsBySpot || [];
+    const otherPlayersBets = visibleBySpot.flatMap((spot) =>
+      (spot.players || [])
+        .filter((player) => player.playerId !== profile.user.id)
+        .map((player) => ({
+          betType: spot.betType,
+          betValue: spot.betValue,
+          amount: player.amount,
+          tone: participantToneByUserId.get(player.playerId) || "amber",
+          playerId: player.playerId,
+        })),
+    );
+
+    const selfMergedBets = displayBets.map((bet) => ({
+      betType: bet.betType,
+      betValue: bet.betValue,
+      amount: bet.amount,
+      tone: selfPortTone,
+      playerId: profile.user.id,
+    }));
+
+    return [...otherPlayersBets, ...selfMergedBets];
+  }, [displayBets, participantToneByUserId, profile.user.id, room?.round.visibleBetsBySpot, selfPortTone]);
   const activeTotal = activeBets.reduce((sum, bet) => sum + bet.amount, 0);
   const hasPendingBets = pendingBets.length > 0;
   const betsLocked = tableHasServerActivity && remainingMs <= ROULETTE_AUTO_SUBMIT_THRESHOLD_MS;
@@ -1309,12 +1344,7 @@ export default function RouletteRoom({
                   onAmountChange={setAmount}
                   selectedBet={selectedBet}
                   selectedBetTone={selfPortTone}
-                  placedBets={displayBets.map((bet) => ({
-                    betType: bet.betType,
-                    betValue: bet.betValue,
-                    amount: bet.amount,
-                    tone: selfPortTone,
-                  }))}
+                  placedBets={boardPlacedBets}
                   onBetChange={handleBoardBetChange}
                   onClearBets={clearPendingBets}
                   clearDisabled={betsLocked || (!hasPendingBets && !selectedBet)}

@@ -11,6 +11,38 @@ const POKER_SEAT_LAYOUT = [
   { x: "82%", y: "68%", align: "end", tag: "BD" },
 ] as const;
 
+function getPokerSeatLayout(count: number) {
+  if (count <= 1) {
+    return [{ x: "50%", y: "19%", align: "center", tag: "P1" }] as const;
+  }
+
+  if (count === 2) {
+    return [
+      { x: "28%", y: "26%", align: "start", tag: "P1" },
+      { x: "72%", y: "26%", align: "end", tag: "P2" },
+    ] as const;
+  }
+
+  if (count === 3) {
+    return [
+      { x: "20%", y: "34%", align: "start", tag: "P1" },
+      { x: "50%", y: "18%", align: "center", tag: "P2" },
+      { x: "80%", y: "34%", align: "end", tag: "P3" },
+    ] as const;
+  }
+
+  if (count === 4) {
+    return [
+      { x: "18%", y: "62%", align: "start", tag: "P1" },
+      { x: "24%", y: "24%", align: "start", tag: "P2" },
+      { x: "76%", y: "24%", align: "end", tag: "P3" },
+      { x: "82%", y: "62%", align: "end", tag: "P4" },
+    ] as const;
+  }
+
+  return POKER_SEAT_LAYOUT;
+}
+
 function isSeatAbsent(updatedAt: string | null, forcedAbsent = false) {
   if (forcedAbsent) return true;
   if (!updatedAt) return false;
@@ -88,6 +120,7 @@ export default function PokerTableScene({
   void smallBlind;
   const communityCards = state?.communityCards || [];
   const remoteParticipants = participants.filter((participant) => !participant.isSelf).slice(0, POKER_SEAT_LAYOUT.length);
+  const remoteSeatLayout = getPokerSeatLayout(remoteParticipants.length);
   const remoteSeatBindings = remoteParticipants.map((participant) => ({
     participant,
     seat: findParticipantSeat(participant, state?.aiSeats || []),
@@ -102,7 +135,7 @@ export default function PokerTableScene({
           <div className="casino-felt-table__halo" />
 
           {remoteSeatBindings.map(({ participant, seat }, index) => {
-            const layout = POKER_SEAT_LAYOUT[index] || POKER_SEAT_LAYOUT[POKER_SEAT_LAYOUT.length - 1];
+            const layout = remoteSeatLayout[index] || POKER_SEAT_LAYOUT[Math.min(index, POKER_SEAT_LAYOUT.length - 1)];
             const absent = isSeatAbsent(participant.updatedAt);
             const folded = Boolean(seat?.folded);
             const seatCards = seat?.cards || [];
@@ -158,7 +191,7 @@ export default function PokerTableScene({
 
           <section className={`casino-table-core casino-table-core--poker ${isDecisionPhase ? "is-focus" : ""}`}>
             <div className="casino-table-core__headline">
-              <strong>{stage === "idle" ? "Table au repos" : state?.stageLabel || "Street en cours"}</strong>
+              <strong>{stage === "idle" ? "Table au repos" : state?.stageLabel || (stage === "waiting" ? "En attente d'un joueur" : "Street en cours")}</strong>
               <span className="casino-token-inline"><img src={jetonImg} alt="" />Pot {formatCredits(state?.pot || 0)}</span>
             </div>
             <div className="casino-poker-board">
@@ -190,7 +223,15 @@ export default function PokerTableScene({
           <article className={`casino-oval-seat casino-oval-seat--player ${state?.playerFolded ? "is-folded" : ""} ${isDecisionPhase ? "is-focus" : ""}`}>
             <div className="casino-card-seat__meta">
               <strong>{heroName}</strong>
-              <span>{state?.playerFolded ? "Main couchee" : state?.playerHand?.label || (stage === "showdown" ? "Showdown" : "Decision ouverte")}</span>
+              <span>
+                {state?.playerFolded
+                  ? "Main couchee"
+                  : state?.playerHand?.label || (stage === "showdown"
+                    ? "Showdown"
+                    : stage === "waiting"
+                      ? "En attente"
+                      : "Decision ouverte")}
+              </span>
             </div>
             <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
               {state?.playerCards.length ? (

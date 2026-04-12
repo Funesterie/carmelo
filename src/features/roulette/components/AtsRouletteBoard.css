@@ -381,6 +381,15 @@
   opacity: 0.9;
 }
 
+.ats-roulette-cell__stack--clustered {
+  width: clamp(22px, 2.2vw, 30px);
+  min-height: clamp(22px, 2.2vw, 30px);
+}
+
+.ats-roulette-cell__stack--clustered b {
+  font-size: clamp(0.34rem, 0.52vw, 0.5rem);
+}
+
 .ats-port-button strong,
 .ats-port-button span {
   white-space: nowrap;
