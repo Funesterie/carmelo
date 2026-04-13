@@ -9,6 +9,7 @@ import {
   actBlackjackRound,
   fetchBlackjackRoomState,
   joinBlackjackRoom,
+  leaveCasinoTableRoom,
   startBlackjackRound,
   type BlackjackAction,
   type BlackjackHand,
@@ -274,6 +275,10 @@ export default function BlackjackRoom({
   const [resultFlash, setResultFlash] = useState<{ label: string; detail?: string; tone: "win" | "lose" } | null>(null);
   const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [isDocumentVisible, setIsDocumentVisible] = useState(() => {
+    if (typeof document === "undefined") return true;
+    return document.visibilityState !== "hidden";
+  });
   const previousCardKeysRef = useRef<string[]>([]);
   const previousStageRef = useRef<string>("idle");
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
@@ -355,6 +360,52 @@ export default function BlackjackRoom({
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
+    function updateVisibility() {
+      setIsDocumentVisible(document.visibilityState !== "hidden");
+    }
+
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+    window.addEventListener("focus", updateVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", updateVisibility);
+      window.removeEventListener("focus", updateVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    async function releasePresence(keepalive = false) {
+      try {
+        await leaveCasinoTableRoom("blackjack", roomId, { keepalive });
+      } catch {
+        // Best effort: losing presence on tab hide/unmount should not block the UI.
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        void releasePresence(true);
+      }
+    }
+
+    function handlePageHide() {
+      void releasePresence(true);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      void releasePresence(true);
+    };
+  }, [roomId]);
+
+  useEffect(() => {
     latestAppliedSyncAtRef.current = 0;
     skipNextSyncPublishRef.current = false;
     lastTurnSignatureRef.current = "";
@@ -383,6 +434,10 @@ export default function BlackjackRoom({
   }, [roomId, roomSwitchLocked, working]);
 
   useEffect(() => {
+    if (!isDocumentVisible) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function syncRoom() {
@@ -431,7 +486,7 @@ export default function BlackjackRoom({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [currentRoundIsLive, onError, roomId, stage, turnDeadlineAt]);
+  }, [currentRoundIsLive, isDocumentVisible, onError, roomId, stage, turnDeadlineAt]);
 
   useEffect(() => {
     const existingSnapshot = readTableChannelSnapshot<BlackjackState>("blackjack", roomId);
@@ -483,6 +538,7 @@ export default function BlackjackRoom({
       || !turnDeadlineAt
       || turnDeadlineAt > nowTick
       || working
+      || !isDocumentVisible
     ) {
       return;
     }
@@ -512,7 +568,7 @@ export default function BlackjackRoom({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [currentRoundIsLive, nowTick, playerName, profile.user.id, roomId, stage, state, turnDeadlineAt, working]);
+  }, [currentRoundIsLive, isDocumentVisible, nowTick, playerName, profile.user.id, roomId, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     if (
@@ -521,6 +577,7 @@ export default function BlackjackRoom({
       || stage !== "player-turn"
       || !turnDeadlineAt
       || working
+      || !isDocumentVisible
       || !isBlackjackSelfTurn(state, profile.user.id, playerName)
     ) {
       return;
@@ -531,7 +588,7 @@ export default function BlackjackRoom({
 
     lastTimedOutSignatureRef.current = signature;
     onError("Temps ecoule: la table se resynchronise.");
-  }, [currentRoundIsLive, nowTick, onError, playerName, profile.user.id, stage, state, turnDeadlineAt, working]);
+  }, [currentRoundIsLive, isDocumentVisible, nowTick, onError, playerName, profile.user.id, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     return () => {

@@ -9,6 +9,7 @@ import {
   actPokerRound,
   fetchPokerRoomState,
   joinPokerRoom,
+  leaveCasinoTableRoom,
   removeAbsentPokerSeat,
   startPokerRound,
   type CasinoTableRoom,
@@ -251,6 +252,10 @@ export default function PokerRoom({
   const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
   const [removingAbsentUserId, setRemovingAbsentUserId] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [isDocumentVisible, setIsDocumentVisible] = useState(() => {
+    if (typeof document === "undefined") return true;
+    return document.visibilityState !== "hidden";
+  });
   const displayState = useMemo<PokerState | null>(() => {
     if (!state) return null;
     return state;
@@ -353,6 +358,52 @@ export default function PokerRoom({
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
+    function updateVisibility() {
+      setIsDocumentVisible(document.visibilityState !== "hidden");
+    }
+
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+    window.addEventListener("focus", updateVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", updateVisibility);
+      window.removeEventListener("focus", updateVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    async function releasePresence(keepalive = false) {
+      try {
+        await leaveCasinoTableRoom("poker", roomId, { keepalive });
+      } catch {
+        // Best effort only: tab-based presence should not crash the table UI.
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        void releasePresence(true);
+      }
+    }
+
+    function handlePageHide() {
+      void releasePresence(true);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      void releasePresence(true);
+    };
+  }, [roomId]);
+
+  useEffect(() => {
     latestAppliedSyncAtRef.current = 0;
     skipNextSyncPublishRef.current = false;
     lastTurnSignatureRef.current = "";
@@ -381,6 +432,10 @@ export default function PokerRoom({
   }, [roomId, roomSwitchLocked, working]);
 
   useEffect(() => {
+    if (!isDocumentVisible) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function syncRoom() {
@@ -423,7 +478,7 @@ export default function PokerRoom({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [onError, playerName, profile.user.id, roomId, state, turnDeadlineAt]);
+  }, [isDocumentVisible, onError, playerName, profile.user.id, roomId, state, turnDeadlineAt]);
 
   useEffect(() => {
     const existingSnapshot = readTableChannelSnapshot<PokerState>("poker", roomId);
@@ -468,7 +523,7 @@ export default function PokerRoom({
   }, [playerName, profile.user.id, roomId, state, turnDeadlineAt]);
 
   useEffect(() => {
-    if (!state?.token || !turnDeadlineAt || turnDeadlineAt > nowTick || working) {
+    if (!state?.token || !turnDeadlineAt || turnDeadlineAt > nowTick || working || !isDocumentVisible) {
       return;
     }
 
@@ -497,7 +552,7 @@ export default function PokerRoom({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [nowTick, playerName, profile.user.id, roomId, state, turnDeadlineAt, working]);
+  }, [isDocumentVisible, nowTick, playerName, profile.user.id, roomId, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     if (
@@ -506,6 +561,7 @@ export default function PokerRoom({
       || state.playerFolded
       || !turnDeadlineAt
       || working
+      || !isDocumentVisible
       || !isPokerSelfTurn(state, profile.user.id, playerName)
     ) {
       return;
@@ -517,7 +573,7 @@ export default function PokerRoom({
     lastTimedOutSignatureRef.current = signature;
     onError("Temps ecoule: la main est automatiquement couchee.");
     void act("fold");
-  }, [act, nowTick, onError, playerName, profile.user.id, stage, state, turnDeadlineAt, working]);
+  }, [act, isDocumentVisible, nowTick, onError, playerName, profile.user.id, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     return () => {

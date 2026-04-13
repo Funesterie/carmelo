@@ -129,6 +129,8 @@ function getDefaultApiBase() {
 const API_BASE = String(import.meta.env.VITE_A11_API_BASE_URL || getDefaultApiBase()).trim().replace(/\/$/, "");
 const TOKEN_KEY = 'funesterie-casino-token';
 const DISPLAY_NAME_KEY = 'funesterie-casino-display-name';
+const TAB_ID_KEY = "funesterie-casino-tab-id";
+let fallbackCasinoTabId = "";
 
 function getApiUrl(path: string) {
   const normalizedPath = String(path || '').trim();
@@ -147,6 +149,34 @@ async function readJsonSafe(response: Response) {
 function getErrorMessage(payload: any, fallback: string) {
   const raw = String(payload?.error || payload?.message || '').trim();
   return raw || fallback;
+}
+
+function createCasinoTabId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `casino-tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function getCasinoTabId() {
+  if (fallbackCasinoTabId) {
+    return fallbackCasinoTabId;
+  }
+
+  try {
+    const existing = String(sessionStorage.getItem(TAB_ID_KEY) || "").trim();
+    if (existing) {
+      fallbackCasinoTabId = existing;
+      return existing;
+    }
+    const nextId = createCasinoTabId();
+    sessionStorage.setItem(TAB_ID_KEY, nextId);
+    fallbackCasinoTabId = nextId;
+    return nextId;
+  } catch {
+    fallbackCasinoTabId = createCasinoTabId();
+    return fallbackCasinoTabId;
+  }
 }
 
 export class CasinoApiError extends Error {
@@ -223,6 +253,7 @@ function buildAuthHeaders() {
   return {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
+    'X-Casino-Tab-Id': getCasinoTabId(),
   };
 }
 
@@ -743,4 +774,25 @@ export async function joinBlackjackRoom(roomId: string) {
 
 export async function joinPokerRoom(roomId: string) {
   return postCasinoAuthed<TableLobbyResponse>("/api/casino/poker/rooms/join", { roomId });
+}
+
+export async function leaveCasinoTableRoom(
+  game: "blackjack" | "poker",
+  roomId: string,
+  options: { keepalive?: boolean } = {},
+) {
+  const response = await fetch(getApiUrl("/api/casino/table-presence/leave"), {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    body: JSON.stringify({
+      game,
+      roomId,
+    }),
+    keepalive: options.keepalive === true,
+  });
+  const payload = (await readJsonSafe(response)) as { ok?: boolean; error?: string } | null;
+  if (!response.ok || !payload?.ok) {
+    throw new CasinoApiError(getErrorMessage(payload, "Sortie de table impossible"), { status: response.status });
+  }
+  return payload;
 }
