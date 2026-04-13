@@ -30,6 +30,8 @@ type PokerSidebarProps = {
   infoTab: "journal" | "lecture" | "salons" | "joueurs";
   isDecisionPhase: boolean;
   isSpectatingRound: boolean;
+  hasPendingSeat: boolean;
+  queuedForNextHand: boolean;
   roomSwitchLocked: boolean;
   ante: number;
   playerChips: number;
@@ -59,7 +61,7 @@ type PokerSidebarProps = {
 
 function getDecisionHeadline(state: PokerState | null) {
   if (!state) return "Selectionne une structure puis rejoins.";
-  if (state.stage === "waiting") return "En attente d'un second joueur";
+  if (state.stage === "waiting") return "Table en preparation";
   if (state.playerFolded) return "Main couchee";
   if (state.stage === "showdown") return "Pot resolu";
   if (state.legalActions.includes("call")) return `Defense a ${formatCredits(state.toCall)}`;
@@ -71,10 +73,10 @@ function getDecisionHeadline(state: PokerState | null) {
 
 function getDecisionCaption(state: PokerState | null) {
   if (!state) {
-    return "Le backend gere maintenant les vrais spots par street: check, call, bet, raise et fold avec sizing.";
+    return "Rejoins la table puis attends la prochaine main pour entrer proprement dans le coup.";
   }
   if (state.stage === "waiting") {
-    return state.message || "Le salon garde ta place jusqu'a l'arrivee d'un second joueur humain.";
+    return state.message || "Le salon prepare la prochaine donne et garde les places deja validees.";
   }
   if (state.stage === "showdown") {
     return state.message;
@@ -98,6 +100,8 @@ export default function PokerSidebar({
   infoTab,
   isDecisionPhase,
   isSpectatingRound,
+  hasPendingSeat,
+  queuedForNextHand,
   roomSwitchLocked,
   ante,
   playerChips,
@@ -125,17 +129,23 @@ export default function PokerSidebar({
   onJoin,
 }: PokerSidebarProps) {
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
-  const canJoin = isSpectatingRound || stage === "idle" || stage === "waiting" || stage === "showdown";
-  const waitingForTurn = !canJoin && !isDecisionPhase && !state?.playerFolded;
+  void hasPendingSeat;
+  const canJoin = !queuedForNextHand && (isSpectatingRound || stage === "idle" || stage === "waiting" || stage === "showdown");
+  const showJoinPanel = canJoin || queuedForNextHand;
+  const waitingForTurn = !showJoinPanel && !isDecisionPhase && !state?.playerFolded;
   const smallBlind = Math.max(10, Math.round(ante / 2));
-  const actionHeadline = isSpectatingRound
-    ? "Main externe en cours"
-    : waitingForTurn
+  const actionHeadline = queuedForNextHand
+    ? "Prochaine main"
+    : isSpectatingRound
+      ? "Main externe en cours"
+      : waitingForTurn
       ? "Tour adverse"
       : getDecisionHeadline(state);
-  const actionCaption = isSpectatingRound
-    ? "Ce salon diffuse une main deja lancee. Reste sur cette table pour attendre la prochaine phase de mise multi."
-    : waitingForTurn
+  const actionCaption = queuedForNextHand
+    ? "Ta place est reservee. Le backend t'ajoutera a la prochaine main de cette table."
+    : isSpectatingRound
+      ? "Ce salon diffuse une main deja lancee. Tu peux deja reserver ta place pour la prochaine donne."
+      : waitingForTurn
       ? (state?.message || "La main continue. Les actions se debloquent des que le tour revient sur toi.")
       : getDecisionCaption(state);
 
@@ -148,15 +158,17 @@ export default function PokerSidebar({
             <p>{actionCaption}</p>
           </div>
 
-          {canJoin ? (
+          {showJoinPanel ? (
             <>
               <div className="casino-command-dock__betline-meta casino-command-dock__betline-meta--poker">
                 <span>Blindes {formatCredits(smallBlind)} / {formatCredits(ante)}</span>
                 <span>
                   {isTableFull
                     ? "Table pleine"
-                    : stage === "waiting"
-                      ? "Place reservee"
+                    : queuedForNextHand
+                      ? "Inscrit"
+                      : stage === "waiting"
+                        ? "Table ouverte"
                       : isLiveMultiplayerReady
                         ? "Table prete"
                         : "1 joueur en attente"}
@@ -167,15 +179,15 @@ export default function PokerSidebar({
                   type="button"
                   className="casino-primary-button"
                   onClick={onJoin}
-                  disabled={working || profile.wallet.balance < ante || isTableFull}
+                  disabled={working || profile.wallet.balance < ante || isTableFull || queuedForNextHand}
                 >
-                  {isSpectatingRound ? "Attendre ici" : stage === "waiting" ? "Miser" : "Rejoindre"}
+                  {queuedForNextHand ? "Inscrit" : isSpectatingRound ? "Prochaine main" : "Rejoindre la table"}
                 </button>
               </div>
             </>
           ) : null}
 
-          {!canJoin && isDecisionPhase && (canBet || canRaise) ? (
+          {!showJoinPanel && isDecisionPhase && (canBet || canRaise) ? (
             <div className="casino-poker-betbox casino-poker-betbox--dock">
               <div className="casino-poker-betbox__header">
                 <div>
@@ -197,7 +209,7 @@ export default function PokerSidebar({
             </div>
           ) : null}
 
-          {!canJoin ? (
+          {!showJoinPanel ? (
             <div className="casino-command-dock__actions casino-command-dock__actions--poker-decision-row">
               <button
                 type="button"

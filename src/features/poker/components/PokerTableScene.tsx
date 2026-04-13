@@ -10,6 +10,7 @@ const POKER_SEAT_LAYOUT = [
   { x: "81%", y: "28%", align: "end", tag: "HD" },
   { x: "82%", y: "68%", align: "end", tag: "BD" },
 ] as const;
+const ABSENT_SEAT_TIMEOUT_MS = 5 * 60_000;
 
 function getPokerSeatLayout(count: number) {
   if (count <= 1) {
@@ -48,7 +49,7 @@ function isSeatAbsent(updatedAt: string | null, forcedAbsent = false) {
   if (!updatedAt) return false;
   const heartbeatAt = Date.parse(updatedAt);
   if (Number.isNaN(heartbeatAt)) return false;
-  return Date.now() - heartbeatAt > 95_000;
+  return Date.now() - heartbeatAt > ABSENT_SEAT_TIMEOUT_MS;
 }
 
 function normalizeSeatIdentity(value: string | null | undefined) {
@@ -99,7 +100,7 @@ function getParticipantStatus(
   absent: boolean,
   folded: boolean,
 ) {
-  if (absent) return "Hors tempo";
+  if (absent) return "Absent 5 min";
   if (seat?.isActive) return "Tour actif";
   if (folded) return "Fold";
   if (seat?.hand?.label) return seat.hand.label;
@@ -214,6 +215,7 @@ type PokerTableSceneProps = {
   currentUserId: string;
   playerName: string;
   isSpectatingRound: boolean;
+  queuedForNextHand: boolean;
   participants: Array<CasinoTableRoomParticipant & { isSelf: boolean }>;
   activeAnte: number;
   smallBlind: number;
@@ -229,6 +231,7 @@ export default function PokerTableScene({
   currentUserId,
   playerName,
   isSpectatingRound,
+  queuedForNextHand,
   participants,
   activeAnte,
   smallBlind,
@@ -246,7 +249,7 @@ export default function PokerTableScene({
   const heroCards = state?.playerCards?.length ? state.playerCards : selfSeat?.cards || [];
   const heroAbsent = Boolean(state?.playerFolded || selfSeat?.folded);
   const heroName = String(playerName || "Toi").trim();
-  const showHeroSeat = !isSpectatingRound || Boolean(selfSeat) || Boolean(heroCards.length);
+  const showHeroSeat = (!isSpectatingRound || Boolean(selfSeat) || Boolean(heroCards.length)) && !queuedForNextHand;
   const heroStatus =
     state?.playerFolded
       ? "Main couchee"
@@ -283,7 +286,7 @@ export default function PokerTableScene({
                 <span className="casino-oval-seat__tag">{layout.tag}</span>
                 <header>
                   <strong>{seatLabel}</strong>
-                  <span>{absent ? "Absent" : seat?.isActive ? "Tour actif" : "Connecte"}</span>
+                  <span>{absent ? "Absent 5m" : seat?.isActive ? "Tour actif" : "Connecte"}</span>
                 </header>
                 <div className="casino-seat-role-row" aria-label={`Roles de ${seatLabel}`}>
                   {seat?.lastAction && !seat.isActive ? (
@@ -296,7 +299,7 @@ export default function PokerTableScene({
                   ) : null}
                   {seat?.isActive ? <span className="casino-seat-role-chip casino-seat-role-chip--action">A jouer</span> : null}
                   {folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
-                  {absent && !folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Absent</span> : null}
+                  {absent && !folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Absent 5m</span> : null}
                 </div>
                 <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-peer">
                   {seatCards.length ? (

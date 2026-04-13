@@ -73,6 +73,22 @@ function isBlackjackSpectatorRound(state: BlackjackState | null, currentUserId: 
   return !hasBlackjackHeroRound(state, currentUserId, playerName);
 }
 
+function hasBlackjackPendingSeat(state: BlackjackState | null, currentUserId: string, playerName: string) {
+  const normalizedCurrentUserId = normalizeBlackjackIdentity(currentUserId);
+  const normalizedPlayerName = normalizeBlackjackIdentity(playerName);
+
+  return Boolean(
+    state?.pendingSeats?.some((seat) => {
+      const seatUserId = normalizeBlackjackIdentity(seat.userId);
+      const seatName = normalizeBlackjackIdentity(seat.username);
+      return Boolean(
+        (normalizedCurrentUserId && seatUserId === normalizedCurrentUserId)
+        || (normalizedPlayerName && seatName === normalizedPlayerName),
+      );
+    }),
+  );
+}
+
 function getNormalizedBlackjackHands(state: BlackjackState | null): BlackjackHand[] {
   if (!state) return [];
 
@@ -273,6 +289,8 @@ export default function BlackjackRoom({
   const lastDelta = state?.lastDelta || 0;
   const hasHeroRound = hasBlackjackHeroRound(state, profile.user.id, playerName);
   const isSpectatingRound = isBlackjackSpectatorRound(state, profile.user.id, playerName);
+  const hasPendingSeat = hasBlackjackPendingSeat(state, profile.user.id, playerName);
+  const isBettingPhase = stage === "waiting" || Boolean(state?.waitingForPlayers);
   const roomSwitchLocked = stage === "player-turn" && hasHeroRound;
   const betLocked = roomSwitchLocked || working;
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
@@ -289,7 +307,11 @@ export default function BlackjackRoom({
   const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "--:--";
   const blackjackStatusMessage = isSpectatingRound
     ? "Une manche est deja en cours sur ce salon."
-    : state?.message || "Table synchronisee par salon avec mise et resultat geres cote serveur.";
+    : hasPendingSeat && isBettingPhase
+      ? "Mise validee. La table attend les autres reponses ou la fin du chrono pour lancer la prochaine donne."
+      : isBettingPhase
+        ? state?.message || "Phase de mise ouverte: valide ta place avant la prochaine donne."
+        : state?.message || "Table synchronisee par salon avec mise et resultat geres cote serveur.";
 
   function applySyncedState(nextState: BlackjackState | null, syncedAt: number, nextDeadlineAt: number | null) {
     if (!nextState?.roomId) return;
@@ -700,9 +722,9 @@ export default function BlackjackRoom({
                 <div className="casino-topdeck__info-body" role="tabpanel">
                   {activeHeaderInfo === "table" ? (
                     <div className="casino-rule-list">
-                      <p>{autoLiveMode ? "La table bascule en multijoueur quand au moins un autre joueur est deja sur le salon ou le rejoint." : "La table reste en solo automatique tant que tu es seul sur le salon choisi."}</p>
+                      <p>{autoLiveMode ? "La table reste partagee avec les joueurs presents sur ce salon et lance la prochaine donne depuis la phase de mise." : "Le salon reste ouvert et attend les autres joueurs avant de lancer la prochaine donne."}</p>
                       <p>Le blackjack naturel paie plus fort et le reglement passe par le wallet A11.</p>
-                      <p>Le dock garde les commandes en haut et le salon se synchronise sans bouton solo/live.</p>
+                      <p>La phase de mise reste visible sur le front, avec places en attente et timer serveur.</p>
                     </div>
                   ) : null}
                   {activeHeaderInfo === "mise" ? (
@@ -727,10 +749,11 @@ export default function BlackjackRoom({
                   ) : null}
                   {activeHeaderInfo === "live" ? (
                     <div className="casino-rule-list">
-                      <p>Le salon passe en multijoueur a partir de 2 joueurs humains connectes sur la meme table.</p>
+                      <p>Le salon confirme les joueurs presents pendant la phase de mise avant d'envoyer la donne.</p>
                       <p>Le tour actif reste synchronise entre les joueurs du meme salon.</p>
                       <p>Table en cours: {activeRoom ? BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
                       <p>Joueurs presents: {Math.max(1, activePlayerCount)}</p>
+                      <p>Places deja validees: {state?.pendingSeats?.length || 0}</p>
                     </div>
                   ) : null}
                 </div>
@@ -786,7 +809,9 @@ export default function BlackjackRoom({
               rooms={rooms}
               infoTab={infoTab}
               isDecisionPhase={isDecisionPhase}
+              isBettingPhase={isBettingPhase}
               isSpectatingRound={isSpectatingRound}
+              hasPendingSeat={hasPendingSeat}
               roomSwitchLocked={roomSwitchLocked}
               legalActions={legalActions}
               onBetChipAdd={handleBetChipAdd}

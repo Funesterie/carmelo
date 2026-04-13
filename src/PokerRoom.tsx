@@ -30,7 +30,7 @@ const TABLE_DEAL_STEP_MS = 92;
 const LIVE_MIN_OPPONENTS = 1;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
 const POKER_MAX_PLAYERS = 6;
-const LIVE_PARTICIPANT_STALE_MS = 95_000;
+const LIVE_PARTICIPANT_STALE_MS = 5 * 60_000;
 
 type PokerAction = "check" | "call" | "bet" | "raise" | "fold";
 
@@ -264,6 +264,7 @@ export default function PokerRoom({
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
   const isSpectatingRound = isPokerSpectatorRound(state, profile.user.id, playerName);
+  const hasPendingSeat = hasPokerPendingSeat(state, profile.user.id, playerName);
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const tableParticipants = useMemo<Array<CasinoTableRoomParticipant & { isSelf: boolean }>>(() => {
     const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
@@ -302,6 +303,8 @@ export default function PokerRoom({
   const communityCards = state?.communityCards || [];
   const toCall = state?.toCall || 0;
   const isDecisionPhase = isPokerSelfTurn(state, profile.user.id, playerName);
+  const selfSeat = findPokerSelfSeat(state, profile.user.id, playerName);
+  const queuedForNextHand = Boolean(hasPendingSeat && !selfSeat && !(state?.playerCards?.length));
   const playerChips = state?.playerChips || 0;
   const playerCommitted = state?.playerCommitted || activeAnte;
   const playerStreetCommitted = state?.playerStreetCommitted || 0;
@@ -317,7 +320,7 @@ export default function PokerRoom({
   const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
   const isTurnClockStale = Boolean(turnDeadlineAt && nowTick - turnDeadlineAt > 6_000);
   const canSoftUnlockExpiredRound = Boolean(turnDeadlineAt && nowTick - turnDeadlineAt > 12_000);
-  const turnCountdownLabel = turnDeadlineAt ? (isTurnClockStale ? "Sync" : formatTurnClock(turnCountdownMs)) : "--:--";
+  const turnCountdownLabel = turnDeadlineAt ? (isTurnClockStale ? "Attente" : formatTurnClock(turnCountdownMs)) : "--:--";
   const turnTimerAriaLabel = turnDeadlineAt
     ? isTurnClockStale
       ? "Resynchronisation de la table poker"
@@ -568,6 +571,10 @@ export default function PokerRoom({
   }, [aggressionMax, aggressionMin, blindUnit, canBet, canRaise]);
 
   async function joinHand() {
+    if (queuedForNextHand) {
+      onError("Ta place est deja reservee pour la prochaine main sur cette table.");
+      return;
+    }
     if (isTableFull) {
       onError("La table est pleine: 6 joueurs maximum.");
       return;
@@ -709,9 +716,11 @@ export default function PokerRoom({
                 </div>
                 <strong>{pokerRoomMeta?.title || "Texas hold'em rapide"}</strong>
                 <p>
-                  {isSpectatingRound
-                    ? "Une main est deja en cours sur ce salon. Tu peux attendre la prochaine donne ou rejoindre un autre salon libre."
-                    : state?.message || "Table partagee par salon avec etat synchronise et actions gerees cote serveur."}
+                  {queuedForNextHand
+                    ? "Ta place est reservee sur ce salon. Tu entreras automatiquement sur la prochaine main disponible."
+                    : isSpectatingRound
+                      ? "Une main est deja en cours sur ce salon. Tu peux reserver la prochaine donne ou rejoindre un autre salon libre."
+                      : state?.message || "Table partagee par salon avec etat synchronise et actions gerees cote serveur."}
                   {" "}
                   {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
                 </p>
@@ -753,8 +762,8 @@ export default function PokerRoom({
                   {activeHeaderInfo === "structure" ? (
                     <div className="casino-rule-list">
                       <p>Texas hold'em 6-max uniquement, avec 5 places adverses visibles autour de toi et aucun bot affiche cote front.</p>
+                      <p>Tu rejoins d'abord la table, puis le backend t'ajoute a la prochaine main disponible.</p>
                       <p>Le backend gere les vraies decisions de check, call, bet, raise et fold, tour par tour.</p>
-                      <p>La phase de mise et chaque tour de parole utilisent maintenant un chrono serveur de 5 minutes.</p>
                     </div>
                   ) : null}
                   {activeHeaderInfo === "mises" ? (
@@ -779,9 +788,9 @@ export default function PokerRoom({
                   ) : null}
                   {activeHeaderInfo === "live" ? (
                     <div className="casino-rule-list">
-                      <p>Le salon doit compter au moins un autre joueur reel connecte pour rejoindre une main multijoueur.</p>
+                      <p>Le salon garde les joueurs inscrits pour la prochaine main au lieu de forcer une entree immediate dans le coup courant.</p>
                       <p>La table est limitee a 6 joueurs humains au total.</p>
-                      <p>Le tour actif reste synchronise entre les joueurs du meme salon et un timeout compte comme fold.</p>
+                      <p>Un joueur sans reponse pendant plus de 5 minutes est marque absent cote front.</p>
                       <p>Table en cours: {activeRoom ? POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
                       <p>Joueurs presents: {activePlayerCount}</p>
                       <p>Adversaires reels disponibles: {connectedOpponentCount}</p>
@@ -822,6 +831,7 @@ export default function PokerRoom({
               currentUserId={profile.user.id}
               playerName={playerName}
               isSpectatingRound={isSpectatingRound}
+              queuedForNextHand={queuedForNextHand}
               participants={tableParticipants}
               activeAnte={activeAnte}
               smallBlind={smallBlind}
@@ -841,6 +851,8 @@ export default function PokerRoom({
               infoTab={infoTab}
               isDecisionPhase={isDecisionPhase}
               isSpectatingRound={isSpectatingRound}
+              hasPendingSeat={hasPendingSeat}
+              queuedForNextHand={queuedForNextHand}
               roomSwitchLocked={roomSwitchLocked}
               ante={activeAnte}
               playerChips={playerChips}

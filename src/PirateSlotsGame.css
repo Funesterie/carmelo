@@ -19197,7 +19197,7 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
-    width: min(22vw, 84px) !important;
+    width: min(24vw, 96px) !important;
     min-height: auto !important;
     padding: 0 !important;
     gap: 4px !important;
@@ -19232,9 +19232,9 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card {
-    width: 28px !important;
-    min-height: 42px !important;
-    margin-left: -8px !important;
+    width: 32px !important;
+    min-height: 48px !important;
+    margin-left: -9px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card:first-child {
@@ -19242,8 +19242,8 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-card-row--dealer .pirate-card {
-    width: 34px !important;
-    min-height: 50px !important;
+    width: 38px !important;
+    min-height: 56px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-player {
@@ -19297,7 +19297,7 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
-    width: min(21vw, 78px) !important;
+    width: min(23vw, 90px) !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer {
@@ -19306,14 +19306,14 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card {
-    width: 26px !important;
-    min-height: 38px !important;
-    margin-left: -7px !important;
+    width: 30px !important;
+    min-height: 44px !important;
+    margin-left: -8px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--dealer .pirate-card {
-    width: 32px !important;
-    min-height: 48px !important;
+    width: 36px !important;
+    min-height: 52px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-player .pirate-card {

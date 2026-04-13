@@ -20,7 +20,9 @@ type BlackjackSidebarProps = {
   rooms: CasinoTableRoom[];
   infoTab: "salons" | "regles" | "joueurs";
   isDecisionPhase: boolean;
+  isBettingPhase: boolean;
   isSpectatingRound: boolean;
+  hasPendingSeat: boolean;
   roomSwitchLocked: boolean;
   legalActions: BlackjackAction[];
   onBetChipAdd: (bet: number) => void;
@@ -51,7 +53,9 @@ export default function BlackjackSidebar({
   rooms,
   infoTab,
   isDecisionPhase,
+  isBettingPhase,
   isSpectatingRound,
+  hasPendingSeat,
   roomSwitchLocked,
   legalActions,
   onBetChipAdd,
@@ -64,7 +68,8 @@ export default function BlackjackSidebar({
   onDeal,
 }: BlackjackSidebarProps) {
   const stage = state?.stage || "idle";
-  const canDeal = stage !== "player-turn" || isSpectatingRound;
+  const showBettingPhase = isBettingPhase || stage === "waiting";
+  const canDeal = (stage !== "player-turn" || isSpectatingRound) && !hasPendingSeat;
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const activeSeat = state?.activeSeatId
     ? (state.seats || []).find((seat) => String(seat.id || seat.userId || "").trim() === String(state.activeSeatId || "").trim()) || null
@@ -74,6 +79,13 @@ export default function BlackjackSidebar({
   const canStand = legalActions.includes("stand");
   const canDouble = legalActions.includes("double");
   const canSplit = legalActions.includes("split");
+  const primaryActionLabel = isSpectatingRound
+    ? "Prochaine manche"
+    : hasPendingSeat && showBettingPhase
+      ? "Mise validee"
+      : stage === "resolved"
+        ? "Rejouer"
+        : "Valider la mise";
   const selectedCounts = betChips.reduce<Record<number, number>>((accumulator, chip) => {
     accumulator[chip] = (accumulator[chip] || 0) + 1;
     return accumulator;
@@ -84,25 +96,29 @@ export default function BlackjackSidebar({
       <div className={`casino-command-dock casino-command-dock--blackjack ${isDecisionPhase ? "is-attention" : ""}`}>
         <div className="casino-command-dock__copy">
           <span className="casino-chip">
-            {isDecisionPhase ? "Decision" : stage === "player-turn" ? "Tour en cours" : "Distribution"}
+            {isDecisionPhase ? "Decision" : showBettingPhase ? "Phase de mise" : stage === "player-turn" ? "Tour en cours" : "Table"}
           </span>
           <strong>
             {isDecisionPhase
               ? `Main a ${state?.playerScore.total || 0} points`
-              : stage === "player-turn"
-                ? `Tour de ${activeSeatName}`
-                : state?.waitingForPlayers
-                  ? "En attente de joueurs"
-                  : "Commandes de table"}
+              : hasPendingSeat && showBettingPhase
+                ? "Mise enregistree"
+                : showBettingPhase
+                  ? "Valide ta place"
+                : stage === "player-turn"
+                  ? `Tour de ${activeSeatName}`
+                    : "Commandes de table"}
           </strong>
           <p>
             {isDecisionPhase
               ? "Concentre-toi sur ta main, la carte visible du croupier et les vraies options de blackjack ouvertes pour cette combinaison."
-              : stage === "player-turn"
-                ? "La table reste synchronisee pendant la main en cours, sans melanger le croupier avec les places joueurs."
-                : state?.waitingForPlayers
-                  ? "Le salon reste synchro et garde les places en attente jusqu'a ce qu'une vraie main puisse partir."
-                  : "Le salon garde la meme table et se synchronise selon les joueurs presents."}
+              : hasPendingSeat && showBettingPhase
+                ? "Ta mise est deja posee. La table attend les autres confirmations ou la fin du timer serveur."
+                : showBettingPhase
+                  ? "Valide ta mise pour entrer dans la prochaine donne. Le timer de table garde la phase ouverte pour tous les joueurs presents."
+                : stage === "player-turn"
+                  ? "La table reste synchronisee pendant la main en cours, sans melanger le croupier avec les places joueurs."
+                    : "Le salon garde la meme table et se synchronise selon les joueurs presents."}
           </p>
         </div>
 
@@ -113,7 +129,7 @@ export default function BlackjackSidebar({
             onClick={onDeal}
             disabled={!canDeal || working || !bet || profile.wallet.balance < bet}
           >
-            Defier
+            {primaryActionLabel}
           </button>
           <button
             type="button"

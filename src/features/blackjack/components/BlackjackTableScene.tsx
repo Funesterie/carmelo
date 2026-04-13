@@ -229,9 +229,7 @@ function getRemoteBlackjackBindings(
     waiting: false,
   }));
 
-  return [...participantBindings, ...orphanSeats]
-    .filter(({ seat }) => Boolean(seat))
-    .slice(0, BLACKJACK_REMOTE_LAYOUT.length);
+  return [...participantBindings, ...orphanSeats].slice(0, BLACKJACK_REMOTE_LAYOUT.length);
 }
 
 export default function BlackjackTableScene({
@@ -316,7 +314,7 @@ export default function BlackjackTableScene({
           const seatCards = seat?.cards || [];
           const seatName = seat?.name || seat?.username || label;
           const seatStatus = waiting
-            ? "En attente"
+            ? "En attente de mise"
             : seat?.isActive
               ? "A jouer"
               : seat?.result
@@ -339,7 +337,7 @@ export default function BlackjackTableScene({
               <span className="casino-oval-seat__tag">{layout.tag}</span>
               <header>
                 <strong>{seatName}</strong>
-                <span>{waiting ? "Connecte" : seat?.isActive ? "Tour actif" : "Table"}</span>
+                <span>{waiting ? "En attente" : seat?.isActive ? "Tour actif" : "Table"}</span>
               </header>
               <div className="casino-seat-role-row" aria-label={`Informations de ${seatName}`}>
                 {typeof seat?.wager === "number" && seat.wager > 0 ? (
@@ -361,8 +359,8 @@ export default function BlackjackTableScene({
                   ))
                 ) : (
                   <div className="casino-empty-seat casino-empty-seat--blackjack-peer">
-                    <strong>{waiting ? "Pret a rejoindre" : "Main vide"}</strong>
-                    <span>{waiting ? "La table attend la prochaine donne." : "Les cartes apparaitront des que la donne commencera."}</span>
+                    <strong>{waiting ? "Mise en attente" : "Main vide"}</strong>
+                    <span>{waiting ? "La table garde cette place jusqu'au lancement de la prochaine donne." : "Les cartes apparaitront des que la donne commencera."}</span>
                   </div>
                 )}
               </div>
@@ -466,7 +464,7 @@ export default function BlackjackTableScene({
               ) : (
                 <div className="casino-blackjack-player-banner" aria-live="polite">
                   <strong>{playerSeatName}</strong>
-                  <span>Pose ta mise pour entrer dans la prochaine manche.</span>
+                  <span>Valide ta mise pour entrer dans la prochaine donne.</span>
                 </div>
               )}
             </div>
