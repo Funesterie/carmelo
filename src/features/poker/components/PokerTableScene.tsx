@@ -10,7 +10,7 @@ const POKER_SEAT_LAYOUT = [
   { x: "81%", y: "28%", align: "end", tag: "HD" },
   { x: "82%", y: "68%", align: "end", tag: "BD" },
 ] as const;
-const ABSENT_SEAT_TIMEOUT_MS = 5 * 60_000;
+const DEFAULT_ABSENT_SEAT_TIMEOUT_MS = 75_000;
 
 function getPokerSeatLayout(count: number) {
   if (count <= 1) {
@@ -44,12 +44,12 @@ function getPokerSeatLayout(count: number) {
   return POKER_SEAT_LAYOUT;
 }
 
-function isSeatAbsent(updatedAt: string | null, forcedAbsent = false) {
+function isSeatAbsent(updatedAt: string | null, presenceWindowMs: number, forcedAbsent = false) {
   if (forcedAbsent) return true;
   if (!updatedAt) return false;
   const heartbeatAt = Date.parse(updatedAt);
   if (Number.isNaN(heartbeatAt)) return false;
-  return Date.now() - heartbeatAt > ABSENT_SEAT_TIMEOUT_MS;
+  return Date.now() - heartbeatAt > Math.max(10_000, Number(presenceWindowMs) || DEFAULT_ABSENT_SEAT_TIMEOUT_MS);
 }
 
 function normalizeSeatIdentity(value: string | null | undefined) {
@@ -121,7 +121,7 @@ function getParticipantStatus(
   folded: boolean,
 ) {
   if (pending) return "Inscrit prochaine main";
-  if (absent) return "Absent 5 min";
+  if (absent) return "Absent";
   if (seat?.isActive) return "Tour actif";
   if (folded) return "Fold";
   if (seat?.hand?.label) return seat.hand.label;
@@ -161,6 +161,7 @@ function getRemotePokerBindings(
   participants: Array<CasinoTableRoomParticipant & { isSelf: boolean }>,
   currentUserId: string,
   playerName: string,
+  presenceWindowMs: number,
 ) {
   const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
   const normalizedSelfSeatId = normalizeSeatIdentity(selfSeat?.id || selfSeat?.userId);
@@ -202,7 +203,7 @@ function getRemotePokerBindings(
         seats.splice(usedIndex, 1);
       }
     }
-    const absent = Boolean(seat?.isAbsent) || isSeatAbsent(participant?.updatedAt || null);
+    const absent = Boolean(seat?.isAbsent) || isSeatAbsent(participant?.updatedAt || null, presenceWindowMs);
     return {
       key: participant.userId || participant.username,
       label: participant.username,
@@ -251,6 +252,7 @@ type PokerTableSceneProps = {
   potTotal: number;
   isDecisionPhase: boolean;
   dealtCardDelays: Record<string, number>;
+  presenceWindowMs: number;
   removingAbsentUserId: string | null;
   onRemoveAbsent: (userId: string) => void;
 };
@@ -269,6 +271,7 @@ export default function PokerTableScene({
   potTotal,
   isDecisionPhase,
   dealtCardDelays,
+  presenceWindowMs,
   removingAbsentUserId,
   onRemoveAbsent,
 }: PokerTableSceneProps) {
@@ -276,7 +279,7 @@ export default function PokerTableScene({
   void smallBlind;
   const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
   const communityCards = stage === "waiting" ? [] : state?.communityCards || [];
-  const remoteBindings = getRemotePokerBindings(state, participants, currentUserId, playerName);
+  const remoteBindings = getRemotePokerBindings(state, participants, currentUserId, playerName, presenceWindowMs);
   const remoteSeatLayout = getPokerSeatLayout(remoteBindings.length);
   const heroCards = state?.playerCards?.length ? state.playerCards : selfSeat?.cards || [];
   const heroAbsent = Boolean(state?.playerFolded || selfSeat?.folded);
@@ -322,7 +325,7 @@ export default function PokerTableScene({
                 <span className="casino-oval-seat__tag">{layout.tag}</span>
                 <header>
                   <strong>{seatLabel}</strong>
-                  <span>{absent ? "Absent 5m" : pending ? "Inscrit" : seat?.isActive ? "Tour actif" : "Connecte"}</span>
+                  <span>{absent ? "Absent" : pending ? "Inscrit" : seat?.isActive ? "Tour actif" : "Connecte"}</span>
                 </header>
                 <div className="casino-seat-role-row" aria-label={`Roles de ${seatLabel}`}>
                   {seat?.lastAction && !seat.isActive ? (
@@ -340,7 +343,7 @@ export default function PokerTableScene({
                   ) : null}
                   {seat?.isActive ? <span className="casino-seat-role-chip casino-seat-role-chip--action">A jouer</span> : null}
                   {folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
-                  {absent && !folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Absent 5m</span> : null}
+                  {absent && !folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Absent</span> : null}
                   {canRemoveAbsent ? (
                     <button
                       type="button"

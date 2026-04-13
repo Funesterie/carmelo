@@ -395,6 +395,7 @@ export type BlackjackState = {
   stage: "waiting" | "player-turn" | "resolved";
   waitingForPlayers?: boolean;
   roomActive?: boolean;
+  presenceWindowMs?: number;
   roundId?: number;
   bettingClosesAt?: string | null;
   turnDeadlineAt?: string | null;
@@ -462,6 +463,7 @@ export type PokerState = {
   stage: "waiting" | "preflop" | "flop" | "turn" | "river" | "showdown";
   stageLabel: string;
   waitingForPlayers?: boolean;
+  presenceWindowMs?: number;
   handId?: number;
   bettingClosesAt?: string | null;
   turnDeadlineAt?: string | null;

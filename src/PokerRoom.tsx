@@ -31,7 +31,7 @@ const TABLE_DEAL_STEP_MS = 92;
 const LIVE_MIN_OPPONENTS = 1;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
 const POKER_MAX_PLAYERS = 6;
-const LIVE_PARTICIPANT_STALE_MS = 5 * 60_000;
+const DEFAULT_POKER_PRESENCE_WINDOW_MS = 75_000;
 
 type PokerAction = "check" | "call" | "bet" | "raise" | "fold";
 
@@ -223,11 +223,11 @@ function isPokerParticipantSelf(
   );
 }
 
-function isParticipantFresh(updatedAt: string | null) {
+function isParticipantFresh(updatedAt: string | null, presenceWindowMs: number) {
   if (!updatedAt) return true;
   const heartbeatAt = Date.parse(updatedAt);
   if (Number.isNaN(heartbeatAt)) return true;
-  return Date.now() - heartbeatAt <= LIVE_PARTICIPANT_STALE_MS;
+  return Date.now() - heartbeatAt <= Math.max(10_000, Number(presenceWindowMs) || DEFAULT_POKER_PRESENCE_WINDOW_MS);
 }
 
 export default function PokerRoom({
@@ -270,6 +270,7 @@ export default function PokerRoom({
   const isSpectatingRound = isPokerSpectatorRound(state, profile.user.id, playerName);
   const hasPendingSeat = hasPokerPendingSeat(state, profile.user.id, playerName);
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const presenceWindowMs = Math.max(10_000, Number(state?.presenceWindowMs || 0) || DEFAULT_POKER_PRESENCE_WINDOW_MS);
   const tableParticipants = useMemo<Array<CasinoTableRoomParticipant & { isSelf: boolean }>>(() => {
     const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
 
@@ -297,7 +298,7 @@ export default function PokerRoom({
   }, [activeRoom?.participants, playerName, profile.user.id, profile.user.username]);
   const activePlayerCount = activeRoom?.playerCount || tableParticipants.length;
   const connectedOpponentCount = tableParticipants.filter(
-    (participant) => !participant.isSelf && isParticipantFresh(participant.updatedAt),
+    (participant) => !participant.isSelf && isParticipantFresh(participant.updatedAt, presenceWindowMs),
   ).length;
   const isLiveMultiplayerReady = connectedOpponentCount >= LIVE_MIN_OPPONENTS;
   const isTableFull = Boolean(activeRoom && activePlayerCount >= POKER_MAX_PLAYERS && !activeRoom.hasSelf);
@@ -817,7 +818,7 @@ export default function PokerRoom({
                     <div className="casino-rule-list">
                       <p>Le salon garde les joueurs inscrits pour la prochaine main au lieu de forcer une entree immediate dans le coup courant.</p>
                       <p>La table est limitee a 6 joueurs humains au total.</p>
-                      <p>Un joueur sans reponse pendant plus de 5 minutes passe absent cote serveur et peut etre retire depuis la table.</p>
+                      <p>Un joueur sans heartbeat recent passe absent cote serveur et ne doit plus bloquer la main.</p>
                       <p>Table en cours: {activeRoom ? POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
                       <p>Joueurs presents: {activePlayerCount}</p>
                       <p>Adversaires reels disponibles: {connectedOpponentCount}</p>
@@ -866,6 +867,7 @@ export default function PokerRoom({
               potTotal={state?.pot || 0}
               isDecisionPhase={isDecisionPhase}
               dealtCardDelays={dealtCardDelays}
+              presenceWindowMs={presenceWindowMs}
               removingAbsentUserId={removingAbsentUserId}
               onRemoveAbsent={(userId) => void handleRemoveAbsent(userId)}
             />
