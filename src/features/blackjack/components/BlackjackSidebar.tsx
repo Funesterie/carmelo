@@ -25,6 +25,7 @@ type BlackjackSidebarProps = {
   hasPendingSeat: boolean;
   roomSwitchLocked: boolean;
   legalActions: BlackjackAction[];
+  actionsLocked: boolean;
   onBetChipAdd: (bet: number) => void;
   onInfoTabChange: (tab: "salons" | "regles" | "joueurs") => void;
   onRoomChange: (roomId: string) => void;
@@ -58,6 +59,7 @@ export default function BlackjackSidebar({
   hasPendingSeat,
   roomSwitchLocked,
   legalActions,
+  actionsLocked,
   onBetChipAdd,
   onInfoTabChange,
   onRoomChange,
@@ -135,7 +137,7 @@ export default function BlackjackSidebar({
             type="button"
             className="casino-ghost-button casino-ghost-button--danger"
             onClick={onHit}
-            disabled={stage !== "player-turn" || working || !canHit}
+            disabled={stage !== "player-turn" || working || actionsLocked || !canHit}
           >
             Tirer
           </button>
@@ -143,7 +145,7 @@ export default function BlackjackSidebar({
             type="button"
             className="casino-ghost-button casino-ghost-button--steady"
             onClick={onStand}
-            disabled={stage !== "player-turn" || working || !canStand}
+            disabled={stage !== "player-turn" || working || actionsLocked || !canStand}
           >
             Rester
           </button>
@@ -151,7 +153,7 @@ export default function BlackjackSidebar({
             type="button"
             className="casino-ghost-button"
             onClick={onDouble}
-            disabled={stage !== "player-turn" || working || !canDouble}
+            disabled={stage !== "player-turn" || working || actionsLocked || !canDouble}
           >
             Doubler
           </button>
@@ -159,7 +161,7 @@ export default function BlackjackSidebar({
             type="button"
             className="casino-ghost-button"
             onClick={onSplit}
-            disabled={stage !== "player-turn" || working || !canSplit}
+            disabled={stage !== "player-turn" || working || actionsLocked || !canSplit}
           >
             Split
           </button>

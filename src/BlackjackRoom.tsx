@@ -282,6 +282,7 @@ export default function BlackjackRoom({
   const skipNextSyncPublishRef = useRef(false);
   const lastTurnSignatureRef = useRef("");
   const lastTimedOutSignatureRef = useRef("");
+  const lastExpiredSyncSignatureRef = useRef("");
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
   const bet = useMemo(() => betChips.reduce((total, chip) => total + chip, 0), [betChips]);
 
@@ -304,7 +305,8 @@ export default function BlackjackRoom({
     [playerName, profile.user.id, profile.wallet.balance, state],
   );
   const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
-  const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "--:--";
+  const isTurnClockExpired = Boolean(turnDeadlineAt && turnDeadlineAt <= nowTick);
+  const turnCountdownLabel = turnDeadlineAt ? (isTurnClockExpired ? "Attente" : formatTurnClock(turnCountdownMs)) : "--:--";
   const blackjackStatusMessage = isSpectatingRound
     ? "Une manche est deja en cours sur ce salon."
     : hasPendingSeat && isBettingPhase
@@ -322,6 +324,26 @@ export default function BlackjackRoom({
     setTurnDeadlineAt(nextDeadlineAt);
   }
 
+  async function refreshSharedBlackjackState(silent = false) {
+    try {
+      const sharedState = await fetchBlackjackRoomState(roomId);
+      if (!sharedState) return null;
+      if (
+        hasBlackjackHeroRound(state, profile.user.id, playerName)
+        && !hasBlackjackHeroRound(sharedState, profile.user.id, playerName)
+      ) {
+        return sharedState;
+      }
+      applySyncedState(sharedState, Date.now(), getBlackjackPhaseDeadlineAt(sharedState));
+      return sharedState;
+    } catch (error_) {
+      if (!silent) {
+        onError(error_ instanceof Error ? error_.message : "La table blackjack ne repond pas.");
+      }
+      return null;
+    }
+  }
+
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setNowTick(Date.now());
@@ -337,8 +359,15 @@ export default function BlackjackRoom({
     skipNextSyncPublishRef.current = false;
     lastTurnSignatureRef.current = "";
     lastTimedOutSignatureRef.current = "";
+    lastExpiredSyncSignatureRef.current = "";
     setTurnDeadlineAt(null);
   }, [roomId]);
+
+  useEffect(() => {
+    if (!turnDeadlineAt || turnDeadlineAt > nowTick) {
+      lastExpiredSyncSignatureRef.current = "";
+    }
+  }, [nowTick, roomId, turnDeadlineAt]);
 
   useEffect(() => {
     writeSyncedTableSelection("blackjack", roomId);
@@ -449,6 +478,45 @@ export default function BlackjackRoom({
   useEffect(() => {
     if (
       !currentRoundIsLive
+      || stage !== "player-turn"
+      || !state?.token
+      || !turnDeadlineAt
+      || turnDeadlineAt > nowTick
+      || working
+    ) {
+      return;
+    }
+
+    const signature = buildBlackjackSyncSignature(state, profile.user.id, playerName);
+    if (!signature || lastExpiredSyncSignatureRef.current === signature) return;
+
+    lastExpiredSyncSignatureRef.current = signature;
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const sharedState = await fetchBlackjackRoomState(roomId);
+        if (cancelled || !sharedState) return;
+        if (
+          hasBlackjackHeroRound(state, profile.user.id, playerName)
+          && !hasBlackjackHeroRound(sharedState, profile.user.id, playerName)
+        ) {
+          return;
+        }
+        applySyncedState(sharedState, Date.now(), getBlackjackPhaseDeadlineAt(sharedState));
+      } catch {
+        // The standard poll will keep retrying; this just speeds up recovery after an expired timer.
+      }
+    }, 900);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [currentRoundIsLive, nowTick, playerName, profile.user.id, roomId, stage, state, turnDeadlineAt, working]);
+
+  useEffect(() => {
+    if (
+      !currentRoundIsLive
       || !state?.token
       || stage !== "player-turn"
       || !turnDeadlineAt
@@ -462,8 +530,7 @@ export default function BlackjackRoom({
     if (!signature || turnDeadlineAt > nowTick || lastTimedOutSignatureRef.current === signature) return;
 
     lastTimedOutSignatureRef.current = signature;
-    onError("Temps ecoule: la table passe automatiquement sur Rester.");
-    void act("stand");
+    onError("Temps ecoule: la table se resynchronise.");
   }, [currentRoundIsLive, nowTick, onError, playerName, profile.user.id, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
@@ -576,6 +643,16 @@ export default function BlackjackRoom({
 
   async function act(action: BlackjackAction) {
     if (!state?.token || stage !== "player-turn" || working) return;
+    if (turnDeadlineAt && turnDeadlineAt <= Date.now()) {
+      onError("Le chrono vient d'expirer. Synchronisation de la table...");
+      setWorking(true);
+      try {
+        await refreshSharedBlackjackState(true);
+      } finally {
+        setWorking(false);
+      }
+      return;
+    }
     onError("");
     if (action === "hit" || action === "double" || action === "split") {
       playCheck();
@@ -592,8 +669,16 @@ export default function BlackjackRoom({
         onProfileChange(result.profile);
       }
     } catch (error_) {
-      if (error_ instanceof Error && error_.message.trim().toLowerCase() === "invalid_action") {
+      const normalizedError = error_ instanceof Error ? error_.message.trim().toLowerCase() : "";
+      if (normalizedError === "invalid_action") {
         onError("Cette action n'est pas autorisee pour la main active. Verifie les regles de double ou de split sur ce tour.");
+      } else if (normalizedError === "not_your_turn" || normalizedError === "invalid_round_token") {
+        onError(
+          normalizedError === "not_your_turn"
+            ? "Le tour a deja avance. La table se resynchronise."
+            : "La manche a deja evolue. Synchronisation en cours.",
+        );
+        await refreshSharedBlackjackState(true);
       } else {
         onError(error_ instanceof Error ? error_.message : "La table n'a pas accepte cette action.");
       }
@@ -814,6 +899,7 @@ export default function BlackjackRoom({
               hasPendingSeat={hasPendingSeat}
               roomSwitchLocked={roomSwitchLocked}
               legalActions={legalActions}
+              actionsLocked={isTurnClockExpired}
               onBetChipAdd={handleBetChipAdd}
               onInfoTabChange={setInfoTab}
               onRoomChange={handleRoomChange}

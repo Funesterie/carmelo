@@ -130,8 +130,8 @@ export default function CasinoGameScreen({
   void mediaReady;
   const showHeaderAmbient = true;
   const usesDedicatedAmbient = activeCasinoRoom === "slots" || activeCasinoRoom === "roulette";
-  const showSharedAmbientVideo = !usesDedicatedAmbient;
-  const showDedicatedAmbientPanel = usesDedicatedAmbient && Boolean(ambientPanel);
+  const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient;
+  const showDedicatedAmbientPanel = !showImmersion && usesDedicatedAmbient && Boolean(ambientPanel);
 
   const headerVideoSrc = freshVideo;
 
@@ -230,7 +230,7 @@ export default function CasinoGameScreen({
                 loop
                 playsInline
                 muted={!ambientVideoAudible}
-                preload="metadata"
+                preload="none"
               />
             ) : showDedicatedAmbientPanel ? (
               ambientPanel

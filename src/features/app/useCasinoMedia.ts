@@ -95,7 +95,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     ambientVideoRef,
   }), [ambientVideoAudible, immersionLine, mediaReady, showImmersion, slotsIntroDelayActive]);
 
-  const shouldPlayHeaderVideo = profileLoaded;
+  const shouldPlayHeaderVideo = profileLoaded && !showImmersion;
 
   useEffect(() => {
     return () => {
@@ -151,21 +151,10 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       return;
     }
 
-    const ambient = getAudio(rouletteAmbientAudioRef, sharedAmbientMedia);
-    ambient.loop = true;
-    ambient.volume = 0.14;
-    ambient.muted = false;
-    void ambient.play().catch(() => undefined);
-
     if (!rouletteEntryPlayedRef.current) {
       rouletteEntryPlayedRef.current = true;
       queueRouletteAudio(async () => {
-        const previousAmbientVolume = ambient.volume;
-        pauseMedia(ambient);
-        ambient.volume = 0.02;
         await playAudioClip(cueAudioRef, entryAudio, 0.84, true);
-        ambient.volume = previousAmbientVolume;
-        void ambient.play().catch(() => undefined);
       });
     }
   }, [activeCasinoRoom, profileLoaded, mediaReady]);
@@ -312,13 +301,6 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       await syncAmbientVideo(mediaUnlockedRef.current, shouldPlayHeaderVideo);
     }
 
-    if (mediaUnlockedRef.current && profileLoaded && activeCasinoRoom === "roulette") {
-      const ambient = getAudio(rouletteAmbientAudioRef, sharedAmbientMedia);
-      ambient.loop = true;
-      ambient.volume = 0.14;
-      ambient.muted = false;
-      void ambient.play().catch(() => undefined);
-    }
   }
 
   async function startConnectionImmersion(playerName: string) {
@@ -326,7 +308,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     setSlotsIntroDelayActive(false);
     setImmersionLine(`Pont prive en preparation pour ${playerName || "le capitaine"}...`);
     setShowImmersion(true);
-    await syncAmbientVideo(mediaUnlockedRef.current, shouldPlayHeaderVideo);
+    await syncAmbientVideo(false, false);
     if (mediaUnlockedRef.current && !immersionAudioPlayedRef.current) {
       const didPlay = await playAudioClip(introAudioRef, funesterieAudio, 0.56);
       if (didPlay) {
