@@ -258,12 +258,12 @@ export default function PokerRoom({
   const skipNextSyncPublishRef = useRef(false);
   const lastTurnSignatureRef = useRef("");
   const lastTimedOutSignatureRef = useRef("");
+  const lastExpiredSyncSignatureRef = useRef("");
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
   const isSpectatingRound = isPokerSpectatorRound(state, profile.user.id, playerName);
-  const roomSwitchLocked = !isSpectatingRound && !(stage === "idle" || stage === "waiting" || stage === "showdown");
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const tableParticipants = useMemo<Array<CasinoTableRoomParticipant & { isSelf: boolean }>>(() => {
     const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
@@ -315,7 +315,15 @@ export default function PokerRoom({
   const normalizedBetTarget =
     canBet || canRaise ? normalizeAggressionTarget(betTarget || aggressionMin, aggressionMin, aggressionMax, blindUnit) : 0;
   const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
-  const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "--:--";
+  const isTurnClockStale = Boolean(turnDeadlineAt && nowTick - turnDeadlineAt > 6_000);
+  const canSoftUnlockExpiredRound = Boolean(turnDeadlineAt && nowTick - turnDeadlineAt > 12_000);
+  const turnCountdownLabel = turnDeadlineAt ? (isTurnClockStale ? "Sync" : formatTurnClock(turnCountdownMs)) : "--:--";
+  const turnTimerAriaLabel = turnDeadlineAt
+    ? isTurnClockStale
+      ? "Resynchronisation de la table poker"
+      : `${stage === "waiting" ? "Fin de mise" : "Temps restant"} ${turnCountdownLabel}`
+    : "Timer de table en attente";
+  const roomSwitchLocked = !isSpectatingRound && !canSoftUnlockExpiredRound && !(stage === "idle" || stage === "waiting" || stage === "showdown");
 
   function applySyncedState(nextState: PokerState | null, syncedAt: number, nextDeadlineAt: number | null) {
     if (!nextState) return;
@@ -341,8 +349,15 @@ export default function PokerRoom({
     skipNextSyncPublishRef.current = false;
     lastTurnSignatureRef.current = "";
     lastTimedOutSignatureRef.current = "";
+    lastExpiredSyncSignatureRef.current = "";
     setTurnDeadlineAt(null);
   }, [roomId]);
+
+  useEffect(() => {
+    if (!turnDeadlineAt || turnDeadlineAt > nowTick) {
+      lastExpiredSyncSignatureRef.current = "";
+    }
+  }, [nowTick, roomId, turnDeadlineAt]);
 
   useEffect(() => {
     writeSyncedTableSelection("poker", roomId);
@@ -443,6 +458,38 @@ export default function PokerRoom({
       state,
     });
   }, [playerName, profile.user.id, roomId, state, turnDeadlineAt]);
+
+  useEffect(() => {
+    if (!state?.token || !turnDeadlineAt || turnDeadlineAt > nowTick || working) {
+      return;
+    }
+
+    const signature = buildPokerSyncSignature(state, profile.user.id, playerName);
+    if (!signature || lastExpiredSyncSignatureRef.current === signature) return;
+
+    lastExpiredSyncSignatureRef.current = signature;
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const sharedState = await fetchPokerRoomState(roomId);
+        if (cancelled || !sharedState) return;
+        if (
+          hasPokerHeroRound(state, profile.user.id, playerName)
+          && !hasPokerHeroRound(sharedState, profile.user.id, playerName)
+        ) {
+          return;
+        }
+        applySyncedState(sharedState, Date.now(), getPokerPhaseDeadlineAt(sharedState));
+      } catch {
+        // The standard room poll will keep retrying; this just speeds up recovery after an expired timer.
+      }
+    }, 900);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [nowTick, playerName, profile.user.id, roomId, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     if (
@@ -654,7 +701,7 @@ export default function PokerRoom({
                     </button>
                     <span
                       className={`casino-poker-turn-timer ${turnDeadlineAt ? "is-live" : ""} ${turnCountdownMs <= 10_000 && turnDeadlineAt ? "is-warning" : ""}`}
-                      aria-label={turnDeadlineAt ? `${stage === "waiting" ? "Fin de mise" : "Temps restant"} ${turnCountdownLabel}` : "Timer de table en attente"}
+                      aria-label={turnTimerAriaLabel}
                     >
                       {turnDeadlineAt ? turnCountdownLabel : "Timer --:--"}
                     </span>

@@ -366,6 +366,10 @@ export default function BlackjackTableScene({
                   </div>
                 )}
               </div>
+              <div className="casino-blackjack-peer-caption" aria-label={`Main de ${seatName}`}>
+                <strong>{seatName}</strong>
+                <span>{seatStatus}</span>
+              </div>
               <small>{seatStatus}</small>
             </article>
           );
