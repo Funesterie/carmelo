@@ -18414,6 +18414,21 @@ button {
   color: #ffd5cf;
 }
 
+.casino-seat-role-chip--clickable {
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.casino-seat-role-chip--clickable:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.casino-seat-role-chip--clickable:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .casino-seat-role-chip--stake {
   background: rgba(255, 200, 87, 0.16);
   border-color: rgba(255, 200, 87, 0.28);

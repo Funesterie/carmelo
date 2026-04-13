@@ -9,6 +9,7 @@ import {
   actPokerRound,
   fetchPokerRoomState,
   joinPokerRoom,
+  removeAbsentPokerSeat,
   startPokerRound,
   type CasinoTableRoom,
   type CasinoTableRoomParticipant,
@@ -152,6 +153,7 @@ function buildPokerSyncSignature(state: PokerState | null, currentUserId: string
     token: state.token,
     roomId: state.roomId || null,
     stage: state.stage,
+    bettingClosesAt: state.bettingClosesAt || null,
     selfSeatId: state.selfSeatId || null,
     activeSeatId: state.activeSeatId || null,
     pot: state.pot,
@@ -169,8 +171,9 @@ function buildPokerSyncSignature(state: PokerState | null, currentUserId: string
       committed: seat.totalCommitted || 0,
       cards: seat.cards.map((card) => card.id),
       winner: seat.isWinner,
+      absent: Boolean(seat.isAbsent),
     })),
-    pendingSeats: (state.pendingSeats || []).map((seat) => `${seat.userId}:${seat.username}`),
+    pendingSeats: (state.pendingSeats || []).map((seat) => `${seat.userId}:${seat.username}:${seat.ante}:${seat.readyAt || ""}`),
     legalActions: state.legalActions,
     isSpectating: isPokerSpectatorRound(state, currentUserId, playerName),
     actionLogSize: state.actionLog.length,
@@ -246,6 +249,7 @@ export default function PokerRoom({
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const [betTarget, setBetTarget] = useState(0);
   const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
+  const [removingAbsentUserId, setRemovingAbsentUserId] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const displayState = useMemo<PokerState | null>(() => {
     if (!state) return null;
@@ -571,6 +575,7 @@ export default function PokerRoom({
   }, [aggressionMax, aggressionMin, blindUnit, canBet, canRaise]);
 
   async function joinHand() {
+    if (removingAbsentUserId) return;
     if (queuedForNextHand) {
       onError("Ta place est deja reservee pour la prochaine main sur cette table.");
       return;
@@ -608,7 +613,7 @@ export default function PokerRoom({
   }
 
   async function act(action: PokerAction, amount?: number) {
-    if (!state?.token || !isActivePokerHandStage(stage) || working) return;
+    if (!state?.token || !isActivePokerHandStage(stage) || working || removingAbsentUserId) return;
     if (!isPokerSelfTurn(state, profile.user.id, playerName)) {
       onError("Ce n'est pas ton tour.");
       return;
@@ -657,12 +662,34 @@ export default function PokerRoom({
     await act("fold");
   }
 
+  async function handleRemoveAbsent(userId: string) {
+    const normalizedTargetId = normalizeIdentity(userId);
+    if (!normalizedTargetId || working || removingAbsentUserId === normalizedTargetId) return;
+    onError("");
+    setRemovingAbsentUserId(normalizedTargetId);
+    try {
+      const result = await removeAbsentPokerSeat(roomId, userId);
+      setState(result.state);
+      if (result.rooms) {
+        setRooms(result.rooms);
+      }
+      if (result.profile) {
+        onProfileChange(result.profile);
+      }
+    } catch (error_) {
+      onError(error_ instanceof Error ? error_.message : "Impossible de retirer ce joueur absent.");
+    } finally {
+      setRemovingAbsentUserId(null);
+    }
+  }
+
   function resetTableVisualState() {
     clearQueuedAudio();
     previousCardKeysRef.current = [];
     setDealtCardDelays({});
     setBetTarget(0);
     setTurnDeadlineAt(null);
+    setRemovingAbsentUserId(null);
     if (clearDealAnimationTimeoutRef.current) {
       window.clearTimeout(clearDealAnimationTimeoutRef.current);
       clearDealAnimationTimeoutRef.current = null;
@@ -670,7 +697,7 @@ export default function PokerRoom({
   }
 
   function handleRoomChange(nextRoomId: string) {
-    if (roomSwitchLocked || working || nextRoomId === roomId) return;
+    if (roomSwitchLocked || working || removingAbsentUserId || nextRoomId === roomId) return;
     resetTableVisualState();
     setState(null);
     setRoomId(nextRoomId);
@@ -790,7 +817,7 @@ export default function PokerRoom({
                     <div className="casino-rule-list">
                       <p>Le salon garde les joueurs inscrits pour la prochaine main au lieu de forcer une entree immediate dans le coup courant.</p>
                       <p>La table est limitee a 6 joueurs humains au total.</p>
-                      <p>Un joueur sans reponse pendant plus de 5 minutes est marque absent cote front.</p>
+                      <p>Un joueur sans reponse pendant plus de 5 minutes passe absent cote serveur et peut etre retire depuis la table.</p>
                       <p>Table en cours: {activeRoom ? POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
                       <p>Joueurs presents: {activePlayerCount}</p>
                       <p>Adversaires reels disponibles: {connectedOpponentCount}</p>
@@ -839,13 +866,15 @@ export default function PokerRoom({
               potTotal={state?.pot || 0}
               isDecisionPhase={isDecisionPhase}
               dealtCardDelays={dealtCardDelays}
+              removingAbsentUserId={removingAbsentUserId}
+              onRemoveAbsent={(userId) => void handleRemoveAbsent(userId)}
             />
 
             <PokerSidebar
               profile={profile}
               state={state}
               stage={stage}
-              working={working}
+              working={working || Boolean(removingAbsentUserId)}
               roomId={roomId}
               rooms={rooms}
               infoTab={infoTab}

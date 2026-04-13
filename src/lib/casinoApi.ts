@@ -438,6 +438,8 @@ export type PokerSeat = {
   lastDelta?: number;
   isSelf?: boolean;
   isActive?: boolean;
+  isAbsent?: boolean;
+  absentAt?: string | null;
 };
 
 export type PokerPendingSeat = {
@@ -612,6 +614,10 @@ type PokerResponse = {
   error?: string;
 };
 
+type PokerTableMutationResponse = PokerResponse & {
+  rooms?: CasinoTableRoom[];
+};
+
 type RouletteResponse = {
   ok: boolean;
   room: RouletteRoom;
@@ -698,6 +704,10 @@ export async function fetchBlackjackRoomState(roomId: string) {
 
 export async function startPokerRound(ante: number, roomId?: string) {
   return postCasinoAuthed<PokerResponse>("/api/casino/poker/start", { ante, roomId });
+}
+
+export async function removeAbsentPokerSeat(roomId: string, userId: string) {
+  return postCasinoAuthed<PokerTableMutationResponse>("/api/casino/poker/remove-absent", { roomId, userId });
 }
 
 export async function actPokerRound(
