@@ -29,12 +29,14 @@ type PokerSidebarProps = {
   rooms: CasinoTableRoom[];
   infoTab: "journal" | "lecture" | "salons" | "joueurs";
   isDecisionPhase: boolean;
+  isSpectatingRound: boolean;
   roomSwitchLocked: boolean;
   ante: number;
   playerChips: number;
   playerCommitted: number;
   playerStreetCommitted: number;
   toCall: number;
+  canFold: boolean;
   canCheck: boolean;
   canCall: boolean;
   canBet: boolean;
@@ -95,12 +97,14 @@ export default function PokerSidebar({
   rooms,
   infoTab,
   isDecisionPhase,
+  isSpectatingRound,
   roomSwitchLocked,
   ante,
   playerChips,
   playerCommitted,
   playerStreetCommitted,
   toCall,
+  canFold,
   canCheck,
   canCall,
   canBet,
@@ -121,16 +125,27 @@ export default function PokerSidebar({
   onJoin,
 }: PokerSidebarProps) {
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
-  const canJoin = stage === "idle" || stage === "waiting" || stage === "showdown";
+  const canJoin = isSpectatingRound || stage === "idle" || stage === "waiting" || stage === "showdown";
+  const waitingForTurn = !canJoin && !isDecisionPhase && !state?.playerFolded;
   const smallBlind = Math.max(10, Math.round(ante / 2));
+  const actionHeadline = isSpectatingRound
+    ? "Main externe en cours"
+    : waitingForTurn
+      ? "Tour adverse"
+      : getDecisionHeadline(state);
+  const actionCaption = isSpectatingRound
+    ? "Ce salon diffuse une main deja lancee. Reste sur cette table pour attendre la prochaine phase de mise multi."
+    : waitingForTurn
+      ? (state?.message || "La main continue. Les actions se debloquent des que le tour revient sur toi.")
+      : getDecisionCaption(state);
 
   return (
     <div className="casino-stage-sidebar">
       <div className={`casino-command-dock casino-command-dock--poker ${isDecisionPhase ? "is-attention" : ""}`}>
           <div className="casino-command-dock__copy">
             <span className="casino-chip">{isDecisionPhase ? "Decision" : "Table live"}</span>
-            <strong>{getDecisionHeadline(state)}</strong>
-            <p>{getDecisionCaption(state)}</p>
+            <strong>{actionHeadline}</strong>
+            <p>{actionCaption}</p>
           </div>
 
           {canJoin ? (
@@ -154,13 +169,13 @@ export default function PokerSidebar({
                   onClick={onJoin}
                   disabled={working || profile.wallet.balance < ante || isTableFull}
                 >
-                  {stage === "waiting" ? "Pret" : "Rejoindre"}
+                  {isSpectatingRound ? "Attendre ici" : stage === "waiting" ? "Miser" : "Rejoindre"}
                 </button>
               </div>
             </>
           ) : null}
 
-          {!canJoin && (canBet || canRaise) ? (
+          {!canJoin && isDecisionPhase && (canBet || canRaise) ? (
             <div className="casino-poker-betbox casino-poker-betbox--dock">
               <div className="casino-poker-betbox__header">
                 <div>
@@ -177,7 +192,7 @@ export default function PokerSidebar({
                 step={blindUnit}
                 value={normalizedBetTarget}
                 onChange={(event) => onBetTargetChange(Number(event.target.value))}
-                disabled={working || !(canBet || canRaise)}
+                disabled={working || !isDecisionPhase || !(canBet || canRaise)}
               />
             </div>
           ) : null}
@@ -188,7 +203,7 @@ export default function PokerSidebar({
                 type="button"
                 className="casino-ghost-button casino-ghost-button--danger casino-poker-action-button casino-poker-action-button--fold"
                 onClick={onFold}
-                disabled={stage === "idle" || stage === "showdown" || working}
+                disabled={working || !isDecisionPhase || !canFold}
               >
                 Fold
               </button>
@@ -196,7 +211,7 @@ export default function PokerSidebar({
                 type="button"
                 className="casino-ghost-button casino-poker-action-button casino-poker-action-button--check"
                 onClick={onCheck}
-                disabled={working || !canCheck}
+                disabled={working || !isDecisionPhase || !canCheck}
               >
                 Check
               </button>
@@ -204,7 +219,7 @@ export default function PokerSidebar({
                 type="button"
                 className="casino-ghost-button casino-poker-action-button casino-poker-action-button--call"
                 onClick={onCall}
-                disabled={working || !canCall}
+                disabled={working || !isDecisionPhase || !canCall}
               >
                 Call
               </button>
@@ -212,9 +227,9 @@ export default function PokerSidebar({
                 type="button"
                 className="casino-primary-button casino-primary-button--cyan casino-poker-action-button casino-poker-action-button--raise"
                 onClick={onRaise}
-                disabled={working || (!(canBet || canRaise)) || !normalizedBetTarget}
+                disabled={working || !isDecisionPhase || (!(canBet || canRaise)) || !normalizedBetTarget}
               >
-                Raise
+                {canRaise ? "Raise" : "Bet"}
               </button>
             </div>
           ) : null}

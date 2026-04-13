@@ -55,6 +55,22 @@ function normalizeSeatIdentity(value: string | null | undefined) {
   return String(value || "").trim().toLowerCase();
 }
 
+function formatPokerActionLabel(action: string | null | undefined) {
+  const normalized = normalizeSeatIdentity(action);
+  if (!normalized) return "";
+
+  const labels: Record<string, string> = {
+    attend: "Attend",
+    check: "Check",
+    call: "Call",
+    bet: "Bet",
+    raise: "Raise",
+    fold: "Fold",
+  };
+
+  return labels[normalized] || normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 function findParticipantSeat(
   participant: CasinoTableRoomParticipant & { isSelf: boolean },
   seats: PokerSeat[],
@@ -64,37 +80,140 @@ function findParticipantSeat(
 
   return (
     seats.find((seat) => {
-      const seatId = normalizeSeatIdentity(seat.id);
-      const seatName = normalizeSeatIdentity(seat.name);
+      const seatId = normalizeSeatIdentity(seat.id || seat.userId);
+      const seatUserId = normalizeSeatIdentity(seat.userId);
+      const seatName = normalizeSeatIdentity(seat.name || seat.username);
       return (
-        Boolean(participantId && seatId === participantId)
-        || Boolean(participantName && seatId === participantName)
+        Boolean(participantId && (seatId === participantId || seatUserId === participantId))
         || Boolean(participantName && seatName === participantName)
+        || Boolean(participantName && seatId === participantName)
       );
     }) || null
   );
 }
 
 function getParticipantStatus(
-  participant: CasinoTableRoomParticipant & { isSelf: boolean },
+  participantLabel: string,
   seat: PokerSeat | null,
   stage: "idle" | PokerState["stage"],
   absent: boolean,
   folded: boolean,
 ) {
   if (absent) return "Hors tempo";
+  if (seat?.isActive) return "Tour actif";
   if (folded) return "Fold";
   if (seat?.hand?.label) return seat.hand.label;
   if (seat?.read) return seat.read;
-  if (seat?.lastAction) return seat.lastAction;
+  if (seat?.lastAction) return formatPokerActionLabel(seat.lastAction);
   if (stage === "showdown") return "Showdown";
-  return `${participant.username} en jeu`;
+  return `${participantLabel} en jeu`;
+}
+
+function findPokerSelfSeat(
+  state: PokerState | null,
+  currentUserId: string,
+  playerName: string,
+) {
+  const normalizedSelfSeatId = normalizeSeatIdentity(state?.selfSeatId);
+  const normalizedCurrentUserId = normalizeSeatIdentity(currentUserId);
+  const normalizedPlayerName = normalizeSeatIdentity(playerName);
+  const candidates = [...(state?.seats || []), ...(state?.aiSeats || [])];
+
+  return (
+    candidates.find((seat) => {
+      const seatId = normalizeSeatIdentity(seat.id);
+      const seatUserId = normalizeSeatIdentity(seat.userId);
+      const seatName = normalizeSeatIdentity(seat.name || seat.username);
+      return Boolean(
+        seat.isSelf
+        || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
+        || (normalizedCurrentUserId && (seatId === normalizedCurrentUserId || seatUserId === normalizedCurrentUserId))
+        || (normalizedPlayerName && seatName === normalizedPlayerName),
+      );
+    }) || null
+  );
+}
+
+function getRemotePokerBindings(
+  state: PokerState | null,
+  participants: Array<CasinoTableRoomParticipant & { isSelf: boolean }>,
+  currentUserId: string,
+  playerName: string,
+) {
+  const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
+  const normalizedSelfSeatId = normalizeSeatIdentity(selfSeat?.id || selfSeat?.userId);
+  const normalizedSelfSeatName = normalizeSeatIdentity(selfSeat?.name || selfSeat?.username);
+  const seenSeats = new Set<string>();
+  const seats = [...(state?.seats || []), ...(state?.aiSeats || [])].filter((seat) => {
+    const dedupeKey = normalizeSeatIdentity(seat.id || seat.userId || seat.name || seat.username);
+    if (dedupeKey && seenSeats.has(dedupeKey)) {
+      return false;
+    }
+    if (dedupeKey) {
+      seenSeats.add(dedupeKey);
+    }
+
+    const seatId = normalizeSeatIdentity(seat.id || seat.userId);
+    const seatUserId = normalizeSeatIdentity(seat.userId);
+    const seatName = normalizeSeatIdentity(seat.name || seat.username);
+    return !(
+      seat.isSelf
+      || (normalizedSelfSeatId && (seatId === normalizedSelfSeatId || seatUserId === normalizedSelfSeatId))
+      || (normalizedSelfSeatName && seatName === normalizedSelfSeatName)
+    );
+  });
+  const normalizedCurrentUserId = normalizeSeatIdentity(currentUserId);
+  const normalizedPlayerName = normalizeSeatIdentity(playerName);
+  const remoteParticipants = participants.filter((participant) => {
+    const participantId = normalizeSeatIdentity(participant.userId);
+    const participantName = normalizeSeatIdentity(participant.username);
+    return !participant.isSelf && participantId !== normalizedCurrentUserId && participantName !== normalizedPlayerName;
+  });
+
+  const participantBindings = remoteParticipants.map((participant) => {
+    const seat = findParticipantSeat(participant, seats);
+    if (seat) {
+      const usedIndex = seats.findIndex((entry) => entry === seat);
+      if (usedIndex >= 0) {
+        seats.splice(usedIndex, 1);
+      }
+    }
+    return {
+      key: participant.userId || participant.username,
+      label: participant.username,
+      participant,
+      seat,
+      waiting: !seat,
+    };
+  });
+
+  const orphanSeats = seats.map((seat) => ({
+    key: seat.id || seat.userId || seat.name || seat.username,
+    label: seat.name || seat.username || "Joueur",
+    participant: null,
+    seat,
+    waiting: false,
+  }));
+
+  return [...participantBindings, ...orphanSeats]
+    .filter(({ seat }) => Boolean(seat))
+    .sort((left, right) => {
+      const leftPosition = typeof left.seat?.position === "number" ? left.seat.position : Number.MAX_SAFE_INTEGER;
+      const rightPosition = typeof right.seat?.position === "number" ? right.seat.position : Number.MAX_SAFE_INTEGER;
+      if (leftPosition !== rightPosition) {
+        return leftPosition - rightPosition;
+      }
+      return String(left.label || "").localeCompare(String(right.label || ""));
+    })
+    .slice(0, POKER_SEAT_LAYOUT.length);
 }
 
 type PokerTableSceneProps = {
   state: PokerState | null;
   stage: "idle" | PokerState["stage"];
+  currentUserId: string;
   playerName: string;
+  isSpectatingRound: boolean;
   participants: Array<CasinoTableRoomParticipant & { isSelf: boolean }>;
   activeAnte: number;
   smallBlind: number;
@@ -107,7 +226,9 @@ type PokerTableSceneProps = {
 export default function PokerTableScene({
   state,
   stage,
+  currentUserId,
   playerName,
+  isSpectatingRound,
   participants,
   activeAnte,
   smallBlind,
@@ -118,15 +239,23 @@ export default function PokerTableScene({
 }: PokerTableSceneProps) {
   void activeAnte;
   void smallBlind;
+  const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
   const communityCards = state?.communityCards || [];
-  const remoteParticipants = participants.filter((participant) => !participant.isSelf).slice(0, POKER_SEAT_LAYOUT.length);
-  const remoteSeatLayout = getPokerSeatLayout(remoteParticipants.length);
-  const remoteSeatBindings = remoteParticipants.map((participant) => ({
-    participant,
-    seat: findParticipantSeat(participant, state?.aiSeats || []),
-  }));
-  const heroAbsent = Boolean(state?.playerFolded);
+  const remoteBindings = getRemotePokerBindings(state, participants, currentUserId, playerName);
+  const remoteSeatLayout = getPokerSeatLayout(remoteBindings.length);
+  const heroCards = state?.playerCards?.length ? state.playerCards : selfSeat?.cards || [];
+  const heroAbsent = Boolean(state?.playerFolded || selfSeat?.folded);
   const heroName = String(playerName || "Toi").trim();
+  const showHeroSeat = !isSpectatingRound || Boolean(selfSeat) || Boolean(heroCards.length);
+  const heroStatus =
+    state?.playerFolded
+      ? "Main couchee"
+      : state?.playerHand?.label || selfSeat?.hand?.label || (stage === "showdown"
+        ? "Showdown"
+        : stage === "waiting"
+          ? "En attente"
+          : "Decision ouverte");
+  const heroStake = state?.playerCommitted || selfSeat?.totalCommitted || heroCommitted;
 
   return (
     <>
@@ -134,17 +263,18 @@ export default function PokerTableScene({
         <div className={`casino-felt-table casino-felt-table--poker ${isDecisionPhase ? "is-decision-phase" : ""}`}>
           <div className="casino-felt-table__halo" />
 
-          {remoteSeatBindings.map(({ participant, seat }, index) => {
+          {remoteBindings.map(({ key, label, participant, seat }, index) => {
             const layout = remoteSeatLayout[index] || POKER_SEAT_LAYOUT[Math.min(index, POKER_SEAT_LAYOUT.length - 1)];
-            const absent = isSeatAbsent(participant.updatedAt);
+            const absent = isSeatAbsent(participant?.updatedAt || null);
             const folded = Boolean(seat?.folded);
             const seatCards = seat?.cards || [];
             const revealSeatCards = stage === "showdown" && seatCards.length > 0;
-            const seatStatus = getParticipantStatus(participant, seat, stage, absent, folded);
+            const seatLabel = seat?.name || seat?.username || label || "Joueur";
+            const seatStatus = getParticipantStatus(seatLabel, seat, stage, absent, folded);
             return (
               <article
-                key={participant.userId}
-                className={`casino-oval-seat casino-oval-seat--poker-peer casino-oval-seat--${layout.align} ${folded ? "is-folded" : ""} ${seat?.isWinner ? "is-winner" : ""}`}
+                key={key}
+                className={`casino-oval-seat casino-oval-seat--poker-peer casino-oval-seat--${layout.align} ${folded ? "is-folded" : ""} ${seat?.isWinner ? "is-winner" : ""} ${seat?.isActive ? "is-active" : ""}`}
                 style={{
                   ["--seat-x" as string]: layout.x,
                   ["--seat-y" as string]: layout.y,
@@ -152,16 +282,19 @@ export default function PokerTableScene({
               >
                 <span className="casino-oval-seat__tag">{layout.tag}</span>
                 <header>
-                  <strong>{participant.username}</strong>
-                  <span>{absent ? "Absent" : "Connecte"}</span>
+                  <strong>{seatLabel}</strong>
+                  <span>{absent ? "Absent" : seat?.isActive ? "Tour actif" : "Connecte"}</span>
                 </header>
-                <div className="casino-seat-role-row" aria-label={`Roles de ${participant.username}`}>
-                  {seat?.lastAction ? <span className="casino-seat-role-chip casino-seat-role-chip--action">{seat.lastAction}</span> : null}
+                <div className="casino-seat-role-row" aria-label={`Roles de ${seatLabel}`}>
+                  {seat?.lastAction && !seat.isActive ? (
+                    <span className="casino-seat-role-chip casino-seat-role-chip--action">{formatPokerActionLabel(seat.lastAction)}</span>
+                  ) : null}
                   {typeof seat?.totalCommitted === "number" && seat.totalCommitted > 0 ? (
                     <span className="casino-seat-role-chip casino-seat-role-chip--stake">
                       {formatCredits(seat.totalCommitted)}
                     </span>
                   ) : null}
+                  {seat?.isActive ? <span className="casino-seat-role-chip casino-seat-role-chip--action">A jouer</span> : null}
                   {folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
                   {absent && !folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Absent</span> : null}
                 </div>
@@ -169,16 +302,16 @@ export default function PokerTableScene({
                   {seatCards.length ? (
                     seatCards.map((card, cardIndex) => (
                       <PiratePlayingCardView
-                        key={`${seat?.id || participant.userId}-${card.id}-${cardIndex}`}
+                        key={`${seat?.id || key}-${card.id}-${cardIndex}`}
                         card={card}
                         hidden={!revealSeatCards}
-                        dealt={Boolean(dealtCardDelays[`${seat?.id || participant.userId}-${card.id}-${cardIndex}`] !== undefined)}
-                        dealDelayMs={dealtCardDelays[`${seat?.id || participant.userId}-${card.id}-${cardIndex}`] || 0}
+                        dealt={Boolean(dealtCardDelays[`${seat?.id || key}-${card.id}-${cardIndex}`] !== undefined)}
+                        dealDelayMs={dealtCardDelays[`${seat?.id || key}-${card.id}-${cardIndex}`] || 0}
                       />
                     ))
                   ) : (
                     Array.from({ length: 2 }, (_, cardBackIndex) => (
-                      <div key={`${participant.userId}-back-${cardBackIndex}`} className="casino-poker-card-back" aria-hidden="true">
+                      <div key={`${key}-back-${cardBackIndex}`} className="casino-poker-card-back" aria-hidden="true">
                         <span>☠</span>
                       </div>
                     ))
@@ -220,41 +353,38 @@ export default function PokerTableScene({
             </div>
           </section>
 
-          <article className={`casino-oval-seat casino-oval-seat--player ${state?.playerFolded ? "is-folded" : ""} ${isDecisionPhase ? "is-focus" : ""}`}>
-            <div className="casino-card-seat__meta">
-              <strong>{heroName}</strong>
-              <span>
-                {state?.playerFolded
-                  ? "Main couchee"
-                  : state?.playerHand?.label || (stage === "showdown"
-                    ? "Showdown"
-                    : stage === "waiting"
-                      ? "En attente"
-                      : "Decision ouverte")}
-              </span>
-            </div>
-            <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
-              {state?.playerCards.length ? (
-                state.playerCards.map((card, index) => (
-                  <PiratePlayingCardView
-                    key={`poker-player-${card.id}-${index}`}
-                    card={card}
-                    emphasis="strong"
-                    dealt={Boolean(dealtCardDelays[`poker-player-${card.id}-${index}`] !== undefined)}
-                    dealDelayMs={dealtCardDelays[`poker-player-${card.id}-${index}`] || 0}
-                  />
-                ))
-              ) : (
-                <div className="casino-empty-seat">Le joueur n'a pas encore touche ses cartes.</div>
-              )}
-            </div>
-            <div className="casino-seat-role-row casino-seat-role-row--player casino-seat-role-row--stats" aria-label={`Mise de ${heroName}`}>
-              <span className="casino-seat-role-chip casino-seat-role-chip--stake">
-                Mise {formatCredits(heroCommitted)}
-              </span>
-              {heroAbsent ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
-            </div>
-          </article>
+          {showHeroSeat ? (
+            <article className={`casino-oval-seat casino-oval-seat--player ${heroAbsent ? "is-folded" : ""} ${isDecisionPhase ? "is-focus" : ""}`}>
+              <div className="casino-card-seat__meta">
+                <strong>{heroName}</strong>
+                <span>{heroStatus}</span>
+              </div>
+              <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
+                {heroCards.length ? (
+                  heroCards.map((card, index) => {
+                    const cardKey = `poker-player-${card.id}-${index}`;
+                    return (
+                      <PiratePlayingCardView
+                        key={cardKey}
+                        card={card}
+                        emphasis="strong"
+                        dealt={Boolean(dealtCardDelays[cardKey] !== undefined)}
+                        dealDelayMs={dealtCardDelays[cardKey] || 0}
+                      />
+                    );
+                  })
+                ) : (
+                  <div className="casino-empty-seat">Le joueur n'a pas encore touche ses cartes.</div>
+                )}
+              </div>
+              <div className="casino-seat-role-row casino-seat-role-row--player casino-seat-role-row--stats" aria-label={`Mise de ${heroName}`}>
+                <span className="casino-seat-role-chip casino-seat-role-chip--stake">
+                  Mise {formatCredits(heroStake)}
+                </span>
+                {heroAbsent ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
+              </div>
+            </article>
+          ) : null}
         </div>
       </div>
     </>

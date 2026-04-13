@@ -29,11 +29,10 @@ import { POKER_SALONS } from "./lib/tableSalons";
 const TABLE_DEAL_STEP_MS = 92;
 const LIVE_MIN_OPPONENTS = 1;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
-const LIVE_TURN_LIMIT_MS = 90_000;
 const POKER_MAX_PLAYERS = 6;
 const LIVE_PARTICIPANT_STALE_MS = 95_000;
 
-type PokerAction = "reveal" | "showdown" | "check" | "call" | "bet" | "raise" | "fold";
+type PokerAction = "check" | "call" | "bet" | "raise" | "fold";
 
 type PokerRoomProps = {
   playerName: string;
@@ -70,17 +69,98 @@ function normalizeAggressionTarget(rawValue: number, minValue: number, maxValue:
   return Math.max(minValue, Math.min(maxValue, snapped));
 }
 
-function buildPokerSyncSignature(state: PokerState | null) {
+function isActivePokerHandStage(value: string | null | undefined): value is Exclude<PokerState["stage"], "waiting" | "showdown"> {
+  return value === "preflop" || value === "flop" || value === "turn" || value === "river";
+}
+
+function findPokerSelfSeat(state: PokerState | null, currentUserId: string, playerName: string) {
+  const normalizedSelfSeatId = normalizeIdentity(state?.selfSeatId);
+  const normalizedCurrentUserId = normalizeIdentity(currentUserId);
+  const normalizedPlayerName = normalizeIdentity(playerName);
+  const candidates = [...(state?.seats || []), ...(state?.aiSeats || [])];
+
+  return (
+    candidates.find((seat) => {
+      const seatId = normalizeIdentity(seat.id);
+      const seatUserId = normalizeIdentity(seat.userId);
+      const seatName = normalizeIdentity(seat.name || seat.username);
+
+      return Boolean(
+        seat.isSelf
+        || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
+        || (normalizedCurrentUserId && (seatId === normalizedCurrentUserId || seatUserId === normalizedCurrentUserId))
+        || (normalizedPlayerName && seatName === normalizedPlayerName),
+      );
+    }) || null
+  );
+}
+
+function hasPokerPendingSeat(state: PokerState | null, currentUserId: string, playerName: string) {
+  const normalizedCurrentUserId = normalizeIdentity(currentUserId);
+  const normalizedPlayerName = normalizeIdentity(playerName);
+
+  return Boolean(
+    state?.pendingSeats?.some((seat) => {
+      const seatUserId = normalizeIdentity(seat.userId);
+      const seatName = normalizeIdentity(seat.username);
+      return Boolean(
+        (normalizedCurrentUserId && seatUserId === normalizedCurrentUserId)
+        || (normalizedPlayerName && seatName === normalizedPlayerName),
+      );
+    }),
+  );
+}
+
+function hasPokerHeroRound(state: PokerState | null, currentUserId: string, playerName: string) {
+  if (!state) return false;
+  if (state.playerCards.length || state.playerChips > 0 || state.playerCommitted > 0 || state.playerStreetCommitted > 0) {
+    return true;
+  }
+  if (findPokerSelfSeat(state, currentUserId, playerName)) {
+    return true;
+  }
+  return hasPokerPendingSeat(state, currentUserId, playerName);
+}
+
+function isPokerSpectatorRound(state: PokerState | null, currentUserId: string, playerName: string) {
+  if (!state?.token || !state.roomId) return false;
+  return !hasPokerHeroRound(state, currentUserId, playerName);
+}
+
+function isPokerSelfTurn(state: PokerState | null, currentUserId: string, playerName: string) {
+  if (!state || !state.token || !isActivePokerHandStage(state.stage) || state.playerFolded) {
+    return false;
+  }
+
+  const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
+  const selfSeatId = normalizeIdentity(selfSeat?.id || selfSeat?.userId || state.selfSeatId);
+  const activeSeatId = normalizeIdentity(state.activeSeatId);
+  if (selfSeatId && activeSeatId) {
+    return selfSeatId === activeSeatId;
+  }
+
+  if (selfSeat?.isActive) {
+    return true;
+  }
+
+  return Boolean(hasPokerHeroRound(state, currentUserId, playerName) && state.legalActions.length);
+}
+
+function buildPokerSyncSignature(state: PokerState | null, currentUserId: string, playerName: string) {
   if (!state?.token) return "";
   return JSON.stringify({
     token: state.token,
     roomId: state.roomId || null,
     stage: state.stage,
+    selfSeatId: state.selfSeatId || null,
+    activeSeatId: state.activeSeatId || null,
     pot: state.pot,
     currentBet: state.currentBet,
     toCall: state.toCall,
     playerFolded: state.playerFolded,
     playerCards: state.playerCards.map((card) => card.id),
+    playerChips: state.playerChips,
+    playerCommitted: state.playerCommitted,
     communityCards: state.communityCards.map((card) => card.id),
     aiSeats: state.aiSeats.map((seat) => ({
       id: seat.id,
@@ -90,6 +170,9 @@ function buildPokerSyncSignature(state: PokerState | null) {
       cards: seat.cards.map((card) => card.id),
       winner: seat.isWinner,
     })),
+    pendingSeats: (state.pendingSeats || []).map((seat) => `${seat.userId}:${seat.username}`),
+    legalActions: state.legalActions,
+    isSpectating: isPokerSpectatorRound(state, currentUserId, playerName),
     actionLogSize: state.actionLog.length,
     lastDelta: state.lastDelta,
   });
@@ -100,6 +183,19 @@ function formatTurnClock(remainingMs: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function parseTableDeadline(value: string | null | undefined) {
+  const timestamp = Date.parse(String(value || ""));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getPokerPhaseDeadlineAt(state: PokerState | null) {
+  if (!state) return null;
+  if (state.stage === "waiting") {
+    return parseTableDeadline(state.bettingClosesAt);
+  }
+  return parseTableDeadline(state.turnDeadlineAt);
 }
 
 function normalizeIdentity(value: string | number | null | undefined) {
@@ -138,8 +234,6 @@ export default function PokerRoom({
   onProfileChange,
   onError,
 }: PokerRoomProps) {
-  const isActivePokerHandStage = (value: string | null | undefined): value is Exclude<PokerState["stage"], "waiting" | "showdown"> =>
-    value === "preflop" || value === "flop" || value === "turn" || value === "river";
   const pokerRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "poker");
   const [ante] = useState(20);
   const [state, setState] = useState<PokerState | null>(null);
@@ -168,7 +262,8 @@ export default function PokerRoom({
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
-  const roomSwitchLocked = !(stage === "idle" || stage === "waiting" || stage === "showdown");
+  const isSpectatingRound = isPokerSpectatorRound(state, profile.user.id, playerName);
+  const roomSwitchLocked = !isSpectatingRound && !(stage === "idle" || stage === "waiting" || stage === "showdown");
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const tableParticipants = useMemo<Array<CasinoTableRoomParticipant & { isSelf: boolean }>>(() => {
     const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
@@ -206,10 +301,11 @@ export default function PokerRoom({
   const blindUnit = Math.max(20, Math.round(activeAnte));
   const communityCards = state?.communityCards || [];
   const toCall = state?.toCall || 0;
-  const isDecisionPhase = Boolean(state && isActivePokerHandStage(stage) && !state.playerFolded);
+  const isDecisionPhase = isPokerSelfTurn(state, profile.user.id, playerName);
   const playerChips = state?.playerChips || 0;
   const playerCommitted = state?.playerCommitted || activeAnte;
   const playerStreetCommitted = state?.playerStreetCommitted || 0;
+  const canFold = Boolean(state?.legalActions.includes("fold"));
   const canCheck = Boolean(state?.legalActions.includes("check"));
   const canCall = Boolean(state?.legalActions.includes("call"));
   const canBet = Boolean(state?.legalActions.includes("bet"));
@@ -219,7 +315,7 @@ export default function PokerRoom({
   const normalizedBetTarget =
     canBet || canRaise ? normalizeAggressionTarget(betTarget || aggressionMin, aggressionMin, aggressionMax, blindUnit) : 0;
   const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
-  const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "1:30";
+  const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "--:--";
 
   function applySyncedState(nextState: PokerState | null, syncedAt: number, nextDeadlineAt: number | null) {
     if (!nextState) return;
@@ -273,7 +369,13 @@ export default function PokerRoom({
         try {
           const sharedState = await fetchPokerRoomState(roomId);
           if (cancelled || !sharedState) return;
-          applySyncedState(sharedState, Date.now(), turnDeadlineAt);
+          if (
+            hasPokerHeroRound(state, profile.user.id, playerName)
+            && !hasPokerHeroRound(sharedState, profile.user.id, playerName)
+          ) {
+            return;
+          }
+          applySyncedState(sharedState, Date.now(), getPokerPhaseDeadlineAt(sharedState));
           return;
         } catch (syncError) {
           if (cancelled) return;
@@ -298,7 +400,7 @@ export default function PokerRoom({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [onError, roomId, turnDeadlineAt]);
+  }, [onError, playerName, profile.user.id, roomId, state, turnDeadlineAt]);
 
   useEffect(() => {
     const existingSnapshot = readTableChannelSnapshot<PokerState>("poker", roomId);
@@ -320,22 +422,13 @@ export default function PokerRoom({
       return;
     }
 
-    const signature = buildPokerSyncSignature(state);
-    const isActionable = isActivePokerHandStage(stage) && !state.playerFolded && Boolean(state.token);
-    const shouldResetTurnClock = Boolean(
-      isActionable && (!turnDeadlineAt || signature !== lastTurnSignatureRef.current || turnDeadlineAt <= Date.now()),
-    );
-    const nextDeadlineAt = isActionable
-      ? shouldResetTurnClock
-        ? Date.now() + LIVE_TURN_LIMIT_MS
-        : turnDeadlineAt
-      : null;
-
+    const signature = buildPokerSyncSignature(state, profile.user.id, playerName);
     if (signature !== lastTurnSignatureRef.current) {
       lastTimedOutSignatureRef.current = "";
     }
     lastTurnSignatureRef.current = signature;
 
+    const nextDeadlineAt = getPokerPhaseDeadlineAt(state);
     if (nextDeadlineAt !== turnDeadlineAt) {
       setTurnDeadlineAt(nextDeadlineAt);
     }
@@ -349,18 +442,27 @@ export default function PokerRoom({
       turnDeadlineAt: nextDeadlineAt,
       state,
     });
-  }, [roomId, stage, state, turnDeadlineAt]);
+  }, [playerName, profile.user.id, roomId, state, turnDeadlineAt]);
 
   useEffect(() => {
-    if (!state?.token || !isActivePokerHandStage(stage) || state.playerFolded || !turnDeadlineAt || working) return;
+    if (
+      !state?.token
+      || !isActivePokerHandStage(stage)
+      || state.playerFolded
+      || !turnDeadlineAt
+      || working
+      || !isPokerSelfTurn(state, profile.user.id, playerName)
+    ) {
+      return;
+    }
 
-    const signature = buildPokerSyncSignature(state);
+    const signature = buildPokerSyncSignature(state, profile.user.id, playerName);
     if (!signature || turnDeadlineAt > nowTick || lastTimedOutSignatureRef.current === signature) return;
 
     lastTimedOutSignatureRef.current = signature;
     onError("Temps ecoule: la main est automatiquement couchee.");
     void act("fold");
-  }, [act, nowTick, onError, stage, state, turnDeadlineAt, working]);
+  }, [act, nowTick, onError, playerName, profile.user.id, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     return () => {
@@ -435,9 +537,14 @@ export default function PokerRoom({
     setWorking(true);
     try {
       const result = await startPokerRound(ante, roomId);
+      setRooms(rooms);
       setState(result.state);
       if (result.profile) {
         onProfileChange(result.profile);
+      }
+      if (isPokerSpectatorRound(result.state, profile.user.id, playerName)) {
+        onError("Une main est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans la table multi.");
+        return;
       }
     } catch (error_) {
       onError(error_ instanceof Error ? error_.message : "L'entree a la table a echoue.");
@@ -448,10 +555,22 @@ export default function PokerRoom({
 
   async function act(action: PokerAction, amount?: number) {
     if (!state?.token || !isActivePokerHandStage(stage) || working) return;
+    if (!isPokerSelfTurn(state, profile.user.id, playerName)) {
+      onError("Ce n'est pas ton tour.");
+      return;
+    }
+    if (!state.legalActions.includes(action)) {
+      onError("Cette action n'est pas disponible sur ce coup.");
+      return;
+    }
     onError("");
     setWorking(true);
     try {
       const result = await actPokerRound(state.token, action, amount);
+      if (isPokerSpectatorRound(result.state, profile.user.id, playerName)) {
+        onError("Le serveur a renvoye une manche qui ne t'appartient pas. La table reste disponible pour la prochaine donne.");
+        return;
+      }
       setState(result.state);
       if (result.profile) {
         onProfileChange(result.profile);
@@ -464,19 +583,24 @@ export default function PokerRoom({
   }
 
   async function handleCheck() {
-    if (working || !canCheck) return;
+    if (working || !isDecisionPhase || !canCheck) return;
     playCheck();
     await act("check");
   }
 
   async function handleCall() {
-    if (working || !canCall) return;
+    if (working || !isDecisionPhase || !canCall) return;
     await act("call");
   }
 
   async function handleAggression() {
-    if (working || !(canBet || canRaise) || !normalizedBetTarget) return;
+    if (working || !isDecisionPhase || !(canBet || canRaise) || !normalizedBetTarget) return;
     await act(canRaise ? "raise" : "bet", normalizedBetTarget);
+  }
+
+  async function handleFold() {
+    if (working || !isDecisionPhase || !canFold) return;
+    await act("fold");
   }
 
   function resetTableVisualState() {
@@ -530,7 +654,7 @@ export default function PokerRoom({
                     </button>
                     <span
                       className={`casino-poker-turn-timer ${turnDeadlineAt ? "is-live" : ""} ${turnCountdownMs <= 10_000 && turnDeadlineAt ? "is-warning" : ""}`}
-                      aria-label={turnDeadlineAt ? `Temps restant ${turnCountdownLabel}` : "Timer de table en attente"}
+                      aria-label={turnDeadlineAt ? `${stage === "waiting" ? "Fin de mise" : "Temps restant"} ${turnCountdownLabel}` : "Timer de table en attente"}
                     >
                       {turnDeadlineAt ? turnCountdownLabel : "Timer --:--"}
                     </span>
@@ -538,7 +662,9 @@ export default function PokerRoom({
                 </div>
                 <strong>{pokerRoomMeta?.title || "Texas hold'em rapide"}</strong>
                 <p>
-                  {state?.message || "Table partagee par salon avec etat synchronise et actions gerees cote serveur."}
+                  {isSpectatingRound
+                    ? "Une main est deja en cours sur ce salon. Tu peux attendre la prochaine donne ou rejoindre un autre salon libre."
+                    : state?.message || "Table partagee par salon avec etat synchronise et actions gerees cote serveur."}
                   {" "}
                   {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
                 </p>
@@ -581,7 +707,7 @@ export default function PokerRoom({
                     <div className="casino-rule-list">
                       <p>Texas hold'em 6-max uniquement, avec 5 places adverses visibles autour de toi et aucun bot affiche cote front.</p>
                       <p>Le backend gere les vraies decisions de check, call, bet, raise et fold, tour par tour.</p>
-                      <p>Si le timer arrive a zero, la main est consideree comme fold automatiquement.</p>
+                      <p>La phase de mise et chaque tour de parole utilisent maintenant un chrono serveur de 5 minutes.</p>
                     </div>
                   ) : null}
                   {activeHeaderInfo === "mises" ? (
@@ -646,7 +772,9 @@ export default function PokerRoom({
             <PokerTableScene
               state={displayState}
               stage={stage}
+              currentUserId={profile.user.id}
               playerName={playerName}
+              isSpectatingRound={isSpectatingRound}
               participants={tableParticipants}
               activeAnte={activeAnte}
               smallBlind={smallBlind}
@@ -665,12 +793,14 @@ export default function PokerRoom({
               rooms={rooms}
               infoTab={infoTab}
               isDecisionPhase={isDecisionPhase}
+              isSpectatingRound={isSpectatingRound}
               roomSwitchLocked={roomSwitchLocked}
               ante={activeAnte}
               playerChips={playerChips}
               playerCommitted={playerCommitted}
               playerStreetCommitted={playerStreetCommitted}
               toCall={toCall}
+              canFold={canFold}
               canCheck={canCheck}
               canCall={canCall}
               canBet={canBet}
@@ -684,7 +814,7 @@ export default function PokerRoom({
               onInfoTabChange={setInfoTab}
               onRoomChange={handleRoomChange}
               onBetTargetChange={setBetTarget}
-              onFold={() => void act("fold")}
+              onFold={() => void handleFold()}
               onCheck={() => void handleCheck()}
               onCall={() => void handleCall()}
               onRaise={() => void handleAggression()}

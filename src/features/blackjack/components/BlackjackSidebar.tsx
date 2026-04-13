@@ -20,6 +20,7 @@ type BlackjackSidebarProps = {
   rooms: CasinoTableRoom[];
   infoTab: "salons" | "regles" | "joueurs";
   isDecisionPhase: boolean;
+  isSpectatingRound: boolean;
   roomSwitchLocked: boolean;
   legalActions: BlackjackAction[];
   onBetChipAdd: (bet: number) => void;
@@ -50,6 +51,7 @@ export default function BlackjackSidebar({
   rooms,
   infoTab,
   isDecisionPhase,
+  isSpectatingRound,
   roomSwitchLocked,
   legalActions,
   onBetChipAdd,
@@ -62,7 +64,7 @@ export default function BlackjackSidebar({
   onDeal,
 }: BlackjackSidebarProps) {
   const stage = state?.stage || "idle";
-  const canDeal = stage !== "player-turn";
+  const canDeal = stage !== "player-turn" || isSpectatingRound;
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const activeSeat = state?.activeSeatId
     ? (state.seats || []).find((seat) => String(seat.id || seat.userId || "").trim() === String(state.activeSeatId || "").trim()) || null
@@ -81,7 +83,9 @@ export default function BlackjackSidebar({
     <div className="casino-stage-sidebar">
       <div className={`casino-command-dock casino-command-dock--blackjack ${isDecisionPhase ? "is-attention" : ""}`}>
         <div className="casino-command-dock__copy">
-          <span className="casino-chip">{isDecisionPhase ? "Decision" : stage === "player-turn" ? "Tour en cours" : "Distribution"}</span>
+          <span className="casino-chip">
+            {isDecisionPhase ? "Decision" : stage === "player-turn" ? "Tour en cours" : "Distribution"}
+          </span>
           <strong>
             {isDecisionPhase
               ? `Main a ${state?.playerScore.total || 0} points`
@@ -95,7 +99,7 @@ export default function BlackjackSidebar({
             {isDecisionPhase
               ? "Concentre-toi sur ta main, la carte visible du croupier et les vraies options de blackjack ouvertes pour cette combinaison."
               : stage === "player-turn"
-                ? "La table reste synchronisee: tu verras les autres jouer, puis la main passera automatiquement si leur chrono expire."
+                ? "La table reste synchronisee pendant la main en cours, sans melanger le croupier avec les places joueurs."
                 : state?.waitingForPlayers
                   ? "Le salon reste synchro et garde les places en attente jusqu'a ce qu'une vraie main puisse partir."
                   : "Le salon garde la meme table et se synchronise selon les joueurs presents."}
@@ -153,7 +157,7 @@ export default function BlackjackSidebar({
                 type="button"
                 className={`casino-stack-chip casino-stack-chip--picker casino-stack-chip--${CHIP_TONES[preset]} ${(selectedCounts[preset] || 0) > 0 ? "is-active" : ""}`}
                 onClick={() => onBetChipAdd(preset)}
-                disabled={stage === "player-turn" || working || bet + preset > profile.wallet.balance}
+                disabled={(stage === "player-turn" && !isSpectatingRound) || working || bet + preset > profile.wallet.balance}
                 aria-label={`Ajouter un jeton de ${preset}`}
               >
                 <strong>{preset}</strong>
@@ -214,7 +218,7 @@ export default function BlackjackSidebar({
                 <p>Split se joue sur une paire de meme rang: la paire devient deux mains separees si ton solde couvre la deuxieme mise.</p>
                 <p>La mise et le paiement passent par le wallet A11, pas par des jetons locaux.</p>
                 <p>Le dock ouvre Doubler et Split seulement quand la main active suit les regles et que ton solde peut couvrir la mise supplementaire.</p>
-                <p>Le salon se cale seul en solo si tu es seul, puis passe en multijoueur si quelqu'un rejoint la table.</p>
+                <p>La phase de mise reste ouverte 5 minutes, ou se ferme plus vite si tous les presents ont deja mise.</p>
               </div>
             ),
           },

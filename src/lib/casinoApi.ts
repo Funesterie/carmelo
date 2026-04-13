@@ -396,6 +396,10 @@ export type BlackjackState = {
   waitingForPlayers?: boolean;
   roomActive?: boolean;
   roundId?: number;
+  bettingClosesAt?: string | null;
+  turnDeadlineAt?: string | null;
+  bettingWindowMs?: number;
+  turnWindowMs?: number;
   wager: number;
   dealerHidden: boolean;
   playerCards: PiratePlayingCard[];
@@ -417,7 +421,9 @@ export type BlackjackState = {
 
 export type PokerSeat = {
   id: string;
+  userId?: string;
   name: string;
+  username?: string;
   chips: number;
   cards: PiratePlayingCard[];
   hand: PokerScore | null;
@@ -427,6 +433,25 @@ export type PokerSeat = {
   lastAction?: string;
   totalCommitted?: number;
   streetCommitted?: number;
+  position?: number;
+  payoutAmount?: number;
+  lastDelta?: number;
+  isSelf?: boolean;
+  isActive?: boolean;
+};
+
+export type PokerPendingSeat = {
+  userId: string;
+  username: string;
+  ante: number;
+  readyAt: string | null;
+};
+
+export type PokerSeatAmount = {
+  playerId: string;
+  displayName: string;
+  amount: number;
+  position?: number;
 };
 
 export type PokerState = {
@@ -434,11 +459,21 @@ export type PokerState = {
   roomId?: string | null;
   stage: "waiting" | "preflop" | "flop" | "turn" | "river" | "showdown";
   stageLabel: string;
+  waitingForPlayers?: boolean;
+  handId?: number;
+  bettingClosesAt?: string | null;
+  turnDeadlineAt?: string | null;
+  bettingWindowMs?: number;
+  turnWindowMs?: number;
   ante: number;
   pot: number;
+  tablePot?: number;
   playerCards: PiratePlayingCard[];
   communityCards: PiratePlayingCard[];
+  seats?: PokerSeat[];
   aiSeats: PokerSeat[];
+  selfSeatId?: string | null;
+  activeSeatId?: string | null;
   playerFolded: boolean;
   playerHand: PokerScore | null;
   playerChips: number;
@@ -455,6 +490,9 @@ export type PokerState = {
   lastDelta: number;
   payoutAmount: number;
   message: string;
+  pendingSeats?: PokerPendingSeat[];
+  seatBets?: PokerSeatAmount[];
+  seatStacks?: PokerSeatAmount[];
 };
 
 export type RouletteRoundBet = {

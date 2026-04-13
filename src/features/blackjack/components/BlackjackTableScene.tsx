@@ -87,33 +87,19 @@ function findBlackjackSelfSeat(
     }) || null;
 
   if (explicitSeat) return explicitSeat;
-
-  const playerAlreadyHasCards = Boolean(
-    state?.playerCards.length
-    || state?.playerHands?.some((hand) => Boolean(hand.cards?.length)),
-  );
-  if (playerAlreadyHasCards) return null;
-
-  const normalizedActiveSeatId = normalizeBlackjackIdentity(state?.activeSeatId);
-  const activeSeat =
-    candidates.find((seat) => {
-      const seatId = normalizeBlackjackIdentity(seat.id);
-      return Boolean(
-        (normalizedActiveSeatId && seatId === normalizedActiveSeatId)
-        || seat.isActive,
-      );
-    }) || null;
-
-  if (activeSeat?.cards?.length) {
-    return activeSeat;
-  }
-
-  const seatsWithCards = candidates.filter((seat) => seat.cards?.length);
-  return seatsWithCards.length === 1 ? seatsWithCards[0] : null;
+  return null;
 }
 
 function getRenderableHands(state: BlackjackState | null, selfSeat: BlackjackSeat | null) {
   if (!state) return [];
+
+  const hasHeroPayload = Boolean(
+    state.playerCards.length
+    || state.playerHands?.some((hand) => Boolean(hand.cards?.length)),
+  );
+  if (!hasHeroPayload && !selfSeat) {
+    return [];
+  }
 
   const fallbackCards = state.playerCards.length ? state.playerCards : selfSeat?.cards || [];
   const fallbackScore = resolveBlackjackScore(state.playerScore, selfSeat?.score, fallbackCards.length);
@@ -243,20 +229,9 @@ function getRemoteBlackjackBindings(
     waiting: false,
   }));
 
-  const bindings = [...participantBindings, ...orphanSeats].slice(0, BLACKJACK_REMOTE_LAYOUT.length);
-
-  while (bindings.length < BLACKJACK_REMOTE_LAYOUT.length) {
-    const slotNumber = bindings.length + 1;
-    bindings.push({
-      key: `blackjack-empty-${slotNumber}`,
-      label: `Place ${slotNumber}`,
-      participant: null,
-      seat: null,
-      waiting: true,
-    });
-  }
-
-  return bindings;
+  return [...participantBindings, ...orphanSeats]
+    .filter(({ seat }) => Boolean(seat))
+    .slice(0, BLACKJACK_REMOTE_LAYOUT.length);
 }
 
 export default function BlackjackTableScene({
@@ -276,6 +251,11 @@ export default function BlackjackTableScene({
   const selfSeat = findBlackjackSelfSeat(state, currentUserId, playerName);
   const hands = getRenderableHands(state, selfSeat);
   const remoteBindings = getRemoteBlackjackBindings(state, participants, currentUserId, playerName);
+  const occupiedRemoteBindings = remoteBindings.filter(({ seat }) => Boolean(seat));
+  const centeredRemoteBinding = !hands.length && occupiedRemoteBindings.length === 1 ? occupiedRemoteBindings[0] : null;
+  const displayedRemoteBindings = centeredRemoteBinding
+    ? remoteBindings.filter(({ key }) => key !== centeredRemoteBinding.key)
+    : remoteBindings;
   const remoteSeatLayout = getBlackjackSeatLayout();
   const selectedChipTotal = sumChipValues(betChips);
   const lockedWager = hands.reduce((sum, hand) => sum + (hand.wager || 0), 0) || state?.wager || 0;
@@ -297,6 +277,14 @@ export default function BlackjackTableScene({
         )
       : null;
   const playerSeatName = String(playerName || "Toi").trim();
+  const centeredSeat = centeredRemoteBinding?.seat || null;
+  const centeredSeatCards = centeredSeat?.cards || [];
+  const centeredSeatName = centeredSeat?.name || centeredSeat?.username || centeredRemoteBinding?.label || playerSeatName;
+  const centeredSeatScore = centeredSeat
+    ? resolveBlackjackScore(centeredSeat.score, centeredSeat.score, centeredSeatCards.length)
+    : null;
+  const splitHands = hands.length > 1;
+  const showHeroOutcome = Boolean(playerOutcome && !splitHands);
 
   return (
     <div className={`casino-card-felt casino-card-felt--blackjack casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
@@ -323,7 +311,7 @@ export default function BlackjackTableScene({
           </section>
         </div>
 
-        {remoteBindings.map(({ key, label, seat, waiting }, index) => {
+        {displayedRemoteBindings.map(({ key, label, seat, waiting }, index) => {
           const layout = remoteSeatLayout[index] || BLACKJACK_REMOTE_LAYOUT[Math.min(index, BLACKJACK_REMOTE_LAYOUT.length - 1)];
           const seatCards = seat?.cards || [];
           const seatName = seat?.name || seat?.username || label;
@@ -386,71 +374,97 @@ export default function BlackjackTableScene({
         <div className="casino-blackjack-player-layer">
           <article className={`casino-oval-seat casino-oval-seat--player casino-oval-seat--blackjack-player ${isDecisionPhase ? "is-focus" : ""}`}>
             <div className="casino-blackjack-player-core">
-              {playerOutcome ? (
+              {showHeroOutcome ? (
                 <div className={`casino-blackjack-seat-outcome casino-blackjack-seat-outcome--hero is-${playerOutcome.tone}`} aria-live="polite">
                   <strong>{playerOutcome.label}</strong>
                   {playerOutcome.detail ? <span>{playerOutcome.detail}</span> : null}
                 </div>
               ) : null}
 
-              <div className={`casino-blackjack-hand-stack ${hands.length > 1 ? "is-split" : ""}`}>
-                {hands.map((hand, handIndex) => {
-                  const tone = getOutcomeTone(hand.result, hand.lastDelta);
-                  const handOutcome =
-                    state?.stage === "resolved"
-                    && (hands.length > 1 || handIndex > 0)
-                    && tone
-                      ? {
-                          label: tone === "win" ? "WIN" : "LOSE",
-                          detail:
-                            hand.lastDelta > 0
-                              ? `+${formatCredits(hand.lastDelta)}`
-                              : hand.lastDelta < 0
-                                ? `-${formatCredits(Math.abs(hand.lastDelta))}`
-                                : hand.result,
-                          tone,
-                        }
-                      : null;
+              {hands.length ? (
+                <div className={`casino-blackjack-hand-stack ${splitHands ? "is-split" : ""}`}>
+                  {hands.map((hand, handIndex) => {
+                    const tone = getOutcomeTone(hand.result, hand.lastDelta);
+                    const handOutcome =
+                      state?.stage === "resolved"
+                      && (hands.length > 1 || handIndex > 0)
+                      && tone
+                        ? {
+                            label: tone === "win" ? "WIN" : "LOSE",
+                            detail:
+                              hand.lastDelta > 0
+                                ? `+${formatCredits(hand.lastDelta)}`
+                                : hand.lastDelta < 0
+                                  ? `-${formatCredits(Math.abs(hand.lastDelta))}`
+                                  : hand.result,
+                            tone,
+                          }
+                        : null;
 
-                  return (
-                    <section
-                      key={hand.id}
-                      className={`casino-blackjack-player-hand ${hand.isActive ? "is-active" : ""} ${hands.length > 1 ? "is-split-hand" : ""}`}
-                    >
-                      <header className="casino-blackjack-hand-meta casino-blackjack-hand-meta--player">
-                        <span>{hands.length > 1 ? `Main ${handIndex + 1}` : "Joueur"}</span>
-                        <strong>{hand.score.total || 0} points</strong>
-                      </header>
+                    return (
+                      <section
+                        key={hand.id}
+                        className={`casino-blackjack-player-hand ${hand.isActive ? "is-active" : ""} ${splitHands ? "is-split-hand" : ""}`}
+                      >
+                        <header className="casino-blackjack-hand-meta casino-blackjack-hand-meta--player">
+                          <span>{hands.length > 1 ? `Main ${handIndex + 1}` : "Joueur"}</span>
+                          <strong>{hand.score.total || 0} points</strong>
+                        </header>
 
-                      <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
-                        {hand.cards.length ? (
-                          hand.cards.map((card, index) => (
-                            <PiratePlayingCardView
-                              key={`${hand.id}-${card.id}-${index}`}
-                              card={card}
-                              emphasis="strong"
-                              dealt={Boolean(dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] !== undefined)}
-                              dealDelayMs={dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] || 0}
-                            />
-                          ))
-                        ) : null}
-                      </div>
-
-                      <div className="casino-blackjack-player-banner" aria-label={`Main de ${playerSeatName}`}>
-                        <strong>{hands.length > 1 ? `${playerSeatName} · Main ${handIndex + 1}` : playerSeatName}</strong>
-                        <span>{hand.score.total || 0} points</span>
-                      </div>
-
-                      {handOutcome ? (
-                        <div className={`casino-blackjack-seat-outcome is-${handOutcome.tone}`} aria-live="polite">
-                          <strong>{handOutcome.label}</strong>
-                          {handOutcome.detail ? <span>{handOutcome.detail}</span> : null}
+                        <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
+                          {hand.cards.length ? (
+                            hand.cards.map((card, index) => (
+                              <PiratePlayingCardView
+                                key={`${hand.id}-${card.id}-${index}`}
+                                card={card}
+                                emphasis="strong"
+                                dealt={Boolean(dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] !== undefined)}
+                                dealDelayMs={dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] || 0}
+                              />
+                            ))
+                          ) : null}
                         </div>
-                      ) : null}
-                    </section>
-                  );
-                })}
-              </div>
+
+                        <div className="casino-blackjack-player-banner" aria-label={`Main de ${playerSeatName}`}>
+                          <strong>{splitHands ? `${playerSeatName} · Main ${handIndex + 1}` : playerSeatName}</strong>
+                          <span>{hand.score.total || 0} points</span>
+                        </div>
+
+                        {handOutcome ? (
+                          <div className={`casino-blackjack-seat-outcome is-${handOutcome.tone}`} aria-live="polite">
+                            <strong>{handOutcome.label}</strong>
+                            {handOutcome.detail ? <span>{handOutcome.detail}</span> : null}
+                          </div>
+                        ) : null}
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : centeredSeat ? (
+                <section className="casino-blackjack-player-hand casino-blackjack-player-hand--featured-seat">
+                  <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
+                    {centeredSeatCards.map((card, index) => (
+                      <PiratePlayingCardView
+                        key={`${centeredSeat.id || centeredSeatName}-${card.id}-${index}`}
+                        card={card}
+                        emphasis="strong"
+                        dealt={Boolean(dealtCardDelays[`${centeredSeat.id || centeredSeatName}-${card.id}-${index}`] !== undefined)}
+                        dealDelayMs={dealtCardDelays[`${centeredSeat.id || centeredSeatName}-${card.id}-${index}`] || 0}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="casino-blackjack-player-banner" aria-label={`Main de ${centeredSeatName}`}>
+                    <strong>{centeredSeatName}</strong>
+                    <span>{centeredSeatScore?.total || 0} points</span>
+                  </div>
+                </section>
+              ) : (
+                <div className="casino-blackjack-player-banner" aria-live="polite">
+                  <strong>{playerSeatName}</strong>
+                  <span>Pose ta mise pour entrer dans la prochaine manche.</span>
+                </div>
+              )}
             </div>
           </article>
 

@@ -33,7 +33,45 @@ const TABLE_DEAL_STEP_MS = 96;
 const LIVE_MIN_PLAYERS = 2;
 const BLACKJACK_RESULT_FLASH_MS = 1800;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
-const LIVE_TURN_LIMIT_MS = 90_000;
+
+function normalizeBlackjackIdentity(value: string | null | undefined) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function findBlackjackSelfSeat(state: BlackjackState | null, currentUserId: string, playerName: string) {
+  const normalizedSelfSeatId = normalizeBlackjackIdentity(state?.selfSeatId);
+  const normalizedCurrentUserId = normalizeBlackjackIdentity(currentUserId);
+  const normalizedPlayerName = normalizeBlackjackIdentity(playerName);
+  const candidates = [...(state?.seats || []), ...(state?.aiSeats || [])];
+
+  return (
+    candidates.find((seat) => {
+      const seatId = normalizeBlackjackIdentity(seat.id);
+      const seatUserId = normalizeBlackjackIdentity(seat.userId);
+      const seatName = normalizeBlackjackIdentity(seat.name || seat.username);
+
+      return Boolean(
+        seat.isSelf
+        || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
+        || (normalizedCurrentUserId && (seatId === normalizedCurrentUserId || seatUserId === normalizedCurrentUserId))
+        || (normalizedPlayerName && seatName === normalizedPlayerName),
+      );
+    }) || null
+  );
+}
+
+function hasBlackjackHeroRound(state: BlackjackState | null, currentUserId: string, playerName: string) {
+  if (!state) return false;
+  if (state.playerCards.length || state.playerHands?.some((hand) => Boolean(hand.cards?.length))) {
+    return true;
+  }
+  return Boolean(findBlackjackSelfSeat(state, currentUserId, playerName)?.cards?.length);
+}
+
+function isBlackjackSpectatorRound(state: BlackjackState | null, currentUserId: string, playerName: string) {
+  if (!state?.token || !state.roomId) return false;
+  return !hasBlackjackHeroRound(state, currentUserId, playerName);
+}
 
 function getNormalizedBlackjackHands(state: BlackjackState | null): BlackjackHand[] {
   if (!state) return [];
@@ -61,24 +99,36 @@ function getNormalizedBlackjackHands(state: BlackjackState | null): BlackjackHan
   ];
 }
 
-function getBlackjackLegalActions(state: BlackjackState | null) {
-  return getBlackjackLegalActionsForBalance(state, Number.POSITIVE_INFINITY);
+function getBlackjackLegalActions(state: BlackjackState | null, currentUserId: string, playerName: string) {
+  return getBlackjackLegalActionsForBalance(state, Number.POSITIVE_INFINITY, currentUserId, playerName);
 }
 
-function isBlackjackSelfTurn(state: BlackjackState | null) {
+function isBlackjackSelfTurn(state: BlackjackState | null, currentUserId: string, playerName: string) {
   if (!state || state.stage !== "player-turn" || !state.token) return false;
 
-  const selfSeatId = String(state.selfSeatId || "").trim();
-  const activeSeatId = String(state.activeSeatId || "").trim();
+  const selfSeat = findBlackjackSelfSeat(state, currentUserId, playerName);
+  const selfSeatId = normalizeBlackjackIdentity(selfSeat?.id || selfSeat?.userId || state.selfSeatId);
+  const activeSeatId = normalizeBlackjackIdentity(state.activeSeatId);
   if (selfSeatId && activeSeatId) {
     return selfSeatId === activeSeatId;
   }
 
-  return !state.aiSeats.some((seat) => Boolean(seat?.isActive));
+  if (selfSeat?.isActive) {
+    return true;
+  }
+
+  return Boolean(selfSeat && !activeSeatId && ![...(state.seats || []), ...(state.aiSeats || [])].some((seat) => seat !== selfSeat && seat.isActive));
 }
 
-function getBlackjackLegalActionsForBalance(state: BlackjackState | null, walletBalance: number) {
-  if (!state || state.stage !== "player-turn" || !isBlackjackSelfTurn(state)) return [] as BlackjackAction[];
+function getBlackjackLegalActionsForBalance(
+  state: BlackjackState | null,
+  walletBalance: number,
+  currentUserId: string,
+  playerName: string,
+) {
+  if (!state || state.stage !== "player-turn" || !isBlackjackSelfTurn(state, currentUserId, playerName)) {
+    return [] as BlackjackAction[];
+  }
 
   const actionSet = new Set<BlackjackAction>(state.legalActions?.length ? state.legalActions : ["hit", "stand"]);
   getNormalizedBlackjackHands(state)
@@ -127,7 +177,7 @@ function getBlackjackCardKeys(state: BlackjackState | null) {
   return keys;
 }
 
-function buildBlackjackSyncSignature(state: BlackjackState | null) {
+function buildBlackjackSyncSignature(state: BlackjackState | null, currentUserId: string, playerName: string) {
   if (!state?.token) return "";
   const normalizedHands = getNormalizedBlackjackHands(state);
   return JSON.stringify({
@@ -152,7 +202,7 @@ function buildBlackjackSyncSignature(state: BlackjackState | null) {
       total: hand.score.total,
       active: Boolean(hand.isActive),
     })),
-    legalActions: getBlackjackLegalActions(state),
+    legalActions: getBlackjackLegalActions(state, currentUserId, playerName),
     playerTotal: state.playerScore.total,
     dealerTotal: state.dealerScore.total,
     payoutAmount: state.payoutAmount,
@@ -165,6 +215,19 @@ function formatTurnClock(remainingMs: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function parseTableDeadline(value: string | null | undefined) {
+  const timestamp = Date.parse(String(value || ""));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getBlackjackPhaseDeadlineAt(state: BlackjackState | null) {
+  if (!state) return null;
+  if (state.stage === "waiting") {
+    return parseTableDeadline(state.bettingClosesAt);
+  }
+  return parseTableDeadline(state.turnDeadlineAt);
 }
 
 type BlackjackRoomProps = {
@@ -208,20 +271,25 @@ export default function BlackjackRoom({
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
-  const roomSwitchLocked = stage === "player-turn";
+  const hasHeroRound = hasBlackjackHeroRound(state, profile.user.id, playerName);
+  const isSpectatingRound = isBlackjackSpectatorRound(state, profile.user.id, playerName);
+  const roomSwitchLocked = stage === "player-turn" && hasHeroRound;
   const betLocked = roomSwitchLocked || working;
   const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
   const activePlayerCount = activeRoom?.playerCount || 0;
   const autoLiveMode = activePlayerCount >= LIVE_MIN_PLAYERS;
   const currentRoundIsLive = Boolean(state?.roomId);
   const shouldSyncLiveRoom = currentRoundIsLive || (stage !== "player-turn" && autoLiveMode);
-  const isDecisionPhase = isBlackjackSelfTurn(state);
+  const isDecisionPhase = isBlackjackSelfTurn(state, profile.user.id, playerName);
   const legalActions = useMemo(
-    () => getBlackjackLegalActionsForBalance(state, profile.wallet.balance),
-    [profile.wallet.balance, state],
+    () => getBlackjackLegalActionsForBalance(state, profile.wallet.balance, profile.user.id, playerName),
+    [playerName, profile.user.id, profile.wallet.balance, state],
   );
   const turnCountdownMs = turnDeadlineAt ? Math.max(0, turnDeadlineAt - nowTick) : 0;
-  const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "1:30";
+  const turnCountdownLabel = turnDeadlineAt ? formatTurnClock(turnCountdownMs) : "--:--";
+  const blackjackStatusMessage = isSpectatingRound
+    ? "Une manche est deja en cours sur ce salon."
+    : state?.message || "Table synchronisee par salon avec mise et resultat geres cote serveur.";
 
   function applySyncedState(nextState: BlackjackState | null, syncedAt: number, nextDeadlineAt: number | null) {
     if (!nextState?.roomId) return;
@@ -272,15 +340,27 @@ export default function BlackjackRoom({
         if (cancelled) return;
         setRooms(result.rooms);
 
-        try {
-          const sharedState = await fetchBlackjackRoomState(roomId);
-          if (cancelled || !sharedState) return;
-          applySyncedState(sharedState, Date.now(), turnDeadlineAt);
-          return;
-        } catch (syncError) {
-          if (cancelled) return;
-          if (syncError instanceof Error) {
-            onError(syncError.message);
+        const joinedRoom = result.rooms.find((entry) => entry.id === roomId) || null;
+        const joinedRoomIsLive = (joinedRoom?.playerCount || 0) >= LIVE_MIN_PLAYERS;
+        const shouldFetchSharedState = currentRoundIsLive || (stage !== "player-turn" && joinedRoomIsLive);
+
+        if (shouldFetchSharedState) {
+          try {
+            const sharedState = await fetchBlackjackRoomState(roomId);
+            if (cancelled || !sharedState) return;
+            if (
+              hasBlackjackHeroRound(state, profile.user.id, playerName)
+              && !hasBlackjackHeroRound(sharedState, profile.user.id, playerName)
+            ) {
+              return;
+            }
+            applySyncedState(sharedState, Date.now(), getBlackjackPhaseDeadlineAt(sharedState));
+            return;
+          } catch (syncError) {
+            if (cancelled) return;
+            if (syncError instanceof Error) {
+              onError(syncError.message);
+            }
           }
         }
 
@@ -300,7 +380,7 @@ export default function BlackjackRoom({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [onError, roomId, turnDeadlineAt]);
+  }, [currentRoundIsLive, onError, roomId, stage, turnDeadlineAt]);
 
   useEffect(() => {
     const existingSnapshot = readTableChannelSnapshot<BlackjackState>("blackjack", roomId);
@@ -322,22 +402,13 @@ export default function BlackjackRoom({
       return;
     }
 
-    const signature = buildBlackjackSyncSignature(state);
-    const isActionable = state.stage === "player-turn" && Boolean(state.token);
-    const shouldResetTurnClock = Boolean(
-      isActionable && (!turnDeadlineAt || signature !== lastTurnSignatureRef.current || turnDeadlineAt <= Date.now()),
-    );
-    const nextDeadlineAt = isActionable
-      ? shouldResetTurnClock
-        ? Date.now() + LIVE_TURN_LIMIT_MS
-        : turnDeadlineAt
-      : null;
-
+    const signature = buildBlackjackSyncSignature(state, profile.user.id, playerName);
     if (signature !== lastTurnSignatureRef.current) {
       lastTimedOutSignatureRef.current = "";
     }
     lastTurnSignatureRef.current = signature;
 
+    const nextDeadlineAt = getBlackjackPhaseDeadlineAt(state);
     if (nextDeadlineAt !== turnDeadlineAt) {
       setTurnDeadlineAt(nextDeadlineAt);
     }
@@ -351,18 +422,27 @@ export default function BlackjackRoom({
       turnDeadlineAt: nextDeadlineAt,
       state,
     });
-  }, [roomId, state, turnDeadlineAt]);
+  }, [playerName, profile.user.id, roomId, state, turnDeadlineAt]);
 
   useEffect(() => {
-    if (!currentRoundIsLive || !state?.token || stage !== "player-turn" || !turnDeadlineAt || working || !isBlackjackSelfTurn(state)) return;
+    if (
+      !currentRoundIsLive
+      || !state?.token
+      || stage !== "player-turn"
+      || !turnDeadlineAt
+      || working
+      || !isBlackjackSelfTurn(state, profile.user.id, playerName)
+    ) {
+      return;
+    }
 
-    const signature = buildBlackjackSyncSignature(state);
+    const signature = buildBlackjackSyncSignature(state, profile.user.id, playerName);
     if (!signature || turnDeadlineAt > nowTick || lastTimedOutSignatureRef.current === signature) return;
 
     lastTimedOutSignatureRef.current = signature;
     onError("Temps ecoule: la table passe automatiquement sur Rester.");
     void act("stand");
-  }, [currentRoundIsLive, nowTick, onError, stage, state, turnDeadlineAt, working]);
+  }, [currentRoundIsLive, nowTick, onError, playerName, profile.user.id, stage, state, turnDeadlineAt, working]);
 
   useEffect(() => {
     return () => {
@@ -452,10 +532,14 @@ export default function BlackjackRoom({
     }
     setWorking(true);
     try {
-      const result = await startBlackjackRound(bet, autoLiveMode ? roomId : undefined);
+      const result = await startBlackjackRound(bet, roomId);
       setState(result.state);
       if (result.profile) {
         onProfileChange(result.profile);
+      }
+      if (isBlackjackSpectatorRound(result.state, profile.user.id, playerName)) {
+        onError("Une manche est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans cette table.");
+        return;
       }
     } catch (error_) {
       if (error_ instanceof Error && error_.message.trim().toLowerCase() === "table_full") {
@@ -477,6 +561,10 @@ export default function BlackjackRoom({
     setWorking(true);
     try {
       const result = await actBlackjackRound(state.token, action);
+      if (isBlackjackSpectatorRound(result.state, profile.user.id, playerName)) {
+        onError("Le serveur a renvoye une manche qui ne t'appartient pas. La table reste verrouillee jusqu'a la prochaine donne.");
+        return;
+      }
       setState(result.state);
       if (result.profile) {
         onProfileChange(result.profile);
@@ -564,7 +652,7 @@ export default function BlackjackRoom({
                     </button>
                     <span
                       className={`casino-card-turn-timer ${turnDeadlineAt ? "is-live" : ""} ${turnCountdownMs <= 10_000 && turnDeadlineAt ? "is-warning" : ""}`}
-                      aria-label={turnDeadlineAt ? `Temps restant ${turnCountdownLabel}` : "Timer de table en attente"}
+                      aria-label={turnDeadlineAt ? `${stage === "waiting" ? "Fin de mise" : "Temps restant"} ${turnCountdownLabel}` : "Timer de table en attente"}
                     >
                       {turnDeadlineAt ? turnCountdownLabel : "Timer --:--"}
                     </span>
@@ -572,7 +660,7 @@ export default function BlackjackRoom({
                 </div>
                 <strong>{blackjackRoomMeta?.title || "Blackjack pirate"}</strong>
                 <p>
-                  {state?.message || "Table synchronisee par salon avec mise et resultat geres cote serveur."}
+                  {blackjackStatusMessage}
                   {activeRoom ? ` Salon actif: ${BLACKJACK_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
                 </p>
               </div>
@@ -698,6 +786,7 @@ export default function BlackjackRoom({
               rooms={rooms}
               infoTab={infoTab}
               isDecisionPhase={isDecisionPhase}
+              isSpectatingRound={isSpectatingRound}
               roomSwitchLocked={roomSwitchLocked}
               legalActions={legalActions}
               onBetChipAdd={handleBetChipAdd}
