@@ -58,7 +58,6 @@ type PirateSlotsGameProps = {
   slotsIntroDelayActive?: boolean;
   ambientVideoAudible: boolean;
   ambientVideoRef: MutableRefObject<HTMLVideoElement | null>;
-  freshVideo: string;
   onAmbientPanelChange?: (panel: React.ReactNode | null) => void;
   onProfileChange: (profile: CasinoProfile, message?: string) => void;
   onError: (message: string) => void;

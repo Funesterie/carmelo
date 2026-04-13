@@ -119,7 +119,6 @@ export default function App() {
                   slotsIntroDelayActive={media.slotsIntroDelayActive}
                   ambientVideoAudible={media.ambientVideoAudible}
                   ambientVideoRef={media.ambientVideoRef}
-                  freshVideo={freshVideo}
                   activeRoom={session.activeCasinoRoom}
                   onRouletteEvent={media.handleRouletteEvent}
                   onAmbientPanelChange={setAmbientPanel}

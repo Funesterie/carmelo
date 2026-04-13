@@ -133,8 +133,6 @@ export default function CasinoGameScreen({
   const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient;
   const showDedicatedAmbientPanel = !showImmersion && usesDedicatedAmbient && Boolean(ambientPanel);
 
-  const headerVideoSrc = freshVideo;
-
   React.useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       if (!profileMenuRef.current?.contains(event.target as Node)) {
@@ -225,7 +223,6 @@ export default function CasinoGameScreen({
               <video
                 ref={ambientVideoRef}
                 className="casino-account-bar__ambient-video"
-                src={headerVideoSrc}
                 autoPlay
                 loop
                 playsInline
