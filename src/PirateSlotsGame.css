@@ -19642,14 +19642,14 @@ button {
     isolation: isolate;
   }
 
-  .casino-account-bar__menu,
-  .casino-account-bar__actions {
+  .casino-account-bar__menu {
     position: relative;
     z-index: 130 !important;
+    pointer-events: none;
   }
 
-  .casino-account-bar__menu {
-    pointer-events: none;
+  .casino-account-bar__actions {
+    z-index: 130 !important;
   }
 
   .casino-account-bar__menu-toggle,
