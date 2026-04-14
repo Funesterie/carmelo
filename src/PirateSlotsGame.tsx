@@ -478,6 +478,21 @@ function SlotsRoom({
     });
   }
 
+  function resumeSlotsAmbientForSpinStart() {
+    if (!slotIntroPlayed || isAlertFeatureActive) return;
+    if (connectionImmersionPending || slotsIntroDelayActive || immersionActive) return;
+
+    const ambientVideo = ambientLoopVideoRef.current;
+    if (!ambientVideo) return;
+
+    const shouldUseAudio = mediaReady;
+    ambientVideo.muted = !shouldUseAudio;
+    ambientVideo.volume = shouldUseAudio ? 0.34 : 0;
+    if (ambientVideo.paused) {
+      void ambientVideo.play().catch(() => undefined);
+    }
+  }
+
   function playCue(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string, volume: number) {
     if (!mediaReady) return;
     if (!ref.current) {
@@ -764,6 +779,7 @@ function SlotsRoom({
 
   async function handleSpin() {
     if (!canSpin) return;
+    resumeSlotsAmbientForSpinStart();
     onError("");
     spinRunIdRef.current += 1;
     const runId = spinRunIdRef.current;
@@ -808,6 +824,7 @@ function SlotsRoom({
 
   function startAutoSpin(count: number) {
     if (!canSpin || spinState !== "idle" || pendingBonusFlow) return;
+    resumeSlotsAmbientForSpinStart();
     setAutoSpinCount(count);
     setLastMessage(`Auto spin arme: ${count} tours en attente.`);
   }
@@ -936,7 +953,10 @@ function SlotsRoom({
                   <button
                     type="button"
                     className="casino-primary-button casino-primary-button--spin"
-                    onClick={handleSpin}
+                    onClick={() => {
+                      onRequestMediaPlayback?.();
+                      void handleSpin();
+                    }}
                     disabled={!canSpin}
                   >
                     {spinState === "spinning" ? "Reels en cours..." : "Lancer le spin"}
@@ -944,7 +964,10 @@ function SlotsRoom({
                   <button
                     type="button"
                     className="casino-ghost-button"
-                    onClick={() => startAutoSpin(autoSpinPreset)}
+                    onClick={() => {
+                      onRequestMediaPlayback?.();
+                      startAutoSpin(autoSpinPreset);
+                    }}
                     disabled={!canSpin || spinState !== "idle" || Boolean(pendingBonusFlow)}
                   >
                     Auto Spin x{autoSpinPreset}

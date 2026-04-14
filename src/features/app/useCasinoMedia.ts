@@ -332,6 +332,13 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     rouletteQueueRef.current = rouletteQueueRef.current.then(task).catch(() => undefined);
   }
 
+  function getRouletteAmbientMedia() {
+    if (activeCasinoRoom === "roulette") {
+      return ambientVideoRef.current || rouletteAmbientAudioRef.current;
+    }
+    return rouletteAmbientAudioRef.current;
+  }
+
   function handleRouletteEvent(event: RouletteSoundEvent) {
     if (!mediaUnlockedRef.current) return;
     if (event.type !== "spin") {
@@ -343,15 +350,17 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       const introVoice = Math.random() > 0.5 ? fantomeAudio : moussaillonAudio;
       const cannonDelayMs = event.canonDelayMs || ROULETTE_TIRAGE_CANNON_DELAY_MS;
       const targetCannonAtMs = Math.max(0, Number(event.cannonAtMs || 0));
-      const ambient = rouletteAmbientAudioRef.current;
+      const ambient = getRouletteAmbientMedia();
       const previousAmbientVolume = ambient?.volume ?? 0.14;
       const shouldResumeAmbient = Boolean(ambient && activeCasinoRoom === "roulette");
 
       stopMedia(cueAudioRef.current);
       stopMedia(cannonAudioRef.current);
       if (ambient) {
-        pauseMedia(ambient);
-        ambient.volume = 0.02;
+        ambient.volume = Math.max(0.03, previousAmbientVolume * 0.28);
+        if (ambient.paused) {
+          void ambient.play().catch(() => undefined);
+        }
       }
 
       await playAudioClip(cueAudioRef, introVoice, 0.92, true);
@@ -365,7 +374,9 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
 
       if (ambient && shouldResumeAmbient) {
         ambient.volume = previousAmbientVolume;
-        void ambient.play().catch(() => undefined);
+        if (ambient.paused) {
+          void ambient.play().catch(() => undefined);
+        }
       }
     });
   }

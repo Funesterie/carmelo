@@ -150,6 +150,7 @@ export default function CasinoGameScreen({
   const usesDedicatedAmbient = activeCasinoRoom === "slots" || activeCasinoRoom === "roulette";
   const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient;
   const showDedicatedAmbientPanel = !showImmersion && usesDedicatedAmbient && Boolean(ambientPanel);
+  const showAmbientUnderlay = !showImmersion && activeCasinoRoom === "roulette";
   const tableGame = isTableChannelRoom(activeCasinoRoom) ? activeCasinoRoom : null;
   const channelRooms = tableGame ? tableLobby?.rooms || [] : [];
   const joinedTableRoomId =
@@ -290,8 +291,23 @@ export default function CasinoGameScreen({
                 muted={!ambientVideoAudible}
                 preload="none"
               />
-            ) : showDedicatedAmbientPanel ? (
-              ambientPanel
+            ) : showDedicatedAmbientPanel || showAmbientUnderlay ? (
+              <>
+                {showAmbientUnderlay ? (
+                  <video
+                    ref={ambientVideoRef}
+                    className="casino-account-bar__ambient-video is-underlay"
+                    autoPlay
+                    loop
+                    playsInline
+                    muted={!ambientVideoAudible}
+                    preload="none"
+                  />
+                ) : null}
+                <div className="casino-account-bar__ambient-overlay">
+                  {showDedicatedAmbientPanel ? ambientPanel : <div className="casino-account-bar__ambient--placeholder" aria-hidden="true" />}
+                </div>
+              </>
             ) : (
               <div className="casino-account-bar__ambient--placeholder" aria-hidden="true" />
             )}

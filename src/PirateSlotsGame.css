@@ -11884,6 +11884,11 @@ button {
   inset: 0;
 }
 
+.casino-account-bar__ambient-overlay > * {
+  width: 100%;
+  height: 100%;
+}
+
 .casino-account-bar__ambient.is-custom-ambient {
   width: min(100%, 620px);
   height: clamp(220px, 28vw, 340px);
