@@ -1,4 +1,5 @@
 import * as React from "react";
+
 import { ROOM_DEFINITIONS, type RoomId } from "../../casino/catalog";
 import type { MutableRefObject, ReactNode } from "react";
 import icoSlotsImg from "../../../images/icomachine.png";
@@ -92,6 +93,7 @@ type CasinoGameScreenProps = {
   showImmersion: boolean;
   immersionLine: string;
   mediaReady: boolean;
+  mediaStatus: string;
   ambientVideoAudible: boolean;
   ambientVideoRef: MutableRefObject<HTMLVideoElement | null>;
   ambientPanel?: ReactNode;
@@ -103,6 +105,7 @@ type CasinoGameScreenProps = {
   onLogout: () => void;
   onRoomChange: (roomId: RoomId) => void;
   gameTable: ReactNode;
+  requestMediaPlayback: () => void;
 };
 
 function isTableChannelRoom(roomId: RoomId): roomId is TableSalonGame {
@@ -119,6 +122,7 @@ export default function CasinoGameScreen({
   showImmersion,
   immersionLine,
   mediaReady,
+  mediaStatus,
   ambientVideoAudible,
   ambientVideoRef,
   ambientPanel,
@@ -130,6 +134,7 @@ export default function CasinoGameScreen({
   onLogout,
   onRoomChange,
   gameTable,
+  requestMediaPlayback,
 }: CasinoGameScreenProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [showOneVideo, setShowOneVideo] = React.useState(false);
@@ -266,6 +271,8 @@ export default function CasinoGameScreen({
           style={{
             backgroundImage: `linear-gradient(140deg, rgba(5, 8, 12, 0.86), rgba(7, 12, 20, 0.94)), radial-gradient(circle at top left, rgba(255, 200, 87, 0.18), transparent 24%), url("${cardArtwork}")`,
           }}
+          onPointerDown={mediaReady ? undefined : requestMediaPlayback}
+          onClick={mediaReady ? undefined : requestMediaPlayback}
         >
           <div className="casino-immersion-overlay__panel">
             <div className="casino-immersion-overlay__copy">
@@ -277,6 +284,11 @@ export default function CasinoGameScreen({
                 <span>Tables ATS en cours d'arrimage</span>
                 <span>Canon live en veille sur la roulette</span>
               </div>
+              {!mediaReady ? (
+                <button className="casino-immersion-audio-btn" onClick={requestMediaPlayback}>
+                  Activer le son
+                </button>
+              ) : null}
             </div>
             <div
               className="casino-immersion-overlay__video-shell"

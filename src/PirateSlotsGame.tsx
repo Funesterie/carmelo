@@ -48,6 +48,7 @@ import {
   type CasinoSpin,
   type CasinoTransaction,
 } from "./lib/casinoApi";
+import { safePlayMedia } from "./features/app/useCasinoMedia";
 
 type PirateSlotsGameProps = {
   activeRoom: RoomId;
@@ -397,7 +398,7 @@ function SlotsRoom({
     const playAmbientLoop = () => {
       ambientVideo.muted = !shouldUseAudio;
       ambientVideo.volume = shouldUseAudio ? 0.34 : 0;
-      void ambientVideo.play().catch(() => undefined);
+      void safePlayMedia(ambientVideo, "ambientVideo");
     };
 
     ambientVideo.addEventListener("loadeddata", playAmbientLoop);
@@ -496,7 +497,7 @@ function SlotsRoom({
       }
       video.muted = !shouldUseAudio;
       video.volume = shouldUseAudio ? volume : 0;
-      void video.play().catch(() => undefined);
+      void safePlayMedia(video, "featureVideo");
     };
 
     video.addEventListener("loadeddata", playFeatureVideo);
@@ -555,7 +556,7 @@ function SlotsRoom({
     ambientVideo.muted = !shouldUseAudio;
     ambientVideo.volume = shouldUseAudio ? 0.34 : 0;
     if (ambientVideo.paused) {
-      void ambientVideo.play().catch(() => undefined);
+      void safePlayMedia(ambientVideo, "ambientVideo");
     }
   }
 
@@ -572,7 +573,7 @@ function SlotsRoom({
       // ignore
     }
     ref.current.volume = volume;
-    void ref.current.play().catch(() => undefined);
+    void safePlayMedia(ref.current, "cueAudio");
   }
 
   function buildBonusHeldTurns(indexes: number[], previous: BonusHeldTurns = {}) {

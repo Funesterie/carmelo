@@ -336,38 +336,38 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       return;
     }
 
-
-    // Ne pas jouer entryAudio ni aucun son audible ici, juste déverrouiller si besoin
-    if (!showImmersion && activeCasinoRoom === "roulette") {
+    // Unlock audio même pendant l’immersion
+    let result;
+    setMediaStatus("unlocking");
+    if (activeCasinoRoom === "roulette" && !showImmersion) {
       const unlockAudio = getAudio(cueAudioRef, entryAudio);
       unlockAudio.volume = 0.84;
       unlockAudio.muted = false;
-      setMediaStatus("unlocking");
-      const result = await safePlayMedia(unlockAudio, "unlockAudio");
+      result = await safePlayMedia(unlockAudio, "unlockAudio");
       unlockAudio.pause();
       unlockAudio.currentTime = 0;
-      mediaUnlockedRef.current = !!result.ok;
-      setMediaReady(!!result.ok);
-      setMediaStatus(result.ok ? "ready" : "blocked");
-    } else if (!showImmersion) {
-      // Pour les autres cas, déverrouille avec un son muet
+    } else {
       const unlockAudio = new Audio(silentAudio);
       unlockAudio.volume = 0;
       unlockAudio.muted = false;
-      setMediaStatus("unlocking");
-      const result = await safePlayMedia(unlockAudio, "unlockSilent");
+      result = await safePlayMedia(unlockAudio, "unlockSilent");
       unlockAudio.pause();
       unlockAudio.currentTime = 0;
-      mediaUnlockedRef.current = !!result.ok;
-      setMediaReady(!!result.ok);
-      setMediaStatus(result.ok ? "ready" : "blocked");
     }
+    mediaUnlockedRef.current = !!result.ok;
+    setMediaReady(!!result.ok);
+    setMediaStatus(result.ok ? "ready" : "blocked");
 
-    if (activeCasinoRoom === "slots") {
-      pauseMedia(ambientVideoRef.current);
-      setAmbientVideoAudible(false);
-    } else {
-      await syncAmbientVideo(mediaUnlockedRef.current, shouldPlayHeaderVideo);
+    // Si on est en immersion et l’audio n’a pas encore été joué, jouer funesterie.mp3 immédiatement après unlock
+    if (showImmersion && !immersionAudioPlayedRef.current && mediaUnlockedRef.current) {
+      const didPlay = await playAudioClip(introAudioRef, funesterieAudio, 0.56);
+      if (didPlay) {
+        scheduleSlotsIntroDelay();
+        immersionAudioPlayedRef.current = true;
+        try {
+          sessionStorage.setItem(CASINO_IMMERSION_AUDIO_SESSION_KEY, "1");
+        } catch {}
+      }
     }
 
   }
