@@ -16,6 +16,7 @@ export default function App() {
   const media = useCasinoMedia({
     activeCasinoRoom: session.activeCasinoRoom,
     profileLoaded: Boolean(session.profile),
+    roomChangeCount: session.roomChangeCount,
   });
 
   useEffect(() => {

@@ -318,6 +318,15 @@ function SlotsRoom({
   }, [onAmbientPanelChange, slotAmbientPanel]);
 
   useEffect(() => {
+    if (!shouldShowSlotIntro) return;
+    try {
+      sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
+    } catch {
+      // ignore storage failures
+    }
+  }, [shouldShowSlotIntro]);
+
+  useEffect(() => {
     const ambientVideo = ambientLoopVideoRef.current;
     if (!ambientVideo) return;
 
@@ -479,6 +488,11 @@ function SlotsRoom({
           // ignore seek failures
         }
         slotIntroPlaybackStartedRef.current = true;
+        try {
+          sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
+        } catch {
+          // ignore storage failures
+        }
       }
       video.muted = !shouldUseAudio;
       video.volume = shouldUseAudio ? volume : 0;

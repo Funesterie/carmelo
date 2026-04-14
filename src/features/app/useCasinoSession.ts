@@ -56,6 +56,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
   const [notice, setNotice] = useState("");
   const [activeCasinoRoom, setActiveCasinoRoom] = useState<RoomId>("slots");
   const [pendingImmersionName, setPendingImmersionName] = useState("");
+  const [roomChangeCount, setRoomChangeCount] = useState(0);
 
   const [loginName, setLoginName] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -246,6 +247,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       }
     }
 
+    setRoomChangeCount((current) => current + 1);
     setActiveCasinoRoom(nextRoomId);
   }
 
@@ -286,6 +288,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     error,
     notice,
     activeCasinoRoom,
+    roomChangeCount,
     setActiveCasinoRoom,
     handleRoomChange,
     displayName,

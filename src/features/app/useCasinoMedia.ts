@@ -54,12 +54,13 @@ function isSameMediaSource(currentSrc: string | null | undefined, targetSrc: str
 type UseCasinoMediaOptions = {
   activeCasinoRoom: RoomId;
   profileLoaded: boolean;
+  roomChangeCount: number;
 };
 
 const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
 const SLOT_ONE_START_DELAY_MS = 1_500;
 
-export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMediaOptions) {
+export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCount }: UseCasinoMediaOptions) {
   const [showImmersion, setShowImmersion] = useState(false);
   const [immersionLine, setImmersionLine] = useState("Ouverture du pont prive...");
   const [ambientVideoAudible, setAmbientVideoAudible] = useState(false);
@@ -78,6 +79,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
   const rouletteEntryPlayedRef = useRef(false);
   const activeRoomRef = useRef(activeCasinoRoom);
   const rouletteAudioScopeRef = useRef(0);
+  const lastRouletteEntryRoomChangeCountRef = useRef(roomChangeCount);
   const immersionAudioPlayedRef = useRef(
     (() => {
       try {
@@ -165,16 +167,21 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       return;
     }
 
+    if (roomChangeCount === lastRouletteEntryRoomChangeCountRef.current) {
+      return;
+    }
+
     if (!rouletteEntryPlayedRef.current) {
       const scope = rouletteAudioScopeRef.current;
       rouletteEntryPlayedRef.current = true;
+      lastRouletteEntryRoomChangeCountRef.current = roomChangeCount;
       queueRouletteAudio(scope, async () => {
         if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
         await playAudioClip(cueAudioRef, entryAudio, 0.84, true);
         if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
       });
     }
-  }, [activeCasinoRoom, profileLoaded, mediaReady]);
+  }, [activeCasinoRoom, profileLoaded, mediaReady, roomChangeCount]);
 
   function getAudio(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string) {
     if (!ref.current) {
