@@ -20,4 +20,9 @@ src/audio/pirate.m4a
 src/katana/
 playtest-out-local/
 playtest-out/
+playtest-out-codex/
+.playwright-cli/
+output/
 devserver*.err
+preview-*.err
+verify-*.png
