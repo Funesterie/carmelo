@@ -116,6 +116,7 @@ export default function App() {
               void media.requestMediaPlayback();
               session.handleForgot();
             }}
+            onRequestMediaPlayback={media.requestMediaPlayback}
           />
         )}
       </div>

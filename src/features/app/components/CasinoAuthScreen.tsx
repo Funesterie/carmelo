@@ -2,7 +2,7 @@ import type * as React from "react";
 
 type AuthMode = "login" | "register" | "forgot";
 
-type CasinoAuthScreenProps = {
+type CasinoAuthScreenProps = Readonly<{
   authMode: AuthMode;
   busy: boolean;
   error: string;
@@ -25,7 +25,8 @@ type CasinoAuthScreenProps = {
   onLoginSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onRegisterSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onForgotSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-};
+  onRequestMediaPlayback?: () => void;
+}>;
 
 export default function CasinoAuthScreen({
   authMode,
@@ -50,6 +51,7 @@ export default function CasinoAuthScreen({
   onLoginSubmit,
   onRegisterSubmit,
   onForgotSubmit,
+  onRequestMediaPlayback,
 }: CasinoAuthScreenProps) {
   return (
     <div className="casino-auth-layout">
@@ -61,14 +63,34 @@ export default function CasinoAuthScreen({
       </section>
 
       <aside className="casino-auth-panel">
+        {/* Sound unlock button already added above */}
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          {onRequestMediaPlayback && (
+            <button
+              type="button"
+              className="casino-ghost-button casino-sound-unlock-btn"
+              onClick={onRequestMediaPlayback}
+              style={{ fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}
+            >
+              <span role="img" aria-label="Activer le son">🔊</span>
+              <span>Activer le son</span>
+            </button>
+          )}
+        </div>
         <div className="casino-auth-panel__header">
-          <h2>{authMode === "login" ? "Connexion" : authMode === "register" ? "Inscription" : "Mot de passe oublie"}</h2>
+          {(() => {
+            let header = "";
+            if (authMode === "login") header = "Connexion";
+            else if (authMode === "register") header = "Inscription";
+            else header = "Mot de passe oublie";
+            return <h2>{header}</h2>;
+          })()}
           <p>
-            {authMode === "login"
-              ? "Reconnecte-toi avec tes identifiants pour retrouver instantanement ton solde."
-              : authMode === "register"
-                ? ""
-                : "On reutilise le circuit mail A11 pour te renvoyer un lien de recuperation."}
+            {(() => {
+              if (authMode === "login") return "Reconnecte-toi avec tes identifiants pour retrouver instantanement ton solde.";
+              if (authMode === "register") return "";
+              return "On reutilise le circuit mail A11 pour te renvoyer un lien de recuperation.";
+            })()}
           </p>
         </div>
 

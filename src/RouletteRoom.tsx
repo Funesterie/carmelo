@@ -145,7 +145,12 @@ function buildRoulettePrizeRain(amount: number, tone: RouletteCelebrationTone): 
 
   return Array.from({ length: count }, (_, index) => {
     const useDiamond = tone !== "win" && index % 3 === 0;
-    const asset = useDiamond ? (index % 2 === 0 ? saphirImg : rubisImg) : lingotImg;
+    let asset: string;
+    if (useDiamond) {
+      asset = index % 2 === 0 ? saphirImg : rubisImg;
+    } else {
+      asset = lingotImg;
+    }
     return {
       id: `roulette-rain-${Date.now()}-${index}`,
       left: `${4 + ((index * 7.6) % 92)}%`,
@@ -183,7 +188,7 @@ export default function RouletteRoom({
   onError,
   onRouletteEvent,
   onAmbientPanelChange,
-}: RouletteRoomProps) {
+}: Readonly<RouletteRoomProps>) {
   const rouletteRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "roulette");
   const [room, setRoom] = useState<RouletteRoom | null>(null);
   const [amount, setAmount] = useState(ROULETTE_AMOUNT_PRESETS[2]);
@@ -598,11 +603,48 @@ export default function RouletteRoom({
   const hasPendingBets = pendingBets.length > 0;
   const betsLocked = tableHasServerActivity && remainingMs <= ROULETTE_AUTO_SUBMIT_THRESHOLD_MS;
   const displayedGainTotal = celebration?.payoutTotal || lastResolvedPayout;
-  const rouletteSummaryTitle = hasPendingBets
-    ? `${pendingBets.length} mise${pendingBets.length > 1 ? "s" : ""} en attente`
-    : selectedBet
-      ? `Cible: ${selectedBet.label}`
-      : joinedSalon.title;
+
+  // Utilitaire global pour le pluriel
+  function getPlural(count: number, singular: string, plural: string) {
+    return count > 1 ? plural : singular;
+  }
+
+  function getRouletteSummaryTitle() {
+    if (hasPendingBets) {
+      return `${pendingBets.length} mise${getPlural(pendingBets.length, '', 's')} en attente`;
+    }
+    if (selectedBet) {
+      return `Cible: ${selectedBet.label}`;
+    }
+    return joinedSalon.title;
+  }
+
+  function getRouletteSummaryDetail() {
+    if (hasPendingBets) {
+      if (activeBets.length) {
+        return `${activeBets.length} mise${getPlural(activeBets.length, '', 's')} verrouillee${getPlural(activeBets.length, '', 's')} jusqu'au tirage.`;
+      }
+      return "Mises verrouillees jusqu'au tirage.";
+    }
+    if (!tableHasServerActivity) {
+      if (hasPendingBets) {
+        return "Jetons poses. Le prochain tour Railway s'ouvrira des qu'un joueur sera actif sur la table.";
+      }
+      return "Le prochain tirage de 2 minutes s'ouvrira quand quelqu'un activera la table.";
+    }
+    if (hasPendingBets) {
+      return `${pendingBets.length} mise${getPlural(pendingBets.length, '', 's')} posee${getPlural(pendingBets.length, '', 's')} sur le tapis.`;
+    }
+    if (activeBets.length) {
+      return `${activeBets.length} mise${getPlural(activeBets.length, '', 's')} confirmee${getPlural(activeBets.length, '', 's')} sur ce tour.`;
+    }
+    if (selectedBet) {
+      return `Cible prete: ${selectedBet.label}.`;
+    }
+    return "Pose simplement tes jetons sur le tapis.";
+  }
+
+  // Les variables sont utilisées directement via les fonctions
   const rouletteStatusCopy = betsLocked
     ? activeBets.length
       ? `${activeBets.length} mise${activeBets.length > 1 ? "s" : ""} verrouillee${activeBets.length > 1 ? "s" : ""} jusqu'au tirage.`
@@ -963,7 +1005,7 @@ export default function RouletteRoom({
   function scheduleDraw(payload: { winningNumber: number; roundId: number; resultId: number; startAt: number }) {
     pendingDrawRef.current = payload;
     if (drawTimeoutRef.current) {
-      window.clearTimeout(drawTimeoutRef.current);
+      globalThis.clearTimeout(drawTimeoutRef.current);
       drawTimeoutRef.current = null;
     }
 
@@ -974,7 +1016,7 @@ export default function RouletteRoom({
       return;
     }
 
-    drawTimeoutRef.current = window.setTimeout(() => {
+    drawTimeoutRef.current = globalThis.setTimeout(() => {
       drawTimeoutRef.current = null;
       flushPendingDraw();
     }, waitMs);
@@ -990,10 +1032,10 @@ export default function RouletteRoom({
     if (celebrationTimeoutRef.current) {
       clearTimeout(celebrationTimeoutRef.current);
     }
-    celebrationTimeoutRef.current = window.setTimeout(() => {
+    celebrationTimeoutRef.current = globalThis.setTimeout(() => {
       setCelebration((current) => (current?.resultId === nextCelebration.resultId ? null : current));
       celebrationTimeoutRef.current = null;
-    }, ROULETTE_CELEBRATION_FLASH_MS);
+    }, ROULETTE_CELEBRATION_FLASH_MS) as unknown as number;
 
     // Joue le son rire.mp3 si le gain est sur un numéro plein (pas couleur, pair, etc)
     // On considère qu'un "numéro" est gagné si le betType de la mise gagnante est "straight" (à adapter si besoin)
@@ -1021,10 +1063,10 @@ export default function RouletteRoom({
     if (prizeRainTimeoutRef.current) {
       clearTimeout(prizeRainTimeoutRef.current);
     }
-    prizeRainTimeoutRef.current = window.setTimeout(() => {
+    prizeRainTimeoutRef.current = globalThis.setTimeout(() => {
       setPrizeRain([]);
       prizeRainTimeoutRef.current = null;
-    }, ROULETTE_BIG_WIN_RAIN_MS);
+    }, ROULETTE_BIG_WIN_RAIN_MS) as unknown as number;
   }
 
   useEffect(() => {
@@ -1098,7 +1140,7 @@ export default function RouletteRoom({
           pendingDrawRef.current = null;
           setSequencePhase("idle");
           if (drawTimeoutRef.current) {
-            window.clearTimeout(drawTimeoutRef.current);
+            globalThis.clearTimeout(drawTimeoutRef.current);
             drawTimeoutRef.current = null;
           }
           const settled = buildSettledAnimation(resolved.winningNumber);
