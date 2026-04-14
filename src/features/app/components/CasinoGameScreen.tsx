@@ -133,6 +133,7 @@ export default function CasinoGameScreen({
 }: CasinoGameScreenProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [showOneVideo, setShowOneVideo] = React.useState(false);
+  const oneVideoRef = React.useRef<HTMLVideoElement | null>(null);
 
   React.useEffect(() => {
     if (showImmersion) {
@@ -143,6 +144,19 @@ export default function CasinoGameScreen({
       setShowOneVideo(false);
     }
   }, [showImmersion]);
+
+  // Sur mobile, tente de jouer la vidéo one.mp4 explicitement
+  React.useEffect(() => {
+    if (showOneVideo && oneVideoRef.current) {
+      const playPromise = oneVideoRef.current.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch((err) => {
+          // eslint-disable-next-line no-console
+          console.warn("[casino-media] one.mp4 play() refused", err);
+        });
+      }
+    }
+  }, [showOneVideo]);
   const [clockLabel, setClockLabel] = React.useState(() =>
     new Date().toLocaleTimeString("fr-FR", {
       hour: "2-digit",
@@ -272,6 +286,7 @@ export default function CasinoGameScreen({
             >
               {showOneVideo ? (
                 <video
+                  ref={oneVideoRef}
                   className="casino-immersion-overlay__video"
                   src={oneVideo}
                   autoPlay
