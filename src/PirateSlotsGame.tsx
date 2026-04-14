@@ -996,23 +996,13 @@ function SlotsRoom({
 }
 
 export default function PirateSlotsGame(props: PirateSlotsGameProps) {
-  const [activeRoom, setActiveRoom] = useState<RoomId>(props.activeRoom || "slots");
+  const activeRoom = props.activeRoom || "slots";
   const recentTransactions = useMemo(() => getRecentTransactions(props.profile), [props.profile]);
   const currentRoom = useMemo(
     () => ROOM_DEFINITIONS.find((room) => room.id === activeRoom) || ROOM_DEFINITIONS[0],
     [activeRoom],
   );
   const currentRoomArtwork = resolveRoomArtwork(activeRoom);
-
-  useEffect(() => {
-    props.onRoomChange?.(activeRoom);
-  }, [activeRoom, props.onRoomChange]);
-
-  useEffect(() => {
-    if (props.activeRoom && props.activeRoom !== activeRoom) {
-      setActiveRoom(props.activeRoom);
-    }
-  }, [activeRoom, props.activeRoom]);
 
   useEffect(() => {
     if (activeRoom !== "roulette") {

@@ -2074,6 +2074,39 @@ button {
   gap: 10px;
 }
 
+.casino-last-hand-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 208, 125, 0.18);
+  background: rgba(255, 219, 158, 0.07);
+}
+
+.casino-last-hand-card strong,
+.casino-last-hand-card p,
+.casino-last-hand-card span {
+  margin: 0;
+}
+
+.casino-last-hand-card strong {
+  color: #fff1c2;
+  font-family: "Cinzel", serif;
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.casino-last-hand-card p {
+  color: rgba(246, 239, 224, 0.9);
+  line-height: 1.55;
+}
+
+.casino-last-hand-card span {
+  color: rgba(255, 214, 137, 0.88);
+  font-size: 0.78rem;
+}
+
 .casino-slot-feature {
   display: grid;
   gap: 14px;
@@ -2922,6 +2955,37 @@ button {
 
 .casino-table-core__headline span {
   color: var(--casino-muted);
+}
+
+.casino-poker-showdown-banner {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 208, 125, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 209, 131, 0.16), rgba(255, 209, 131, 0.04)),
+    rgba(7, 12, 18, 0.88);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
+}
+
+.casino-poker-showdown-banner strong,
+.casino-poker-showdown-banner span {
+  display: block;
+}
+
+.casino-poker-showdown-banner strong {
+  color: #fff2cc;
+  font-family: "Cinzel", serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.casino-poker-showdown-banner span {
+  color: rgba(246, 239, 224, 0.82);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .casino-blackjack-arc-label {
@@ -12782,6 +12846,92 @@ button {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.62);
 }
 
+.casino-account-bar__channel-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 2px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 13, 20, 0.58);
+}
+
+.casino-account-bar__channel-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.casino-account-bar__channel-copy .casino-chip {
+  width: max-content;
+  padding: 8px 10px;
+  font-size: 0.66rem;
+}
+
+.casino-account-bar__channel-copy strong,
+.casino-account-bar__channel-copy small {
+  display: block;
+}
+
+.casino-account-bar__channel-copy strong {
+  color: #fff4da;
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.casino-account-bar__channel-copy small {
+  color: rgba(246, 239, 224, 0.68);
+  font-size: 0.76rem;
+}
+
+.casino-account-bar__channel-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.casino-account-bar__channel-pill {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px !important;
+  padding: 10px 12px !important;
+  border-radius: 16px !important;
+  text-align: left;
+}
+
+.casino-account-bar__channel-pill-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.casino-account-bar__channel-pill-copy strong,
+.casino-account-bar__channel-pill-copy small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.casino-account-bar__channel-pill-copy strong {
+  color: #fff4da;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.casino-account-bar__channel-pill-copy small {
+  color: rgba(246, 239, 224, 0.64);
+  font-size: 0.7rem;
+}
+
+.casino-account-bar__channel-pill b {
+  color: #ffd493;
+  font-size: 0.84rem;
+}
+
 .casino-topdeck__chip-row {
   display: flex;
   align-items: center;
@@ -18439,6 +18589,13 @@ button {
   background: rgba(138, 106, 47, 0.16);
   border-color: rgba(255, 214, 137, 0.28);
   color: #ffe4a4;
+}
+
+.casino-seat-role-chip--winner {
+  background: rgba(255, 209, 131, 0.18);
+  border-color: rgba(255, 209, 131, 0.38);
+  color: #fff0be;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 .casino-stage--cards--poker .casino-oval-seat--poker-peer header,

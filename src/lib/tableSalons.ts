@@ -5,6 +5,14 @@ export type TableSalonMeta = {
   blurb: string;
 };
 
+export type TableSalonGame = "blackjack" | "poker";
+
+export type TableChannelDisplayMeta = TableSalonMeta & {
+  channelIndex: number;
+  channelLabel: string;
+  shortLabel: string;
+};
+
 export const BLACKJACK_SALONS: TableSalonMeta[] = [
   {
     id: "lantern-quay",
@@ -46,3 +54,50 @@ export const POKER_SALONS: TableSalonMeta[] = [
     blurb: "Un coin plus calme pour voir qui rejoint et garder le board bien lisible.",
   },
 ];
+
+const TABLE_SALONS: Record<TableSalonGame, TableSalonMeta[]> = {
+  blackjack: BLACKJACK_SALONS,
+  poker: POKER_SALONS,
+};
+
+function buildFallbackTableSalonMeta(game: TableSalonGame, roomId: string, index: number) {
+  const channelIndex = Math.max(1, index + 1);
+  const channelLabel = `Canal ${channelIndex}`;
+
+  if (game === "blackjack") {
+    return {
+      id: roomId,
+      title: channelLabel,
+      chip: "Table auto",
+      blurb: "Canal cree automatiquement selon l'affluence pour garder la phase de mise en commun.",
+    } satisfies TableSalonMeta;
+  }
+
+  return {
+    id: roomId,
+    title: channelLabel,
+    chip: "Table auto",
+    blurb: "Canal cree automatiquement selon l'affluence pour partager la prochaine main avec tes amis.",
+  } satisfies TableSalonMeta;
+}
+
+export function getTableSalonMeta(game: TableSalonGame, roomId: string, index = 0) {
+  const normalizedRoomId = String(roomId || "").trim();
+  const knownMeta =
+    TABLE_SALONS[game].find((entry) => entry.id === normalizedRoomId)
+    || null;
+
+  return knownMeta || buildFallbackTableSalonMeta(game, normalizedRoomId, index);
+}
+
+export function getTableChannelDisplayMeta(game: TableSalonGame, roomId: string, index = 0): TableChannelDisplayMeta {
+  const baseMeta = getTableSalonMeta(game, roomId, index);
+  const channelIndex = Math.max(1, index + 1);
+
+  return {
+    ...baseMeta,
+    channelIndex,
+    channelLabel: `Canal ${channelIndex}`,
+    shortLabel: `C${channelIndex}`,
+  };
+}

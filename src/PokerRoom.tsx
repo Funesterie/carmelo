@@ -23,18 +23,38 @@ import {
   readSyncedTableSelection,
   subscribeTableChannel,
   subscribeSyncedTableSelection,
+  writeTableLobbySnapshot,
   writeSyncedTableSelection,
   writeTableChannelSnapshot,
 } from "./lib/tableChannelSync";
-import { POKER_SALONS } from "./lib/tableSalons";
+import { POKER_SALONS, getTableChannelDisplayMeta } from "./lib/tableSalons";
 
 const TABLE_DEAL_STEP_MS = 92;
 const LIVE_MIN_OPPONENTS = 1;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
+const LIVE_ROOM_LOBBY_SYNC_INTERVAL_MS = 20_000;
 const POKER_MAX_PLAYERS = 6;
 const DEFAULT_POKER_PRESENCE_WINDOW_MS = 75_000;
+const POKER_SHOWDOWN_REVEAL_MS = 12_000;
 
 type PokerAction = "check" | "call" | "bet" | "raise" | "fold";
+
+type PokerLastHandRecapWinner = {
+  id: string;
+  name: string;
+  handLabel: string;
+  amount: number;
+  isSelf: boolean;
+};
+
+type PokerLastHandRecap = {
+  handId: string;
+  resolvedAt: number;
+  message: string;
+  winners: PokerLastHandRecapWinner[];
+  heroHandLabel: string;
+  actionLog: string[];
+};
 
 type PokerRoomProps = {
   playerName: string;
@@ -148,6 +168,64 @@ function isPokerSelfTurn(state: PokerState | null, currentUserId: string, player
   return Boolean(hasPokerHeroRound(state, currentUserId, playerName) && state.legalActions.length);
 }
 
+function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string, playerName: string): PokerLastHandRecap | null {
+  if (!state?.token) return null;
+
+  const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
+  const normalizedSelfSeatId = normalizeIdentity(selfSeat?.id || selfSeat?.userId || state.selfSeatId);
+  const normalizedPlayerName = normalizeIdentity(playerName);
+  const heroName = String(playerName || selfSeat?.name || selfSeat?.username || "Toi").trim();
+  const heroHandLabel = state.playerHand?.label || selfSeat?.hand?.label || "";
+  const heroAmount = Number(state.lastDelta || state.payoutAmount || 0);
+  const heroWon = Boolean(selfSeat?.isWinner || heroAmount > 0);
+  const winners: PokerLastHandRecapWinner[] = [];
+
+  if (heroWon) {
+    winners.push({
+      id: normalizedSelfSeatId || normalizedPlayerName || "self",
+      name: heroName,
+      handLabel: heroHandLabel || "Main gagnante",
+      amount: heroAmount,
+      isSelf: true,
+    });
+  }
+
+  const seenSeatIds = new Set<string>(winners.map((winner) => winner.id));
+  [...(state.seats || []), ...(state.aiSeats || [])].forEach((seat) => {
+    const seatId = normalizeIdentity(seat.id || seat.userId || seat.name || seat.username);
+    const seatName = String(seat.name || seat.username || "Joueur").trim();
+    const seatHandLabel = seat.hand?.label || seat.read || "";
+    const seatAmount = Number(seat.lastDelta || seat.payoutAmount || 0);
+    const isSeatSelf = Boolean(
+      seat.isSelf
+      || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
+      || (normalizedPlayerName && normalizeIdentity(seatName) === normalizedPlayerName),
+    );
+
+    if (!seatId || seenSeatIds.has(seatId) || !seat.isWinner || isSeatSelf) {
+      return;
+    }
+
+    seenSeatIds.add(seatId);
+    winners.push({
+      id: seatId,
+      name: seatName,
+      handLabel: seatHandLabel || "Main gagnante",
+      amount: seatAmount,
+      isSelf: false,
+    });
+  });
+
+  return {
+    handId: String(state.handId || state.token),
+    resolvedAt: Date.now(),
+    message: state.message || "Main terminee.",
+    winners,
+    heroHandLabel,
+    actionLog: [...(state.actionLog || [])].slice(-8),
+  };
+}
+
 function buildPokerSyncSignature(state: PokerState | null, currentUserId: string, playerName: string) {
   if (!state?.token) return "";
   return JSON.stringify({
@@ -246,40 +324,61 @@ export default function PokerRoom({
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
   const [infoTab, setInfoTab] = useState<"journal" | "lecture" | "salons" | "joueurs">("journal");
   const [showRoomInfo, setShowRoomInfo] = useState(false);
-  const [activeHeaderInfo, setActiveHeaderInfo] = useState<"structure" | "mises" | "live">("structure");
+  const [activeHeaderInfo, setActiveHeaderInfo] = useState<"structure" | "mises" | "historique">("structure");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const [betTarget, setBetTarget] = useState(0);
   const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
   const [removingAbsentUserId, setRemovingAbsentUserId] = useState<string | null>(null);
+  const [showdownReplayState, setShowdownReplayState] = useState<PokerState | null>(null);
+  const [lastResolvedHand, setLastResolvedHand] = useState<PokerLastHandRecap | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [isDocumentVisible, setIsDocumentVisible] = useState(() => {
     if (typeof document === "undefined") return true;
     return document.visibilityState !== "hidden";
   });
   const displayState = useMemo<PokerState | null>(() => {
-    if (!state) return null;
-    return state;
-  }, [state]);
+    return showdownReplayState || state;
+  }, [showdownReplayState, state]);
 
   const previousCardKeysRef = useRef<string[]>([]);
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
+  const clearShowdownReplayTimeoutRef = useRef<number | null>(null);
   const latestAppliedSyncAtRef = useRef(0);
+  const latestStateRef = useRef<PokerState | null>(state);
+  const latestRoomsRef = useRef<CasinoTableRoom[]>(rooms);
+  const lastLobbySyncAtRef = useRef(0);
   const skipNextSyncPublishRef = useRef(false);
   const lastTurnSignatureRef = useRef("");
   const lastTimedOutSignatureRef = useRef("");
   const lastExpiredSyncSignatureRef = useRef("");
+  const onErrorRef = useRef(onError);
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
 
   const stage = state?.stage || "idle";
+  const displayStage = displayState?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
   const isSpectatingRound = isPokerSpectatorRound(state, profile.user.id, playerName);
   const hasPendingSeat = hasPokerPendingSeat(state, profile.user.id, playerName);
-  const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const availableRooms = useMemo(() => {
+    if (rooms.length) return rooms;
+    return [
+      {
+        id: roomId,
+        playerCount: 0,
+        participants: [],
+        isCurrent: true,
+        hasSelf: true,
+      },
+    ] satisfies CasinoTableRoom[];
+  }, [roomId, rooms]);
+  const activeRoom = availableRooms.find((entry) => entry.id === roomId) || availableRooms[0] || null;
+  const activeRoomIndex = Math.max(0, availableRooms.findIndex((entry) => entry.id === (activeRoom?.id || roomId)));
+  const activeChannelMeta = getTableChannelDisplayMeta("poker", activeRoom?.id || roomId, activeRoomIndex);
   const presenceWindowMs = Math.max(10_000, Number(state?.presenceWindowMs || 0) || DEFAULT_POKER_PRESENCE_WINDOW_MS);
   const tableParticipants = useMemo<Array<CasinoTableRoomParticipant & { isSelf: boolean }>>(() => {
     const deduped = new Map<string, CasinoTableRoomParticipant & { isSelf: boolean }>();
 
-    (activeRoom?.participants || []).forEach((participant) => {
+    [...(activeRoom?.participants || []), ...(state?.roomParticipants || [])].forEach((participant) => {
       const dedupeKey = normalizeIdentity(participant.userId) || normalizeIdentity(participant.username);
       const isSelf = isPokerParticipantSelf(participant, profile, playerName);
       deduped.set(dedupeKey, {
@@ -300,13 +399,17 @@ export default function PokerRoom({
     }
 
     return [...deduped.values()];
-  }, [activeRoom?.participants, playerName, profile.user.id, profile.user.username]);
-  const activePlayerCount = activeRoom?.playerCount || tableParticipants.length;
+  }, [activeRoom?.participants, playerName, profile.user.id, profile.user.username, state?.roomParticipants]);
+  const activePlayerCount = Math.max(activeRoom?.playerCount || 0, tableParticipants.length);
   const connectedOpponentCount = tableParticipants.filter(
     (participant) => !participant.isSelf && isParticipantFresh(participant.updatedAt, presenceWindowMs),
   ).length;
+  const lastResolvedWinnersLabel = lastResolvedHand?.winners.length
+    ? lastResolvedHand.winners.map((winner) => winner.name).join(", ")
+    : "";
   const isLiveMultiplayerReady = connectedOpponentCount >= LIVE_MIN_OPPONENTS;
-  const isTableFull = Boolean(activeRoom && activePlayerCount >= POKER_MAX_PLAYERS && !activeRoom.hasSelf);
+  const roomHasSelf = Boolean(activeRoom?.hasSelf || tableParticipants.some((participant) => participant.isSelf));
+  const isTableFull = activePlayerCount >= POKER_MAX_PLAYERS && !roomHasSelf;
   const activeAnte = state?.ante || ante;
   const smallBlind = Math.max(10, Math.round(activeAnte / 2));
   const blindUnit = Math.max(20, Math.round(activeAnte));
@@ -346,6 +449,18 @@ export default function PokerRoom({
     setState(nextState);
     setTurnDeadlineAt(nextDeadlineAt);
   }
+
+  useEffect(() => {
+    latestStateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    latestRoomsRef.current = rooms;
+  }, [rooms]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -405,11 +520,18 @@ export default function PokerRoom({
 
   useEffect(() => {
     latestAppliedSyncAtRef.current = 0;
+    lastLobbySyncAtRef.current = 0;
     skipNextSyncPublishRef.current = false;
     lastTurnSignatureRef.current = "";
     lastTimedOutSignatureRef.current = "";
     lastExpiredSyncSignatureRef.current = "";
     setTurnDeadlineAt(null);
+    setShowdownReplayState(null);
+    setLastResolvedHand(null);
+    if (clearShowdownReplayTimeoutRef.current) {
+      window.clearTimeout(clearShowdownReplayTimeoutRef.current);
+      clearShowdownReplayTimeoutRef.current = null;
+    }
   }, [roomId]);
 
   useEffect(() => {
@@ -421,6 +543,17 @@ export default function PokerRoom({
   useEffect(() => {
     writeSyncedTableSelection("poker", roomId);
   }, [roomId]);
+
+  useEffect(() => {
+    if (!rooms.length) return;
+
+    writeTableLobbySnapshot({
+      game: "poker",
+      joinedRoomId: roomId,
+      syncedAt: Date.now(),
+      rooms,
+    });
+  }, [roomId, rooms]);
 
   useEffect(() => {
     return subscribeSyncedTableSelection("poker", (nextRoomId) => {
@@ -437,18 +570,43 @@ export default function PokerRoom({
     }
 
     let cancelled = false;
+    let syncing = false;
 
-    async function syncRoom() {
+    async function syncRoom(forceLobbySync = false) {
+      if (syncing) return;
+      syncing = true;
+      let joinedRoomId = roomId;
+      let lobbyError: Error | null = null;
       try {
-        const result = await joinPokerRoom(roomId);
-        if (cancelled) return;
-        setRooms(result.rooms);
+        const currentState = latestStateRef.current;
+        const shouldRefreshLobby = forceLobbySync
+          || !latestRoomsRef.current.length
+          || (Date.now() - lastLobbySyncAtRef.current) >= LIVE_ROOM_LOBBY_SYNC_INTERVAL_MS;
+
+        if (shouldRefreshLobby) {
+          try {
+            const result = await joinPokerRoom(roomId);
+            if (cancelled) return;
+            setRooms(result.rooms);
+            lastLobbySyncAtRef.current = Date.now();
+            joinedRoomId = String(result.joinedRoomId || roomId).trim() || roomId;
+            if (joinedRoomId && joinedRoomId !== roomId) {
+              setRoomId(joinedRoomId);
+            }
+          } catch (error_) {
+            if (error_ instanceof Error) {
+              lobbyError = error_;
+            } else {
+              lobbyError = new Error("Le salon poker ne repond pas.");
+            }
+          }
+        }
 
         try {
-          const sharedState = await fetchPokerRoomState(roomId);
+          const sharedState = await fetchPokerRoomState(joinedRoomId);
           if (cancelled || !sharedState) return;
           if (
-            hasPokerHeroRound(state, profile.user.id, playerName)
+            hasPokerHeroRound(currentState, profile.user.id, playerName)
             && !hasPokerHeroRound(sharedState, profile.user.id, playerName)
           ) {
             return;
@@ -457,28 +615,36 @@ export default function PokerRoom({
           return;
         } catch (syncError) {
           if (cancelled) return;
-          if (syncError instanceof Error) {
-            onError(syncError.message);
+          if (!lobbyError && syncError instanceof Error) {
+            lobbyError = syncError;
           }
         }
 
-        const snapshot = readTableChannelSnapshot<PokerState>("poker", roomId);
-        if (cancelled || !snapshot?.state) return;
-        applySyncedState(snapshot.state, snapshot.syncedAt, snapshot.turnDeadlineAt);
+        const snapshot = readTableChannelSnapshot<PokerState>("poker", joinedRoomId);
+        if (!cancelled && snapshot?.state) {
+          applySyncedState(snapshot.state, snapshot.syncedAt, snapshot.turnDeadlineAt);
+          return;
+        }
+
+        if (!cancelled && lobbyError) {
+          onErrorRef.current(lobbyError.message);
+        }
       } catch (error_) {
         if (cancelled) return;
-        onError(error_ instanceof Error ? error_.message : "Le salon poker ne repond pas.");
+        onErrorRef.current(error_ instanceof Error ? error_.message : "Le salon poker ne repond pas.");
+      } finally {
+        syncing = false;
       }
     }
 
-    void syncRoom();
-    const intervalId = window.setInterval(() => void syncRoom(), LIVE_ROOM_POLL_INTERVAL_MS);
+    void syncRoom(true);
+    const intervalId = window.setInterval(() => void syncRoom(false), LIVE_ROOM_POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [isDocumentVisible, onError, playerName, profile.user.id, roomId, state, turnDeadlineAt]);
+  }, [isDocumentVisible, playerName, profile.user.id, roomId]);
 
   useEffect(() => {
     const existingSnapshot = readTableChannelSnapshot<PokerState>("poker", roomId);
@@ -580,8 +746,33 @@ export default function PokerRoom({
       if (clearDealAnimationTimeoutRef.current) {
         window.clearTimeout(clearDealAnimationTimeoutRef.current);
       }
+      if (clearShowdownReplayTimeoutRef.current) {
+        window.clearTimeout(clearShowdownReplayTimeoutRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (stage !== "showdown" || !state?.token) {
+      return;
+    }
+
+    setShowdownReplayState(state);
+    const nextRecap = buildPokerLastHandRecap(state, profile.user.id, playerName);
+    if (nextRecap) {
+      setLastResolvedHand(nextRecap);
+    }
+
+    if (clearShowdownReplayTimeoutRef.current) {
+      window.clearTimeout(clearShowdownReplayTimeoutRef.current);
+    }
+
+    const showdownToken = state.token;
+    clearShowdownReplayTimeoutRef.current = window.setTimeout(() => {
+      setShowdownReplayState((current) => (current?.token === showdownToken ? null : current));
+      clearShowdownReplayTimeoutRef.current = null;
+    }, POKER_SHOWDOWN_REVEAL_MS);
+  }, [playerName, profile.user.id, stage, state]);
 
   useEffect(() => {
     const currentCardKeys = getPokerCardKeys(displayState);
@@ -747,9 +938,15 @@ export default function PokerRoom({
     setBetTarget(0);
     setTurnDeadlineAt(null);
     setRemovingAbsentUserId(null);
+    setShowdownReplayState(null);
+    setLastResolvedHand(null);
     if (clearDealAnimationTimeoutRef.current) {
       window.clearTimeout(clearDealAnimationTimeoutRef.current);
       clearDealAnimationTimeoutRef.current = null;
+    }
+    if (clearShowdownReplayTimeoutRef.current) {
+      window.clearTimeout(clearShowdownReplayTimeoutRef.current);
+      clearShowdownReplayTimeoutRef.current = null;
     }
   }
 
@@ -806,7 +1003,7 @@ export default function PokerRoom({
                       ? "Une main est deja en cours sur ce salon. Tu peux reserver la prochaine donne ou rejoindre un autre salon libre."
                       : state?.message || "Table partagee par salon avec etat synchronise et actions gerees cote serveur."}
                   {" "}
-                  {activeRoom ? `Salon actif: ${POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id}.` : ""}
+                  {activeRoom ? `Canal actif: ${activeChannelMeta.channelLabel} (${activeChannelMeta.title}).` : ""}
                 </p>
               </div>
             </div>
@@ -835,11 +1032,11 @@ export default function PokerRoom({
                   <button
                     type="button"
                     role="tab"
-                    className={`casino-topdeck__info-button ${activeHeaderInfo === "live" ? "is-active" : ""}`}
-                    aria-selected={activeHeaderInfo === "live"}
-                    onClick={() => setActiveHeaderInfo("live")}
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "historique" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "historique"}
+                    onClick={() => setActiveHeaderInfo("historique")}
                   >
-                    Live
+                    Historique
                   </button>
                 </div>
                 <div className="casino-topdeck__info-body" role="tabpanel">
@@ -870,36 +1067,52 @@ export default function PokerRoom({
                       </div>
                     </div>
                   ) : null}
-                  {activeHeaderInfo === "live" ? (
+                  {activeHeaderInfo === "historique" ? (
                     <div className="casino-rule-list">
-                      <p>Le salon garde les joueurs inscrits pour la prochaine main au lieu de forcer une entree immediate dans le coup courant.</p>
-                      <p>La table est limitee a 6 joueurs humains au total.</p>
-                      <p>Un joueur sans heartbeat recent passe absent cote serveur et ne doit plus bloquer la main.</p>
-                      <p>Table en cours: {activeRoom ? POKER_SALONS.find((entry) => entry.id === activeRoom.id)?.title || activeRoom.id : "Aucune"}</p>
+                      <p>Canal en cours: {activeRoom ? `${activeChannelMeta.channelLabel} · ${activeChannelMeta.title}` : "Aucun"}</p>
                       <p>Joueurs presents: {activePlayerCount}</p>
                       <p>Adversaires reels disponibles: {connectedOpponentCount}</p>
+                      {lastResolvedHand ? (
+                        <div className="casino-last-hand-card">
+                          <strong>Derniere main</strong>
+                          <p>{lastResolvedWinnersLabel ? `Gagnant${lastResolvedHand.winners.length > 1 ? "s" : ""}: ${lastResolvedWinnersLabel}.` : lastResolvedHand.message}</p>
+                          {lastResolvedHand.heroHandLabel ? <span>Ta main: {lastResolvedHand.heroHandLabel}</span> : null}
+                        </div>
+                      ) : null}
+                      {(state?.actionLog || []).length ? (
+                        [...(state?.actionLog || [])].slice(-6).reverse().map((entry, index) => (
+                          <p key={`header-log-${entry}-${index}`}>{entry}</p>
+                        ))
+                      ) : lastResolvedHand?.actionLog?.length ? (
+                        [...lastResolvedHand.actionLog].reverse().map((entry, index) => (
+                          <p key={`header-last-hand-${entry}-${index}`}>{entry}</p>
+                        ))
+                      ) : (
+                        <p>L'historique de la main apparaitra ici des que le coup demarre.</p>
+                      )}
                     </div>
                   ) : null}
                 </div>
               </article>
             ) : null}
 
-            <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Salons poker">
-              {POKER_SALONS.map((salon) => {
-                const room = rooms.find((entry) => entry.id === salon.id);
+            <div className="casino-salon-strip casino-salon-strip--compact" role="tablist" aria-label="Canaux poker">
+              {availableRooms.map((room, index) => {
+                const channelMeta = getTableChannelDisplayMeta("poker", room.id, index);
                 return (
                   <button
-                    key={salon.id}
+                    key={room.id}
                     type="button"
-                    className={`casino-salon-pill ${salon.id === roomId ? "is-active" : ""}`}
-                    onClick={() => handleRoomChange(salon.id)}
+                    className={`casino-salon-pill ${room.id === roomId ? "is-active" : ""}`}
+                    onClick={() => handleRoomChange(room.id)}
                     disabled={roomSwitchLocked || working}
                     role="tab"
-                    aria-selected={salon.id === roomId}
+                    aria-selected={room.id === roomId}
+                    title={channelMeta.blurb}
                   >
                     <div>
-                      <strong>{salon.title}</strong>
-                      <span>{salon.chip}</span>
+                      <strong>{channelMeta.channelLabel}</strong>
+                      <span>{channelMeta.title}</span>
                     </div>
                     <b>{room?.playerCount || 0}</b>
                   </button>
@@ -911,7 +1124,7 @@ export default function PokerRoom({
           <div className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--poker">
             <PokerTableScene
               state={displayState}
-              stage={stage}
+              stage={displayStage}
               currentUserId={profile.user.id}
               playerName={playerName}
               isSpectatingRound={isSpectatingRound}
@@ -925,6 +1138,7 @@ export default function PokerRoom({
               dealtCardDelays={dealtCardDelays}
               presenceWindowMs={presenceWindowMs}
               removingAbsentUserId={removingAbsentUserId}
+              lastHandRecap={lastResolvedHand}
               onRemoveAbsent={(userId) => void handleRemoveAbsent(userId)}
             />
 
@@ -957,6 +1171,7 @@ export default function PokerRoom({
               aggressionMin={aggressionMin}
               aggressionMax={aggressionMax}
               blindUnit={blindUnit}
+              lastHandRecap={lastResolvedHand}
               onInfoTabChange={setInfoTab}
               onRoomChange={handleRoomChange}
               onBetTargetChange={setBetTarget}

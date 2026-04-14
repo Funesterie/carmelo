@@ -1,6 +1,6 @@
 import PirateInspector from "../../../PirateInspector";
-import { BLACKJACK_SALONS } from "../../../lib/tableSalons";
-import type { BlackjackAction, BlackjackState, CasinoProfile, CasinoTableRoom } from "../../../lib/casinoApi";
+import type { BlackjackAction, BlackjackState, CasinoProfile, CasinoTableRoom, CasinoTableRoomParticipant } from "../../../lib/casinoApi";
+import { getTableChannelDisplayMeta } from "../../../lib/tableSalons";
 
 const PLAYER_BETS = [10, 20, 50, 200];
 const CHIP_TONES: Record<number, "amber" | "cyan" | "crimson" | "ivory"> = {
@@ -18,6 +18,7 @@ type BlackjackSidebarProps = {
   working: boolean;
   roomId: string;
   rooms: CasinoTableRoom[];
+  activeParticipants: CasinoTableRoomParticipant[];
   infoTab: "salons" | "regles" | "joueurs";
   isDecisionPhase: boolean;
   isBettingPhase: boolean;
@@ -52,6 +53,7 @@ export default function BlackjackSidebar({
   working,
   roomId,
   rooms,
+  activeParticipants,
   infoTab,
   isDecisionPhase,
   isBettingPhase,
@@ -71,8 +73,19 @@ export default function BlackjackSidebar({
 }: BlackjackSidebarProps) {
   const stage = state?.stage || "idle";
   const showBettingPhase = isBettingPhase || stage === "waiting";
-  const canDeal = (stage !== "player-turn" || isSpectatingRound) && !hasPendingSeat;
-  const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const canDeal = stage !== "player-turn" && !hasPendingSeat;
+  const availableRooms = rooms.length
+    ? rooms
+    : [
+        {
+          id: roomId,
+          playerCount: 0,
+          participants: [],
+          isCurrent: true,
+          hasSelf: true,
+        },
+      ] satisfies CasinoTableRoom[];
+  const activeRoom = availableRooms.find((entry) => entry.id === roomId) || availableRooms[0] || null;
   const activeSeat = state?.activeSeatId
     ? (state.seats || []).find((seat) => String(seat.id || seat.userId || "").trim() === String(state.activeSeatId || "").trim()) || null
     : null;
@@ -81,9 +94,11 @@ export default function BlackjackSidebar({
   const canStand = legalActions.includes("stand");
   const canDouble = legalActions.includes("double");
   const canSplit = legalActions.includes("split");
-  const primaryActionLabel = isSpectatingRound
-    ? "Prochaine manche"
-    : hasPendingSeat && showBettingPhase
+  const primaryActionLabel = isSpectatingRound && stage === "player-turn"
+    ? "Manche en cours"
+    : isSpectatingRound
+      ? "Prochaine manche"
+      : hasPendingSeat && showBettingPhase
       ? "Mise validee"
       : stage === "resolved"
         ? "Rejouer"
@@ -198,24 +213,25 @@ export default function BlackjackSidebar({
         tabs={[
           {
             id: "salons",
-            label: "Salons",
+            label: "Canaux",
             badge: rooms.find((entry) => entry.id === roomId)?.playerCount || 0,
-            caption: "Change de table sans perdre la lisibilite du layout.",
+            caption: "Change de canal sans perdre la lisibilite du layout.",
             content: (
               <div className="casino-salon-roster">
-                {BLACKJACK_SALONS.map((salon) => {
-                  const room = rooms.find((entry) => entry.id === salon.id);
+                {availableRooms.map((room, index) => {
+                  const channelMeta = getTableChannelDisplayMeta("blackjack", room.id, index);
                   return (
                     <button
-                      key={salon.id}
+                      key={room.id}
                       type="button"
-                      className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}
-                      onClick={() => onRoomChange(salon.id)}
+                      className={`casino-salon-card ${room.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}
+                      onClick={() => onRoomChange(room.id)}
                       disabled={roomSwitchLocked || working}
+                      title={channelMeta.blurb}
                     >
                       <div>
-                        <strong>{salon.title}</strong>
-                        <span>{salon.blurb}</span>
+                        <strong>{channelMeta.channelLabel}</strong>
+                        <span>{channelMeta.title}</span>
                       </div>
                       <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
                     </button>
@@ -243,12 +259,12 @@ export default function BlackjackSidebar({
           {
             id: "joueurs",
             label: "Joueurs",
-            badge: (activeRoom?.participants || []).length,
+            badge: activeParticipants.length,
             caption: "Presence du salon actif.",
             content: (
               <div className="casino-prize-stack">
-                {(activeRoom?.participants || []).length ? (
-                  activeRoom.participants.map((participant) => (
+                {activeParticipants.length ? (
+                  activeParticipants.map((participant) => (
                     <article key={participant.userId} className="casino-prize-card">
                       <div className="casino-prize-card__glyph">21</div>
                       <div>

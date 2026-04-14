@@ -176,6 +176,25 @@ function findBlackjackSeat(
   );
 }
 
+function findBlackjackPendingSeat(
+  participant: CasinoTableRoomParticipant,
+  pendingSeats: CasinoTableRoomParticipant[],
+) {
+  const participantId = normalizeBlackjackIdentity(participant.userId);
+  const participantName = normalizeBlackjackIdentity(participant.username);
+
+  return (
+    pendingSeats.find((seat) => {
+      const seatUserId = normalizeBlackjackIdentity(seat.userId);
+      const seatName = normalizeBlackjackIdentity(seat.username);
+      return (
+        Boolean(participantId && seatUserId === participantId)
+        || Boolean(participantName && seatName === participantName)
+      );
+    }) || null
+  );
+}
+
 function getRemoteBlackjackBindings(
   state: BlackjackState | null,
   participants: CasinoTableRoomParticipant[],
@@ -185,17 +204,32 @@ function getRemoteBlackjackBindings(
   const selfSeat = findBlackjackSelfSeat(state, currentUserId, playerName);
   const normalizedSelfSeatId = normalizeBlackjackIdentity(selfSeat?.id || selfSeat?.userId);
   const normalizedSelfSeatName = normalizeBlackjackIdentity(selfSeat?.name || selfSeat?.username);
-  const seats = [...(state?.aiSeats || [])].filter((seat) => {
+  const seenSeats = new Set<string>();
+  const seats = [...(state?.seats || []), ...(state?.aiSeats || [])].filter((seat) => {
+    const dedupeKey = normalizeBlackjackIdentity(seat.id || seat.userId || seat.name || seat.username);
+    if (dedupeKey && seenSeats.has(dedupeKey)) {
+      return false;
+    }
+    if (dedupeKey) {
+      seenSeats.add(dedupeKey);
+    }
+
     const seatId = normalizeBlackjackIdentity(seat.id || seat.userId);
+    const seatUserId = normalizeBlackjackIdentity(seat.userId);
     const seatName = normalizeBlackjackIdentity(seat.name || seat.username);
     return !(
       seat.isSelf
-      || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
+      || (normalizedSelfSeatId && (seatId === normalizedSelfSeatId || seatUserId === normalizedSelfSeatId))
       || (normalizedSelfSeatName && seatName === normalizedSelfSeatName)
     );
   });
   const normalizedCurrentUserId = normalizeBlackjackIdentity(currentUserId);
   const normalizedPlayerName = normalizeBlackjackIdentity(playerName);
+  const pendingSeats = (state?.pendingSeats || []).filter((seat) => {
+    const seatId = normalizeBlackjackIdentity(seat.userId);
+    const seatName = normalizeBlackjackIdentity(seat.username);
+    return seatId !== normalizedCurrentUserId && seatName !== normalizedPlayerName;
+  });
   const remoteParticipants = participants.filter(
     (participant) => {
       const participantId = normalizeBlackjackIdentity(participant.userId);
@@ -206,30 +240,49 @@ function getRemoteBlackjackBindings(
 
   const participantBindings = remoteParticipants.map((participant) => {
     const seat = findBlackjackSeat(participant, seats);
+    const pendingSeat = findBlackjackPendingSeat(participant, pendingSeats);
     if (seat) {
       const usedIndex = seats.findIndex((entry) => entry === seat);
       if (usedIndex >= 0) {
         seats.splice(usedIndex, 1);
       }
     }
+    if (pendingSeat) {
+      const usedPendingIndex = pendingSeats.findIndex((entry) => entry === pendingSeat);
+      if (usedPendingIndex >= 0) {
+        pendingSeats.splice(usedPendingIndex, 1);
+      }
+    }
     return {
-      key: participant.userId,
+      key: participant.userId || participant.username,
       label: participant.username,
       participant,
       seat,
-      waiting: !seat,
+      placeholder: !seat && !pendingSeat,
+      waiting: !seat && Boolean(pendingSeat),
     };
   });
+
+  const orphanPendingSeats = pendingSeats.map((seat) => ({
+    key: seat.userId || seat.username,
+    label: seat.username,
+    participant: seat,
+    seat: null,
+    placeholder: false,
+    waiting: true,
+  }));
 
   const orphanSeats = seats.map((seat) => ({
     key: seat.id || seat.userId || seat.name,
     label: seat.name || seat.username || "Joueur",
     participant: null,
     seat,
+    placeholder: false,
     waiting: false,
   }));
 
-  return [...participantBindings, ...orphanSeats].slice(0, BLACKJACK_REMOTE_LAYOUT.length);
+  return [...participantBindings, ...orphanPendingSeats, ...orphanSeats]
+    .slice(0, BLACKJACK_REMOTE_LAYOUT.length);
 }
 
 export default function BlackjackTableScene({
@@ -249,11 +302,6 @@ export default function BlackjackTableScene({
   const selfSeat = findBlackjackSelfSeat(state, currentUserId, playerName);
   const hands = getRenderableHands(state, selfSeat);
   const remoteBindings = getRemoteBlackjackBindings(state, participants, currentUserId, playerName);
-  const occupiedRemoteBindings = remoteBindings.filter(({ seat }) => Boolean(seat));
-  const centeredRemoteBinding = !hands.length && occupiedRemoteBindings.length === 1 ? occupiedRemoteBindings[0] : null;
-  const displayedRemoteBindings = centeredRemoteBinding
-    ? remoteBindings.filter(({ key }) => key !== centeredRemoteBinding.key)
-    : remoteBindings;
   const remoteSeatLayout = getBlackjackSeatLayout();
   const selectedChipTotal = sumChipValues(betChips);
   const lockedWager = hands.reduce((sum, hand) => sum + (hand.wager || 0), 0) || state?.wager || 0;
@@ -275,14 +323,21 @@ export default function BlackjackTableScene({
         )
       : null;
   const playerSeatName = String(playerName || "Toi").trim();
-  const centeredSeat = centeredRemoteBinding?.seat || null;
-  const centeredSeatCards = centeredSeat?.cards || [];
-  const centeredSeatName = centeredSeat?.name || centeredSeat?.username || centeredRemoteBinding?.label || playerSeatName;
-  const centeredSeatScore = centeredSeat
-    ? resolveBlackjackScore(centeredSeat.score, centeredSeat.score, centeredSeatCards.length)
-    : null;
   const splitHands = hands.length > 1;
   const showHeroOutcome = Boolean(playerOutcome && !splitHands);
+  const showSpectatorBanner = !hands.length;
+  const spectatorBannerLabel =
+    state?.stage === "player-turn"
+      ? "Manche en cours"
+      : state?.stage === "resolved"
+        ? "Resultat de table"
+        : "Phase de mise";
+  const spectatorBannerDetail =
+    state?.stage === "player-turn"
+      ? "La table joue une donne multijoueur. Attends la prochaine phase de mise pour reprendre une place."
+      : state?.stage === "resolved"
+        ? "La donne se termine sur la table. La prochaine phase de mise va rouvrir pour tous les joueurs presents."
+        : "Valide ta mise pendant la phase commune pour rejoindre la prochaine donne de la table.";
 
   return (
     <div className={`casino-card-felt casino-card-felt--blackjack casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
@@ -309,12 +364,14 @@ export default function BlackjackTableScene({
           </section>
         </div>
 
-        {displayedRemoteBindings.map(({ key, label, seat, waiting }, index) => {
+        {remoteBindings.map(({ key, label, seat, waiting, placeholder }, index) => {
           const layout = remoteSeatLayout[index] || BLACKJACK_REMOTE_LAYOUT[Math.min(index, BLACKJACK_REMOTE_LAYOUT.length - 1)];
           const seatCards = seat?.cards || [];
           const seatName = seat?.name || seat?.username || label;
           const seatStatus = waiting
             ? "En attente de mise"
+            : placeholder
+              ? "Joueur a table"
             : seat?.isActive
               ? "A jouer"
               : seat?.result
@@ -337,7 +394,7 @@ export default function BlackjackTableScene({
               <span className="casino-oval-seat__tag">{layout.tag}</span>
               <header>
                 <strong>{seatName}</strong>
-                <span>{waiting ? "En attente" : seat?.isActive ? "Tour actif" : "Table"}</span>
+                <span>{waiting ? "En attente" : placeholder ? "A table" : seat?.isActive ? "Tour actif" : "Table"}</span>
               </header>
               <div className="casino-seat-role-row" aria-label={`Informations de ${seatName}`}>
                 {typeof seat?.wager === "number" && seat.wager > 0 ? (
@@ -359,8 +416,14 @@ export default function BlackjackTableScene({
                   ))
                 ) : (
                   <div className="casino-empty-seat casino-empty-seat--blackjack-peer">
-                    <strong>{waiting ? "Mise en attente" : "Main vide"}</strong>
-                    <span>{waiting ? "La table garde cette place jusqu'au lancement de la prochaine donne." : "Les cartes apparaitront des que la donne commencera."}</span>
+                    <strong>{waiting ? "Mise en attente" : placeholder ? "Place tenue" : "Main vide"}</strong>
+                    <span>
+                      {waiting
+                        ? "La table garde cette place jusqu'au lancement de la prochaine donne."
+                        : placeholder
+                          ? "Le joueur est bien a table, les cartes se resynchronisent."
+                          : "Les cartes apparaitront des que la donne commencera."}
+                    </span>
                   </div>
                 )}
               </div>
@@ -442,25 +505,11 @@ export default function BlackjackTableScene({
                     );
                   })}
                 </div>
-              ) : centeredSeat ? (
-                <section className="casino-blackjack-player-hand casino-blackjack-player-hand--featured-seat">
-                  <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
-                    {centeredSeatCards.map((card, index) => (
-                      <PiratePlayingCardView
-                        key={`${centeredSeat.id || centeredSeatName}-${card.id}-${index}`}
-                        card={card}
-                        emphasis="strong"
-                        dealt={Boolean(dealtCardDelays[`${centeredSeat.id || centeredSeatName}-${card.id}-${index}`] !== undefined)}
-                        dealDelayMs={dealtCardDelays[`${centeredSeat.id || centeredSeatName}-${card.id}-${index}`] || 0}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="casino-blackjack-player-banner" aria-label={`Main de ${centeredSeatName}`}>
-                    <strong>{centeredSeatName}</strong>
-                    <span>{centeredSeatScore?.total || 0} points</span>
-                  </div>
-                </section>
+              ) : showSpectatorBanner ? (
+                <div className="casino-blackjack-player-banner" aria-live="polite">
+                  <strong>{spectatorBannerLabel}</strong>
+                  <span>{spectatorBannerDetail}</span>
+                </div>
               ) : (
                 <div className="casino-blackjack-player-banner" aria-live="polite">
                   <strong>{playerSeatName}</strong>

@@ -107,7 +107,7 @@ export default function App() {
               media.resetMediaSession();
               session.handleLogout();
             }}
-            onRoomChange={session.setActiveCasinoRoom}
+            onRoomChange={session.handleRoomChange}
             gameTable={(
               <Suspense fallback={<LoadingPanel label="Chargement de la table..." />}>
                 <PirateSlotsGame
@@ -127,7 +127,7 @@ export default function App() {
                   }}
                   onProfileChange={session.handleProfileChange}
                   onError={session.setError}
-                  onRoomChange={session.setActiveCasinoRoom}
+                  onRoomChange={session.handleRoomChange}
                 />
               </Suspense>
             )}

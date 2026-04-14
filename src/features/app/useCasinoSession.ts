@@ -1,6 +1,8 @@
 import * as React from "react";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { SLOT_VIDEO_INTRO_SESSION_KEY, type RoomId } from "../casino/catalog";
+import { BLACKJACK_SALONS } from "../../lib/tableSalons";
+import { POKER_SALONS } from "../../lib/tableSalons";
 import {
   claimCasinoDailyBonus,
   clearCasinoSession,
@@ -8,11 +10,13 @@ import {
   getCasinoDisplayName,
   hasCasinoToken,
   isCasinoSessionError,
+  leaveCasinoTableRoom,
   loginCasino,
   registerCasino,
   requestCasinoPasswordReset,
   type CasinoProfile,
 } from "../../lib/casinoApi";
+import { readSyncedTableSelection } from "../../lib/tableChannelSync";
 
 export type AuthMode = "login" | "register" | "forgot";
 
@@ -196,6 +200,28 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     }
   }
 
+  function handleRoomChange(nextRoomId: RoomId) {
+    if (nextRoomId === activeCasinoRoom) {
+      return;
+    }
+
+    const previousRoom = activeCasinoRoom;
+    if (hasCasinoToken() && (previousRoom === "blackjack" || previousRoom === "poker")) {
+      const previousTableRoomId =
+        readSyncedTableSelection(previousRoom)
+        || (previousRoom === "blackjack" ? BLACKJACK_SALONS[0]?.id : POKER_SALONS[0]?.id)
+        || "";
+
+      if (previousTableRoomId) {
+        void leaveCasinoTableRoom(previousRoom, previousTableRoomId).catch(() => {
+          // Best effort only: the room component cleanup also releases table presence.
+        });
+      }
+    }
+
+    setActiveCasinoRoom(nextRoomId);
+  }
+
   function handleLogout() {
     setPendingImmersionName("");
     setActiveCasinoRoom("slots");
@@ -227,6 +253,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     notice,
     activeCasinoRoom,
     setActiveCasinoRoom,
+    handleRoomChange,
     displayName,
     pendingImmersionName,
     consumePendingImmersionName,

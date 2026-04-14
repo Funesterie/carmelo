@@ -9,6 +9,14 @@ import icoPokerImg from "../../../images/icopoker.png";
 import icoRouletteImg from "../../../images/icoroulette.png";
 import type { CasinoProfile } from "../../../lib/casinoApi";
 import { formatCredits } from "../../../lib/casinoRoomState";
+import {
+  readSyncedTableSelection,
+  readTableLobbySnapshot,
+  subscribeSyncedTableSelection,
+  subscribeTableLobbySnapshot,
+  writeSyncedTableSelection,
+} from "../../../lib/tableChannelSync";
+import { getTableChannelDisplayMeta, type TableSalonGame } from "../../../lib/tableSalons";
 import LoadingPanel from "./LoadingPanel";
 
 const HAMBURGER_ROOM_ICONS: Record<RoomId, string> = {
@@ -96,6 +104,10 @@ type CasinoGameScreenProps = {
   gameTable: ReactNode;
 };
 
+function isTableChannelRoom(roomId: RoomId): roomId is TableSalonGame {
+  return roomId === "blackjack" || roomId === "poker";
+}
+
 export default function CasinoGameScreen({
   profile,
   busy,
@@ -126,12 +138,38 @@ export default function CasinoGameScreen({
     }),
   );
   const profileMenuRef = React.useRef<HTMLDivElement | null>(null);
+  const [tableLobby, setTableLobby] = React.useState(() =>
+    isTableChannelRoom(activeCasinoRoom) ? readTableLobbySnapshot(activeCasinoRoom) : null,
+  );
+  const [tableSelectionFallback, setTableSelectionFallback] = React.useState(() =>
+    isTableChannelRoom(activeCasinoRoom) ? readSyncedTableSelection(activeCasinoRoom) : "",
+  );
 
   void mediaReady;
   const showHeaderAmbient = true;
   const usesDedicatedAmbient = activeCasinoRoom === "slots" || activeCasinoRoom === "roulette";
   const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient;
   const showDedicatedAmbientPanel = !showImmersion && usesDedicatedAmbient && Boolean(ambientPanel);
+  const tableGame = isTableChannelRoom(activeCasinoRoom) ? activeCasinoRoom : null;
+  const channelRooms = tableGame ? tableLobby?.rooms || [] : [];
+  const joinedTableRoomId =
+    tableGame
+      ? String(tableLobby?.joinedRoomId || (!channelRooms.length ? tableSelectionFallback : "") || "").trim()
+      : "";
+  const joinedTableRoomIndex = joinedTableRoomId
+    ? Math.max(0, channelRooms.findIndex((room) => room.id === joinedTableRoomId))
+    : 0;
+  const joinedTableChannelMeta =
+    tableGame && joinedTableRoomId
+      ? getTableChannelDisplayMeta(tableGame, joinedTableRoomId, joinedTableRoomIndex)
+      : null;
+  const channelOptions = React.useMemo(() => {
+    if (!tableGame) return [];
+    return channelRooms.map((room, index) => ({
+      room,
+      meta: getTableChannelDisplayMeta(tableGame, room.id, index),
+    }));
+  }, [channelRooms, tableGame]);
 
   React.useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -168,6 +206,29 @@ export default function CasinoGameScreen({
     const intervalId = window.setInterval(updateClock, 30000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  React.useEffect(() => {
+    if (!tableGame) {
+      setTableLobby(null);
+      setTableSelectionFallback("");
+      return undefined;
+    }
+
+    setTableLobby(readTableLobbySnapshot(tableGame));
+    setTableSelectionFallback(readSyncedTableSelection(tableGame));
+
+    const unsubscribeLobby = subscribeTableLobbySnapshot(tableGame, (snapshot) => {
+      setTableLobby(snapshot);
+    });
+    const unsubscribeSelection = subscribeSyncedTableSelection(tableGame, (roomId) => {
+      setTableSelectionFallback(roomId);
+    });
+
+    return () => {
+      unsubscribeLobby();
+      unsubscribeSelection();
+    };
+  }, [tableGame]);
 
   return (
     <div className={`casino-game-shell ${showHeaderAmbient ? "casino-game-shell--with-ambient" : ""}`}>
@@ -296,6 +357,50 @@ export default function CasinoGameScreen({
                 {profile.wallet.canClaimDailyBonus ? `Bonus +${profile.wallet.dailyBonusAmount}` : "Bonus pris"}
               </span>
             </button>
+            {tableGame ? (
+              <section className="casino-account-bar__channel-panel" aria-label={`Canaux ${tableGame}`}>
+                <div className="casino-account-bar__channel-copy">
+                  <span className="casino-chip">Canal actif</span>
+                  <strong>{joinedTableChannelMeta?.channelLabel || "Canal en cours"}</strong>
+                  <small>{joinedTableChannelMeta?.title || "Connexion de table en cours..."}</small>
+                </div>
+                <div className="casino-account-bar__channel-list" role="tablist" aria-label={`Canaux ${tableGame}`}>
+                  {(channelOptions.length
+                    ? channelOptions
+                    : joinedTableChannelMeta
+                      ? [{
+                          room: {
+                            id: joinedTableRoomId || `${tableGame}-channel-1`,
+                            playerCount: 0,
+                            participants: [],
+                            isCurrent: true,
+                            hasSelf: false,
+                          },
+                          meta: joinedTableChannelMeta,
+                        }]
+                      : []
+                  ).map(({ room, meta }) => (
+                    <button
+                      key={room.id}
+                      type="button"
+                      className={`casino-ghost-button casino-ghost-button--menu casino-account-bar__channel-pill ${room.id === joinedTableRoomId ? "is-active" : ""}`}
+                      role="tab"
+                      aria-selected={room.id === joinedTableRoomId}
+                      onClick={() => {
+                        writeSyncedTableSelection(tableGame, room.id);
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <span className="casino-account-bar__channel-pill-copy">
+                        <strong>{meta.channelLabel}</strong>
+                        <small>{meta.title}</small>
+                      </span>
+                      <b>{room.playerCount || 0}</b>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : null}
             <button
               type="button"
               className="casino-ghost-button casino-ghost-button--menu"

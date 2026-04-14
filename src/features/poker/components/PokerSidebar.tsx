@@ -1,7 +1,7 @@
 import PirateInspector from "../../../PirateInspector";
 import { formatCredits } from "../../../lib/casinoRoomState";
-import { POKER_SALONS } from "../../../lib/tableSalons";
 import type { CasinoProfile, CasinoTableRoom, PokerState } from "../../../lib/casinoApi";
+import { getTableChannelDisplayMeta } from "../../../lib/tableSalons";
 
 const STREET_LABELS = {
   waiting: { title: "Attente" },
@@ -49,6 +49,18 @@ type PokerSidebarProps = {
   aggressionMin: number;
   aggressionMax: number;
   blindUnit: number;
+  lastHandRecap: {
+    message: string;
+    winners: Array<{
+      id: string;
+      name: string;
+      handLabel: string;
+      amount: number;
+      isSelf: boolean;
+    }>;
+    heroHandLabel: string;
+    actionLog: string[];
+  } | null;
   onInfoTabChange: (tab: "journal" | "lecture" | "salons" | "joueurs") => void;
   onRoomChange: (roomId: string) => void;
   onBetTargetChange: (value: number) => void;
@@ -119,6 +131,7 @@ export default function PokerSidebar({
   aggressionMin,
   aggressionMax,
   blindUnit,
+  lastHandRecap,
   onInfoTabChange,
   onRoomChange,
   onBetTargetChange,
@@ -128,7 +141,18 @@ export default function PokerSidebar({
   onRaise,
   onJoin,
 }: PokerSidebarProps) {
-  const activeRoom = rooms.find((entry) => entry.id === roomId) || null;
+  const availableRooms = rooms.length
+    ? rooms
+    : [
+        {
+          id: roomId,
+          playerCount: 0,
+          participants: [],
+          isCurrent: true,
+          hasSelf: true,
+        },
+      ] satisfies CasinoTableRoom[];
+  const activeRoom = availableRooms.find((entry) => entry.id === roomId) || availableRooms[0] || null;
   void hasPendingSeat;
   const canJoin = !queuedForNextHand && (isSpectatingRound || stage === "idle" || stage === "waiting" || stage === "showdown");
   const showJoinPanel = canJoin || queuedForNextHand;
@@ -148,6 +172,9 @@ export default function PokerSidebar({
       : waitingForTurn
       ? (state?.message || "La main continue. Les actions se debloquent des que le tour revient sur toi.")
       : getDecisionCaption(state);
+  const lastHandWinnersLabel = lastHandRecap?.winners.length
+    ? lastHandRecap.winners.map((winner) => winner.name).join(", ")
+    : "";
 
   return (
     <div className="casino-stage-sidebar">
@@ -255,14 +282,25 @@ export default function PokerSidebar({
           tabs={[
           {
             id: "journal",
-            label: "Journal",
+            label: "Historique",
             badge: (state?.actionLog || []).length,
-            caption: "Historique compact des derniers mouvements.",
+            caption: "Resume de la derniere main et des derniers mouvements.",
             content: (
               <div className="casino-rule-list">
+                {lastHandRecap ? (
+                  <div className="casino-last-hand-card">
+                    <strong>Derniere main</strong>
+                    <p>{lastHandWinnersLabel ? `Gagnant${lastHandRecap.winners.length > 1 ? "s" : ""}: ${lastHandWinnersLabel}.` : lastHandRecap.message}</p>
+                    {lastHandRecap.heroHandLabel ? <span>Ta main: {lastHandRecap.heroHandLabel}</span> : null}
+                  </div>
+                ) : null}
                 {(state?.actionLog || []).length ? (
                   [...(state?.actionLog || [])].slice(-6).reverse().map((entry, index) => (
                     <p key={`${entry}-${index}`}>{entry}</p>
+                  ))
+                ) : lastHandRecap?.actionLog?.length ? (
+                  [...lastHandRecap.actionLog].reverse().map((entry, index) => (
+                    <p key={`last-hand-${entry}-${index}`}>{entry}</p>
                   ))
                 ) : (
                   <p>Les actions de la main s'afficheront ici des que le coup demarre.</p>
@@ -297,24 +335,25 @@ export default function PokerSidebar({
           },
           {
             id: "salons",
-            label: "Salons",
+            label: "Canaux",
             badge: rooms.find((entry) => entry.id === roomId)?.playerCount || 0,
-            caption: "Switch de table en gardant le layout compact.",
+            caption: "Switch de canal en gardant le layout compact.",
             content: (
               <div className="casino-salon-roster">
-                {POKER_SALONS.map((salon) => {
-                  const room = rooms.find((entry) => entry.id === salon.id);
+                {availableRooms.map((room, index) => {
+                  const channelMeta = getTableChannelDisplayMeta("poker", room.id, index);
                   return (
                     <button
-                      key={salon.id}
+                      key={room.id}
                       type="button"
-                      className={`casino-salon-card ${salon.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}
-                      onClick={() => onRoomChange(salon.id)}
+                      className={`casino-salon-card ${room.id === roomId ? "is-active" : ""} ${roomSwitchLocked ? "is-locked" : ""}`}
+                      onClick={() => onRoomChange(room.id)}
                       disabled={roomSwitchLocked || working}
+                      title={channelMeta.blurb}
                     >
                       <div>
-                        <strong>{salon.title}</strong>
-                        <span>{salon.blurb}</span>
+                        <strong>{channelMeta.channelLabel}</strong>
+                        <span>{channelMeta.title}</span>
                       </div>
                       <b>{room?.playerCount || 0} joueur{(room?.playerCount || 0) > 1 ? "s" : ""}</b>
                     </button>

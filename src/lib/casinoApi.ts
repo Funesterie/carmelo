@@ -423,6 +423,7 @@ export type BlackjackHand = {
 export type BlackjackState = {
   token: string | null;
   roomId?: string | null;
+  roomParticipants?: CasinoTableRoomParticipant[];
   stage: "waiting" | "player-turn" | "resolved";
   waitingForPlayers?: boolean;
   roomActive?: boolean;
@@ -491,6 +492,7 @@ export type PokerSeatAmount = {
 export type PokerState = {
   token: string | null;
   roomId?: string | null;
+  roomParticipants?: CasinoTableRoomParticipant[];
   stage: "waiting" | "preflop" | "flop" | "turn" | "river" | "showdown";
   stageLabel: string;
   waitingForPlayers?: boolean;

@@ -254,6 +254,17 @@ type PokerTableSceneProps = {
   dealtCardDelays: Record<string, number>;
   presenceWindowMs: number;
   removingAbsentUserId: string | null;
+  lastHandRecap: {
+    message: string;
+    winners: Array<{
+      id: string;
+      name: string;
+      handLabel: string;
+      amount: number;
+      isSelf: boolean;
+    }>;
+    heroHandLabel: string;
+  } | null;
   onRemoveAbsent: (userId: string) => void;
 };
 
@@ -273,6 +284,7 @@ export default function PokerTableScene({
   dealtCardDelays,
   presenceWindowMs,
   removingAbsentUserId,
+  lastHandRecap,
   onRemoveAbsent,
 }: PokerTableSceneProps) {
   void activeAnte;
@@ -286,6 +298,7 @@ export default function PokerTableScene({
   const heroName = String(playerName || "Toi").trim();
   const showHeroSeat = (!isSpectatingRound || Boolean(selfSeat) || Boolean(heroCards.length)) && !queuedForNextHand;
   const displayedPotTotal = stage === "waiting" ? 0 : potTotal;
+  const heroWon = Boolean(selfSeat?.isWinner || state?.lastDelta > 0 || state?.payoutAmount > 0);
   const heroStatus =
     state?.playerFolded
       ? "Main couchee"
@@ -295,6 +308,9 @@ export default function PokerTableScene({
           ? "En attente"
           : "Decision ouverte");
   const heroStake = state?.playerCommitted || selfSeat?.totalCommitted || heroCommitted;
+  const showdownWinnersLabel = lastHandRecap?.winners.length
+    ? lastHandRecap.winners.map((winner) => winner.name).join(", ")
+    : "";
 
   return (
     <>
@@ -312,7 +328,8 @@ export default function PokerTableScene({
             const seatStatus = getParticipantStatus(seatLabel, seat, stage, pending, absent, folded);
             const targetUserId = String(seat?.userId || participant?.userId || pendingSeat?.userId || "").trim();
             const isRemovingAbsent = Boolean(removingAbsentUserId && normalizeSeatIdentity(removingAbsentUserId) === normalizeSeatIdentity(targetUserId));
-            const canRemoveAbsent = Boolean(absent && targetUserId && normalizeSeatIdentity(targetUserId) !== normalizeSeatIdentity(currentUserId));
+            const isSelfSeat = normalizeSeatIdentity(targetUserId) === normalizeSeatIdentity(currentUserId);
+            const canRemoveAbsent = Boolean(absent && targetUserId);
             return (
               <article
                 key={key}
@@ -342,6 +359,7 @@ export default function PokerTableScene({
                     </span>
                   ) : null}
                   {seat?.isActive ? <span className="casino-seat-role-chip casino-seat-role-chip--action">A jouer</span> : null}
+                  {seat?.isWinner ? <span className="casino-seat-role-chip casino-seat-role-chip--winner">Gagnant</span> : null}
                   {folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
                   {absent && !folded ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Absent</span> : null}
                   {canRemoveAbsent ? (
@@ -351,7 +369,7 @@ export default function PokerTableScene({
                       onClick={() => onRemoveAbsent(targetUserId)}
                       disabled={isRemovingAbsent}
                     >
-                      {isRemovingAbsent ? "Retrait..." : "Retirer"}
+                      {isRemovingAbsent ? "Retour..." : isSelfSeat ? "Revenir" : "Retirer"}
                     </button>
                   ) : null}
                 </div>
@@ -388,6 +406,12 @@ export default function PokerTableScene({
               <strong>{stage === "idle" ? "Table au repos" : state?.stageLabel || (stage === "waiting" ? "En attente d'un joueur" : "Street en cours")}</strong>
               <span className="casino-token-inline"><img src={jetonImg} alt="" />Pot {formatCredits(displayedPotTotal)}</span>
             </div>
+            {stage === "showdown" && lastHandRecap ? (
+              <div className="casino-poker-showdown-banner" aria-live="polite">
+                <strong>{showdownWinnersLabel ? `Gagnant${lastHandRecap.winners.length > 1 ? "s" : ""}: ${showdownWinnersLabel}` : "Showdown"}</strong>
+                <span>{lastHandRecap.message}</span>
+              </div>
+            ) : null}
             <div className="casino-poker-board">
               {Array.from({ length: 5 }, (_, index) => {
                 const card = communityCards[index] || null;
@@ -442,6 +466,7 @@ export default function PokerTableScene({
                 <span className="casino-seat-role-chip casino-seat-role-chip--stake">
                   Mise {formatCredits(heroStake)}
                 </span>
+                {heroWon ? <span className="casino-seat-role-chip casino-seat-role-chip--winner">Gagnant</span> : null}
                 {heroAbsent ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
               </div>
             </article>
