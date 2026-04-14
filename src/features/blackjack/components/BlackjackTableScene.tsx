@@ -17,6 +17,7 @@ type BlackjackTableSceneProps = {
   bet: number;
   betChips: number[];
   betLocked: boolean;
+  queuedForNextRound: boolean;
   isDecisionPhase: boolean;
   dealtCardDelays: Record<string, number>;
   resultFlash: { label: string; detail?: string; tone: "win" | "lose" } | null;
@@ -293,6 +294,7 @@ export default function BlackjackTableScene({
   bet,
   betChips,
   betLocked,
+  queuedForNextRound,
   isDecisionPhase,
   dealtCardDelays,
   resultFlash,
@@ -327,13 +329,17 @@ export default function BlackjackTableScene({
   const showHeroOutcome = Boolean(playerOutcome && !splitHands);
   const showSpectatorBanner = !hands.length;
   const spectatorBannerLabel =
-    state?.stage === "player-turn"
+    queuedForNextRound
+      ? "Prochaine donne reservee"
+      : state?.stage === "player-turn"
       ? "Manche en cours"
       : state?.stage === "resolved"
         ? "Resultat de table"
         : "Phase de mise";
   const spectatorBannerDetail =
-    state?.stage === "player-turn"
+    queuedForNextRound
+      ? "La main actuelle se termine. Ta mise est deja posee pour la prochaine donne de cette table."
+      : state?.stage === "player-turn"
       ? "La table joue une donne multijoueur. Attends la prochaine phase de mise pour reprendre une place."
       : state?.stage === "resolved"
         ? "La donne se termine sur la table. La prochaine phase de mise va rouvrir pour tous les joueurs presents."

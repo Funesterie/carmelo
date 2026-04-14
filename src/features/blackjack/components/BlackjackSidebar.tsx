@@ -24,6 +24,7 @@ type BlackjackSidebarProps = {
   isBettingPhase: boolean;
   isSpectatingRound: boolean;
   hasPendingSeat: boolean;
+  queuedForNextRound: boolean;
   roomSwitchLocked: boolean;
   legalActions: BlackjackAction[];
   actionsLocked: boolean;
@@ -59,6 +60,7 @@ export default function BlackjackSidebar({
   isBettingPhase,
   isSpectatingRound,
   hasPendingSeat,
+  queuedForNextRound,
   roomSwitchLocked,
   legalActions,
   actionsLocked,
@@ -73,7 +75,7 @@ export default function BlackjackSidebar({
 }: BlackjackSidebarProps) {
   const stage = state?.stage || "idle";
   const showBettingPhase = isBettingPhase || stage === "waiting";
-  const canDeal = stage !== "player-turn" && !hasPendingSeat;
+  const canDeal = !hasPendingSeat && (stage !== "player-turn" || isSpectatingRound);
   const availableRooms = rooms.length
     ? rooms
     : [
@@ -94,8 +96,10 @@ export default function BlackjackSidebar({
   const canStand = legalActions.includes("stand");
   const canDouble = legalActions.includes("double");
   const canSplit = legalActions.includes("split");
-  const primaryActionLabel = isSpectatingRound && stage === "player-turn"
-    ? "Manche en cours"
+  const primaryActionLabel = queuedForNextRound
+    ? "Prochaine donne reservee"
+    : isSpectatingRound && stage === "player-turn"
+    ? "Prochaine donne"
     : isSpectatingRound
       ? "Prochaine manche"
       : hasPendingSeat && showBettingPhase
@@ -118,8 +122,12 @@ export default function BlackjackSidebar({
           <strong>
             {isDecisionPhase
               ? `Main a ${state?.playerScore.total || 0} points`
+              : queuedForNextRound
+              ? "Place reservee"
               : hasPendingSeat && showBettingPhase
                 ? "Mise enregistree"
+                : isSpectatingRound && stage === "player-turn"
+                  ? "Rejoins la prochaine donne"
                 : showBettingPhase
                   ? "Valide ta place"
                 : stage === "player-turn"
@@ -129,8 +137,12 @@ export default function BlackjackSidebar({
           <p>
             {isDecisionPhase
               ? "Concentre-toi sur ta main, la carte visible du croupier et les vraies options de blackjack ouvertes pour cette combinaison."
+              : queuedForNextRound
+                ? "La donne en cours se termine, puis ta mise entrera automatiquement dans la prochaine manche de cette table."
               : hasPendingSeat && showBettingPhase
                 ? "Ta mise est deja posee. La table attend les autres confirmations ou la fin du timer serveur."
+                : isSpectatingRound && stage === "player-turn"
+                  ? "La table joue encore cette manche, mais tu peux deja poser ta mise pour prendre une place sur la suivante."
                 : showBettingPhase
                   ? "Valide ta mise pour entrer dans la prochaine donne. Le timer de table garde la phase ouverte pour tous les joueurs presents."
                 : stage === "player-turn"

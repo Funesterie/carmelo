@@ -334,6 +334,7 @@ export default function BlackjackRoom({
   const hasHeroRound = hasBlackjackHeroRound(state, profile.user.id, playerName);
   const isSpectatingRound = isBlackjackSpectatorRound(state, profile.user.id, playerName);
   const hasPendingSeat = hasBlackjackPendingSeat(state, profile.user.id, playerName);
+  const queuedForNextRound = Boolean(hasPendingSeat && stage === "player-turn" && !hasHeroRound);
   const isBettingPhase = stage === "waiting" || Boolean(state?.waitingForPlayers);
   const roomSwitchLocked = stage === "player-turn" && hasHeroRound;
   const betLocked = roomSwitchLocked || working;
@@ -382,7 +383,9 @@ export default function BlackjackRoom({
   const isTurnClockExpired = Boolean(turnDeadlineAt && turnDeadlineAt <= nowTick);
   const turnCountdownLabel = turnDeadlineAt ? (isTurnClockExpired ? "Attente" : formatTurnClock(turnCountdownMs)) : "--:--";
   const blackjackStatusMessage = isSpectatingRound
-    ? "Une manche est deja en cours sur ce salon."
+    ? queuedForNextRound
+      ? "Ta mise est en file pour la prochaine donne de cette table."
+      : "Une manche est deja en cours sur ce salon."
     : hasPendingSeat && isBettingPhase
       ? "Mise validee. La table attend les autres reponses ou la fin du chrono pour lancer la prochaine donne."
       : isBettingPhase
@@ -832,12 +835,8 @@ export default function BlackjackRoom({
         const sharedState = await fetchBlackjackRoomState(joinedRoomId);
         if (sharedState) {
           applySyncedState(sharedState, Date.now(), getBlackjackPhaseDeadlineAt(sharedState));
-          if (isBlackjackSpectatorRound(sharedState, profile.user.id, playerName)) {
-            onError("Une manche est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans cette table.");
-            return;
-          }
           if (hasBlackjackPendingSeat(sharedState, profile.user.id, playerName)) {
-            onError("Ta mise est deja validee sur cette table. La donne partira quand tous les joueurs presents auront repondu ou a la fin du chrono.");
+            onError("");
             return;
           }
         }
@@ -861,8 +860,12 @@ export default function BlackjackRoom({
       if (result.profile) {
         onProfileChange(result.profile);
       }
+      if (hasBlackjackPendingSeat(nextState, profile.user.id, playerName)) {
+        onError("");
+        return;
+      }
       if (isBlackjackSpectatorRound(nextState, profile.user.id, playerName)) {
-        onError("Une manche est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans cette table.");
+        onError("Cette table diffuse encore une autre donne. Reessaie quand le chrono repasse en phase de mise.");
         return;
       }
     } catch (error_) {
@@ -1132,6 +1135,7 @@ export default function BlackjackRoom({
               bet={bet}
               betChips={betChips}
               betLocked={betLocked}
+              queuedForNextRound={queuedForNextRound}
               isDecisionPhase={isDecisionPhase}
               dealtCardDelays={dealtCardDelays}
               resultFlash={resultFlash}
@@ -1152,6 +1156,7 @@ export default function BlackjackRoom({
               isBettingPhase={isBettingPhase}
               isSpectatingRound={isSpectatingRound}
               hasPendingSeat={hasPendingSeat}
+              queuedForNextRound={queuedForNextRound}
               roomSwitchLocked={roomSwitchLocked}
               legalActions={legalActions}
               actionsLocked={isTurnClockExpired}

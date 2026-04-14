@@ -872,12 +872,8 @@ export default function PokerRoom({
         const sharedState = await fetchPokerRoomState(joinedRoomId);
         if (sharedState) {
           applySyncedState(sharedState, Date.now(), getPokerPhaseDeadlineAt(sharedState));
-          if (sharedState.stage !== "waiting" && isPokerSpectatorRound(sharedState, profile.user.id, playerName)) {
-            onError("Une main est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans la table multi.");
-            return;
-          }
           if (hasPokerPendingSeat(sharedState, profile.user.id, playerName)) {
-            onError("Ton ante est deja valide sur cette table. La main partira quand tous les joueurs presents auront repondu ou a la fin du chrono.");
+            onError("");
             return;
           }
         }
@@ -902,11 +898,15 @@ export default function PokerRoom({
         onProfileChange(result.profile);
       }
       if (isPokerSpectatorRound(nextState, profile.user.id, playerName)) {
-        onError("Une main est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans la table multi.");
+        onError("La table n'a pas encore pu confirmer ta place pour la prochaine main. Reessaie dans ce salon.");
         return;
       }
     } catch (error_) {
-      onError(error_ instanceof Error ? error_.message : "L'entree a la table a echoue.");
+      if (error_ instanceof Error && error_.message.trim().toLowerCase() === "table_full") {
+        onError("Cette table poker est complete. Maximum 6 joueurs sur la meme main.");
+      } else {
+        onError(error_ instanceof Error ? error_.message : "L'entree a la table a echoue.");
+      }
     } finally {
       setWorking(false);
     }
