@@ -50,16 +50,6 @@ export default function App() {
           <p>Tourne ton telephone en mode portrait pour acceder au casino.</p>
         </div>
       </div>
-      {/* Affichage du bouton d’activation média si bloqué */}
-      {media.mediaStatus === "blocked" && (
-        <div style={{position: "fixed", zIndex: 10000, top: 0, left: 0, right: 0, background: "#222", color: "#fff", padding: 16, textAlign: "center"}}>
-          <strong>⚠️ Le navigateur a bloqué l’autoplay audio/vidéo.</strong>
-          <button
-            style={{marginLeft: 16, padding: "8px 20px", fontWeight: "bold", borderRadius: 8, border: "none", background: "#f90", color: "#222", cursor: "pointer"}}
-            onClick={() => media.requestMediaPlayback()}
-          >Activer le son / les vidéos</button>
-        </div>
-      )}
       <div className="casino-app-content">
         {!session.profile ? (
           <CasinoAuthScreen

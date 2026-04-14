@@ -198,7 +198,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       return;
     }
 
-    if (!rouletteEntryPlayedRef.current) {
+    if (!rouletteEntryPlayedRef.current && !showImmersion) {
       const scope = rouletteAudioScopeRef.current;
       rouletteEntryPlayedRef.current = true;
       lastRouletteEntryRoomChangeCountRef.current = roomChangeCount;
@@ -327,16 +327,20 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       return;
     }
 
-    const unlockAudio = getAudio(cueAudioRef, entryAudio);
-    unlockAudio.volume = 0;
-    unlockAudio.muted = false;
-    setMediaStatus("unlocking");
-    const result = await safePlayMedia(unlockAudio, "unlockAudio");
-    unlockAudio.pause();
-    unlockAudio.currentTime = 0;
-    mediaUnlockedRef.current = !!result.ok;
-    setMediaReady(!!result.ok);
-    setMediaStatus(result.ok ? "ready" : "blocked");
+
+    // Ne pas jouer entryAudio si immersion en cours
+    if (!showImmersion) {
+      const unlockAudio = getAudio(cueAudioRef, entryAudio);
+      unlockAudio.volume = 0;
+      unlockAudio.muted = false;
+      setMediaStatus("unlocking");
+      const result = await safePlayMedia(unlockAudio, "unlockAudio");
+      unlockAudio.pause();
+      unlockAudio.currentTime = 0;
+      mediaUnlockedRef.current = !!result.ok;
+      setMediaReady(!!result.ok);
+      setMediaStatus(result.ok ? "ready" : "blocked");
+    }
 
     if (activeCasinoRoom === "slots") {
       pauseMedia(ambientVideoRef.current);

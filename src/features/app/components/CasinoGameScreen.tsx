@@ -18,6 +18,7 @@ import {
 } from "../../../lib/tableChannelSync";
 import { getTableChannelDisplayMeta, type TableSalonGame } from "../../../lib/tableSalons";
 import LoadingPanel from "./LoadingPanel";
+import { oneVideo } from "../../casino/catalog";
 
 const HAMBURGER_ROOM_ICONS: Record<RoomId, string> = {
   slots: icoSlotsImg,
@@ -131,6 +132,17 @@ export default function CasinoGameScreen({
   gameTable,
 }: CasinoGameScreenProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [showOneVideo, setShowOneVideo] = React.useState(false);
+
+  React.useEffect(() => {
+    if (showImmersion) {
+      setShowOneVideo(false);
+      const timeout = setTimeout(() => setShowOneVideo(true), 10000);
+      return () => clearTimeout(timeout);
+    } else {
+      setShowOneVideo(false);
+    }
+  }, [showImmersion]);
   const [clockLabel, setClockLabel] = React.useState(() =>
     new Date().toLocaleTimeString("fr-FR", {
       hour: "2-digit",
@@ -252,22 +264,23 @@ export default function CasinoGameScreen({
                 <span>Canon live en veille sur la roulette</span>
               </div>
             </div>
-
             <div
               className="casino-immersion-overlay__video-shell"
               style={{
                 backgroundImage: `linear-gradient(180deg, rgba(4, 8, 14, 0.14), rgba(4, 8, 14, 0.84)), url("${districtArtwork}")`,
               }}
             >
-              <video
-                className="casino-immersion-overlay__video"
-                src={freshVideo}
-                autoPlay
-                loop
-                playsInline
-                muted
-                preload="metadata"
-              />
+              {showOneVideo ? (
+                <video
+                  className="casino-immersion-overlay__video"
+                  src={oneVideo}
+                  autoPlay
+                  loop
+                  playsInline
+                  muted
+                  preload="metadata"
+                />
+              ) : null}
             </div>
           </div>
         </div>

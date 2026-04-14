@@ -39,6 +39,8 @@ import deppVideo from "../../videos/depp.mp4";
 import expVideo from "../../videos/exp.mp4";
 import jokerVideo from "../../videos/joker.mp4";
 import oneVideo from "../../videos/one.mp4";
+
+export { oneVideo };
 import powerVideo from "../../videos/power.mp4";
 import rangerVideo from "../../videos/ranger.mp4";
 import spartaVideo from "../../videos/sparta.mp4";
