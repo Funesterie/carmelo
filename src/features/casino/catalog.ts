@@ -466,6 +466,11 @@ export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
   }
 
   const strongestWin = [...spin.wins].sort((left, right) => right.payout - left.payout)[0];
+  const strongestWinMatchCount = Math.max(
+    Number(strongestWin?.matchCount || 0),
+    Array.isArray(strongestWin?.indexes) ? strongestWin.indexes.length : 0,
+  );
+  if (strongestWinMatchCount < 5) return "idle";
   const strongestWinSymbol = getSlotDisplaySymbolId(strongestWin?.symbol || "");
   if (strongestWinSymbol === "ELEPHANT") return "elephant";
   if (strongestWinSymbol === "SOLDAT") return "soldat";

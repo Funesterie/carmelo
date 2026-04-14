@@ -57,7 +57,7 @@ type UseCasinoMediaOptions = {
 };
 
 const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
-const SLOT_ONE_START_DELAY_MS = 10_000;
+const SLOT_ONE_START_DELAY_MS = 1_500;
 
 export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMediaOptions) {
   const [showImmersion, setShowImmersion] = useState(false);
@@ -76,6 +76,8 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
   const mediaUnlockedRef = useRef(false);
   const rouletteQueueRef = useRef(Promise.resolve());
   const rouletteEntryPlayedRef = useRef(false);
+  const activeRoomRef = useRef(activeCasinoRoom);
+  const rouletteAudioScopeRef = useRef(0);
   const immersionAudioPlayedRef = useRef(
     (() => {
       try {
@@ -107,6 +109,18 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       stopMedia(ambientVideoRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    activeRoomRef.current = activeCasinoRoom;
+    rouletteAudioScopeRef.current += 1;
+    if (activeCasinoRoom !== "roulette") {
+      rouletteEntryPlayedRef.current = false;
+      rouletteQueueRef.current = Promise.resolve();
+      stopMedia(cueAudioRef.current);
+      stopMedia(cannonAudioRef.current);
+      pauseMedia(rouletteAmbientAudioRef.current);
+    }
+  }, [activeCasinoRoom]);
 
   useEffect(() => {
     const unlockOnFirstGesture = () => {
@@ -152,9 +166,12 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     }
 
     if (!rouletteEntryPlayedRef.current) {
+      const scope = rouletteAudioScopeRef.current;
       rouletteEntryPlayedRef.current = true;
-      queueRouletteAudio(async () => {
+      queueRouletteAudio(scope, async () => {
+        if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
         await playAudioClip(cueAudioRef, entryAudio, 0.84, true);
+        if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
       });
     }
   }, [activeCasinoRoom, profileLoaded, mediaReady]);
@@ -231,11 +248,13 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
         settled = true;
         audio.removeEventListener("ended", finish);
         audio.removeEventListener("error", finish);
+        audio.removeEventListener("pause", finish);
         resolve();
       };
 
       audio.addEventListener("ended", finish, { once: true });
       audio.addEventListener("error", finish, { once: true });
+      audio.addEventListener("pause", finish, { once: true });
       window.setTimeout(finish, Math.max(1800, Math.ceil((audio.duration || 0) * 1000) + 300));
     });
 
@@ -328,12 +347,17 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     }, 5200);
   }
 
-  function queueRouletteAudio(task: () => Promise<void>) {
-    rouletteQueueRef.current = rouletteQueueRef.current.then(task).catch(() => undefined);
+  function queueRouletteAudio(scope: number, task: () => Promise<void>) {
+    rouletteQueueRef.current = rouletteQueueRef.current
+      .then(async () => {
+        if (scope !== rouletteAudioScopeRef.current) return;
+        await task();
+      })
+      .catch(() => undefined);
   }
 
   function getRouletteAmbientMedia() {
-    if (activeCasinoRoom === "roulette") {
+    if (activeRoomRef.current === "roulette") {
       return ambientVideoRef.current || rouletteAmbientAudioRef.current;
     }
     return rouletteAmbientAudioRef.current;
@@ -345,14 +369,17 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       return;
     }
 
-    queueRouletteAudio(async () => {
+    const scope = rouletteAudioScopeRef.current;
+    queueRouletteAudio(scope, async () => {
+      if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
       const sequenceStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
       const introVoice = Math.random() > 0.5 ? fantomeAudio : moussaillonAudio;
       const cannonDelayMs = event.canonDelayMs || ROULETTE_TIRAGE_CANNON_DELAY_MS;
       const targetCannonAtMs = Math.max(0, Number(event.cannonAtMs || 0));
+      const shouldPlayIntroVoice = targetCannonAtMs === 0 || targetCannonAtMs >= 1_200;
       const ambient = getRouletteAmbientMedia();
       const previousAmbientVolume = ambient?.volume ?? 0.14;
-      const shouldResumeAmbient = Boolean(ambient && activeCasinoRoom === "roulette");
+      const shouldResumeAmbient = Boolean(ambient && activeRoomRef.current === "roulette");
 
       stopMedia(cueAudioRef.current);
       stopMedia(cannonAudioRef.current);
@@ -363,16 +390,26 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
         }
       }
 
-      await playAudioClip(cueAudioRef, introVoice, 0.92, true);
+      if (shouldPlayIntroVoice) {
+        await playAudioClip(cueAudioRef, introVoice, 0.92, true);
+        if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
+      }
+
       const elapsedSinceStartMs =
         (typeof performance !== "undefined" ? performance.now() : Date.now()) - sequenceStartedAt;
       const remainingBeforeCannonMs = targetCannonAtMs > 0
         ? Math.max(0, targetCannonAtMs - elapsedSinceStartMs)
         : cannonDelayMs;
-      await waitForMs(remainingBeforeCannonMs);
-      await playAudioClip(cannonAudioRef, canonAudio, 1, false);
+      const shouldSkipCannon = targetCannonAtMs > 0 && remainingBeforeCannonMs <= 120;
+      if (remainingBeforeCannonMs > 0) {
+        await waitForMs(remainingBeforeCannonMs);
+        if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
+      }
+      if (!shouldSkipCannon) {
+        await playAudioClip(cannonAudioRef, canonAudio, 1, false);
+      }
 
-      if (ambient && shouldResumeAmbient) {
+      if (ambient && shouldResumeAmbient && scope === rouletteAudioScopeRef.current && activeRoomRef.current === "roulette") {
         ambient.volume = previousAmbientVolume;
         if (ambient.paused) {
           void ambient.play().catch(() => undefined);
@@ -388,6 +425,8 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     setMediaReady(false);
     setSlotsIntroDelayActive(false);
     mediaUnlockedRef.current = false;
+    rouletteAudioScopeRef.current += 1;
+    rouletteQueueRef.current = Promise.resolve();
     stopMedia(introAudioRef.current);
     stopMedia(cueAudioRef.current);
     stopMedia(cannonAudioRef.current);

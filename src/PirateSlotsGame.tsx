@@ -183,6 +183,7 @@ function SlotsRoom({
   const [autoSpinCount, setAutoSpinCount] = useState(0);
   const [autoSpinPreset, setAutoSpinPreset] = useState(10);
   const [featurePlaybackNonce, setFeaturePlaybackNonce] = useState(0);
+  const [ambientPanelMountNonce, setAmbientPanelMountNonce] = useState(0);
   const intervalRef = useRef<number | null>(null);
   const goldRainTimeoutRef = useRef<number | null>(null);
   const celebrationTimeoutRef = useRef<number | null>(null);
@@ -193,6 +194,7 @@ function SlotsRoom({
   const ambientLoopVideoRef = useRef<HTMLVideoElement | null>(null);
   const ambientResumeTimeRef = useRef(0);
   const ambientResumePendingRef = useRef(false);
+  const slotIntroPlaybackStartedRef = useRef(false);
   const lastAppliedFeaturePlaybackNonceRef = useRef(-1);
   const jokerFeaturePlayedForBonusRef = useRef(false);
   const powerFeaturePlayedForBonusRef = useRef(false);
@@ -306,7 +308,11 @@ function SlotsRoom({
 
   useEffect(() => {
     onAmbientPanelChange?.(slotAmbientPanel);
+    const mountTick = window.requestAnimationFrame(() => {
+      setAmbientPanelMountNonce((current) => current + 1);
+    });
     return () => {
+      window.cancelAnimationFrame(mountTick);
       onAmbientPanelChange?.(null);
     };
   }, [onAmbientPanelChange, slotAmbientPanel]);
@@ -379,20 +385,29 @@ function SlotsRoom({
     }
 
     const shouldUseAudio = mediaReady;
-    ambientVideo.muted = !shouldUseAudio;
-    ambientVideo.volume = shouldUseAudio ? 0.34 : 0;
-    void ambientVideo.play().catch(() => undefined);
+    const playAmbientLoop = () => {
+      ambientVideo.muted = !shouldUseAudio;
+      ambientVideo.volume = shouldUseAudio ? 0.34 : 0;
+      void ambientVideo.play().catch(() => undefined);
+    };
+
+    ambientVideo.addEventListener("loadeddata", playAmbientLoop);
+    ambientVideo.addEventListener("canplay", playAmbientLoop);
+    playAmbientLoop();
 
     return () => {
       ambientVideo.removeEventListener("timeupdate", syncAmbientTime);
       ambientVideo.removeEventListener("loadedmetadata", restoreAmbientPosition);
+      ambientVideo.removeEventListener("loadeddata", playAmbientLoop);
+      ambientVideo.removeEventListener("canplay", playAmbientLoop);
     };
-  }, [connectionImmersionPending, immersionActive, isAlertFeatureActive, mediaReady, shouldShowSlotIntro, slotIntroArmed, slotIntroPlayed, slotsIntroDelayActive]);
+  }, [ambientPanelMountNonce, connectionImmersionPending, immersionActive, isAlertFeatureActive, mediaReady, shouldShowSlotIntro, slotIntroArmed, slotIntroPlayed, slotsIntroDelayActive]);
 
   useEffect(() => {
     const video = featureVideoRef.current;
     if (!video) return;
     if (!showFeatureLayer || !featureMedia.video) {
+      slotIntroPlaybackStartedRef.current = false;
       video.pause();
       return;
     }
@@ -411,6 +426,7 @@ function SlotsRoom({
         lastAppliedFeaturePlaybackNonceRef.current = featurePlaybackNonce;
       } else {
         lastAppliedFeaturePlaybackNonceRef.current = -1;
+        slotIntroPlaybackStartedRef.current = false;
       }
     }
 
@@ -426,6 +442,7 @@ function SlotsRoom({
     video.addEventListener("ended", handleEnded);
 
     if (connectionImmersionPending || slotsIntroDelayActive || immersionActive) {
+      slotIntroPlaybackStartedRef.current = false;
       video.pause();
       if (shouldShowSlotIntro) {
         try {
@@ -441,6 +458,7 @@ function SlotsRoom({
 
     const shouldUseAudio = mediaReady;
     if (!isAlertFeatureActive && shouldShowSlotIntro && !shouldUseAudio) {
+      slotIntroPlaybackStartedRef.current = false;
       video.pause();
       try {
         video.currentTime = 0;
@@ -453,13 +471,29 @@ function SlotsRoom({
     }
 
     const volume = isAlertFeatureActive ? 0.5 : shouldShowSlotIntro ? 0.42 : 0.34;
-    video.muted = !shouldUseAudio;
-    video.volume = shouldUseAudio ? volume : 0;
-    void video.play().catch(() => undefined);
+    const playFeatureVideo = () => {
+      if (!isAlertFeatureActive && shouldShowSlotIntro && !slotIntroPlaybackStartedRef.current) {
+        try {
+          video.currentTime = 0;
+        } catch {
+          // ignore seek failures
+        }
+        slotIntroPlaybackStartedRef.current = true;
+      }
+      video.muted = !shouldUseAudio;
+      video.volume = shouldUseAudio ? volume : 0;
+      void video.play().catch(() => undefined);
+    };
+
+    video.addEventListener("loadeddata", playFeatureVideo);
+    video.addEventListener("canplay", playFeatureVideo);
+    playFeatureVideo();
     return () => {
       video.removeEventListener("ended", handleEnded);
+      video.removeEventListener("loadeddata", playFeatureVideo);
+      video.removeEventListener("canplay", playFeatureVideo);
     };
-  }, [connectionImmersionPending, featureMedia.image, featureMedia.video, featurePlaybackNonce, immersionActive, isAlertFeatureActive, mediaReady, shouldShowSlotIntro, showFeatureLayer, slotIntroPlayed, slotsIntroDelayActive]);
+  }, [ambientPanelMountNonce, connectionImmersionPending, featureMedia.image, featureMedia.video, featurePlaybackNonce, immersionActive, isAlertFeatureActive, mediaReady, shouldShowSlotIntro, showFeatureLayer, slotIntroPlayed, slotsIntroDelayActive]);
 
   useEffect(() => {
     if (!autoSpinActive || spinState !== "idle" || busy) return;
@@ -482,6 +516,7 @@ function SlotsRoom({
   }, [autoSpinActive, bet, busy, profile.wallet.balance, spinState]);
 
   function markSlotsIntroPlayed() {
+    slotIntroPlaybackStartedRef.current = false;
     setSlotIntroPlayed((current) => {
       if (current) return current;
       try {

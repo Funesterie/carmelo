@@ -94,6 +94,7 @@ const ROULETTE_BIG_WIN_RAIN_MS = 4_600;
 const ROULETTE_SYNC_ROOM_ID = "ats-live";
 const ROULETTE_SYNC_LEAD_MS = 0;
 const ROULETTE_KICKOFF_DELAY_MS = 1_800;
+const ROULETTE_MAX_REPLAY_AGE_MS = SPIN_DURATION_MS + 1_800;
 // Validation automatique des jetons 15 secondes avant le tirage
 const ROULETTE_AUTO_SUBMIT_THRESHOLD_MS = 15_000;
 const ROULETTE_PORT_ORDER = ["http", "https", "app", "ssh"] as const;
@@ -1089,6 +1090,21 @@ export default function RouletteRoom({
         const syncedStartAt = Number.isFinite(resolvedAtMs)
           ? resolvedAtMs + ROULETTE_SYNC_LEAD_MS
           : Date.now();
+        const replayAgeMs = Number.isFinite(resolvedAtMs)
+          ? Math.max(0, Date.now() - resolvedAtMs)
+          : 0;
+        if (replayAgeMs > ROULETTE_MAX_REPLAY_AGE_MS) {
+          pendingDrawRef.current = null;
+          setSequencePhase("idle");
+          if (drawTimeoutRef.current) {
+            window.clearTimeout(drawTimeoutRef.current);
+            drawTimeoutRef.current = null;
+          }
+          const settled = buildSettledAnimation(resolved.winningNumber);
+          animationRef.current = settled;
+          setAnimation(settled);
+          return;
+        }
         scheduleDraw({
           winningNumber: resolved.winningNumber,
           roundId: room.round.id,

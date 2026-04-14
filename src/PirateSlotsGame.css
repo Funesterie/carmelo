@@ -19602,3 +19602,72 @@ button {
     top: 75% !important;
   }
 }
+
+@media (max-width: 780px) {
+  html,
+  body,
+  #root {
+    height: 100svh !important;
+    min-height: 100svh !important;
+    max-height: 100svh !important;
+    overflow: hidden !important;
+  }
+
+  .casino-shell--game,
+  .casino-shell--game .casino-app-content {
+    height: 100svh !important;
+    min-height: 100svh !important;
+    max-height: 100svh !important;
+    overflow: hidden !important;
+  }
+
+  .casino-shell--game .casino-game-shell {
+    height: 100svh !important;
+    min-height: 100svh !important;
+    max-height: 100svh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .casino-shell--game .casino-floor,
+  .casino-shell--game .casino-floor__room {
+    overflow: visible !important;
+  }
+
+  .casino-account-bar {
+    position: relative;
+    z-index: 120 !important;
+    isolation: isolate;
+  }
+
+  .casino-account-bar__menu,
+  .casino-account-bar__actions {
+    position: relative;
+    z-index: 130 !important;
+  }
+
+  .casino-account-bar__menu {
+    pointer-events: none;
+  }
+
+  .casino-account-bar__menu-toggle,
+  .casino-account-bar__actions {
+    pointer-events: auto;
+  }
+
+  .casino-account-bar__identity,
+  .casino-account-bar > div:first-child {
+    min-width: 0 !important;
+  }
+
+  .casino-account-bar__identity h1,
+  .casino-account-bar h1,
+  .casino-account-bar .casino-eyebrow {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
