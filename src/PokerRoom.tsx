@@ -462,6 +462,22 @@ export default function PokerRoom({
     onErrorRef.current = onError;
   }, [onError]);
 
+  async function refreshPokerLobby(targetRoomId: string) {
+    const result = await joinPokerRoom(targetRoomId);
+    setRooms(result.rooms);
+    lastLobbySyncAtRef.current = Date.now();
+
+    const joinedRoomId = String(result.joinedRoomId || targetRoomId).trim() || targetRoomId;
+    if (joinedRoomId && joinedRoomId !== roomId) {
+      setRoomId(joinedRoomId);
+    }
+
+    return {
+      joinedRoomId,
+      rooms: result.rooms,
+    };
+  }
+
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setNowTick(Date.now());
@@ -843,13 +859,49 @@ export default function PokerRoom({
     }
     setWorking(true);
     try {
-      const result = await startPokerRound(ante, roomId);
-      setRooms(rooms);
-      setState(result.state);
+      let joinedRoomId = roomId;
+      try {
+        const lobby = await refreshPokerLobby(roomId);
+        joinedRoomId = lobby.joinedRoomId;
+      } catch (error_) {
+        onError(error_ instanceof Error ? error_.message : "Le salon poker ne repond pas.");
+        return;
+      }
+
+      try {
+        const sharedState = await fetchPokerRoomState(joinedRoomId);
+        if (sharedState) {
+          applySyncedState(sharedState, Date.now(), getPokerPhaseDeadlineAt(sharedState));
+          if (sharedState.stage !== "waiting" && isPokerSpectatorRound(sharedState, profile.user.id, playerName)) {
+            onError("Une main est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans la table multi.");
+            return;
+          }
+          if (hasPokerPendingSeat(sharedState, profile.user.id, playerName)) {
+            onError("Ton ante est deja valide sur cette table. La main partira quand tous les joueurs presents auront repondu ou a la fin du chrono.");
+            return;
+          }
+        }
+      } catch {
+        // If the shared room state is briefly unavailable, keep going with the start call.
+      }
+
+      const result = await startPokerRound(ante, joinedRoomId);
+      let nextState = result.state;
+      if (result.state.roomId && result.state.token) {
+        try {
+          const sharedState = await fetchPokerRoomState(result.state.roomId);
+          if (sharedState?.token === result.state.token) {
+            nextState = sharedState;
+          }
+        } catch {
+          // The normal polling loop will recover if the immediate sync fails.
+        }
+      }
+      setState(nextState);
       if (result.profile) {
         onProfileChange(result.profile);
       }
-      if (isPokerSpectatorRound(result.state, profile.user.id, playerName)) {
+      if (isPokerSpectatorRound(nextState, profile.user.id, playerName)) {
         onError("Une main est deja en cours sur ce salon. Attends la prochaine phase de mise pour entrer dans la table multi.");
         return;
       }

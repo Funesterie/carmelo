@@ -304,6 +304,7 @@ export default function BlackjackRoom({
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [activeHeaderInfo, setActiveHeaderInfo] = useState<"table" | "mise" | "live">("table");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
+  const [resolvedReplayState, setResolvedReplayState] = useState<BlackjackState | null>(null);
   const [resultFlash, setResultFlash] = useState<{ label: string; detail?: string; tone: "win" | "lose" } | null>(null);
   const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -326,6 +327,7 @@ export default function BlackjackRoom({
   const onErrorRef = useRef(onError);
   const { clearQueuedAudio, playCardBurst, playCheck } = useTableAudio(mediaReady);
   const bet = useMemo(() => betChips.reduce((total, chip) => total + chip, 0), [betChips]);
+  const displayState = useMemo<BlackjackState | null>(() => resolvedReplayState || state, [resolvedReplayState, state]);
 
   const stage = state?.stage || "idle";
   const lastDelta = state?.lastDelta || 0;
@@ -724,9 +726,12 @@ export default function BlackjackRoom({
     const previousStage = previousStageRef.current;
     previousStageRef.current = stage;
 
-    if (stage !== "resolved" || previousStage === "resolved") {
+    if (stage !== "resolved" || previousStage === "resolved" || !state?.token) {
       return;
     }
+
+    const resolvedToken = state.token;
+    setResolvedReplayState(state);
 
     const nextFlash =
       lastDelta > 0
@@ -746,12 +751,29 @@ export default function BlackjackRoom({
     }
     clearResultFlashTimeoutRef.current = window.setTimeout(() => {
       setResultFlash(null);
+      setResolvedReplayState((current) => (current?.token === resolvedToken ? null : current));
       clearResultFlashTimeoutRef.current = null;
     }, BLACKJACK_RESULT_FLASH_MS);
-  }, [lastDelta, stage]);
+  }, [lastDelta, stage, state]);
 
   useEffect(() => {
-    const currentCardKeys = getBlackjackCardKeys(state);
+    if (
+      state?.stage === "player-turn"
+      && state?.token
+      && resolvedReplayState?.token
+      && state.token !== resolvedReplayState.token
+    ) {
+      setResolvedReplayState(null);
+      setResultFlash(null);
+      if (clearResultFlashTimeoutRef.current) {
+        window.clearTimeout(clearResultFlashTimeoutRef.current);
+        clearResultFlashTimeoutRef.current = null;
+      }
+    }
+  }, [resolvedReplayState?.token, state?.stage, state?.token]);
+
+  useEffect(() => {
+    const currentCardKeys = getBlackjackCardKeys(displayState);
     const previousCardKeys = new Set(previousCardKeysRef.current);
     const nextFreshKeys = currentCardKeys.filter((key) => !previousCardKeys.has(key));
     previousCardKeysRef.current = currentCardKeys;
@@ -780,7 +802,7 @@ export default function BlackjackRoom({
       });
       clearDealAnimationTimeoutRef.current = null;
     }, 1100 + nextFreshKeys.length * TABLE_DEAL_STEP_MS);
-  }, [state]);
+  }, [displayState]);
 
   async function startRound() {
     if (!bet) {
@@ -921,6 +943,7 @@ export default function BlackjackRoom({
     clearQueuedAudio();
     previousCardKeysRef.current = [];
     setDealtCardDelays({});
+    setResolvedReplayState(null);
     setResultFlash(null);
     setTurnDeadlineAt(null);
     if (clearDealAnimationTimeoutRef.current) {
@@ -1102,7 +1125,7 @@ export default function BlackjackRoom({
 
           <div className="casino-reel-shell casino-room-shell casino-room-shell--cards casino-reel-shell--table-compact casino-reel-shell--blackjack">
             <BlackjackTableScene
-              state={state}
+              state={displayState}
               participants={tableParticipants}
               currentUserId={profile.user.id}
               playerName={playerName}
