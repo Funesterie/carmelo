@@ -1,0 +1,170 @@
+- main [ref=e3]:
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Salle privee
+        - heading "uiqa1776145391" [level=1] [ref=e12]
+      - generic [ref=e17]:
+        - button "Ouvrir le menu" [ref=e18] [cursor=pointer]
+        - generic:
+          - tablist "Jeux casino":
+            - tab "Slots":
+              - generic: Slots
+            - tab "Carte":
+              - generic: Carte
+            - tab "Chasse":
+              - generic: Chasse
+            - tab "Blackjack" [selected]:
+              - generic: Blackjack
+            - tab "Poker":
+              - generic: Poker
+            - tab "Roulette":
+              - generic: Roulette
+          - button "Bonus +1200":
+            - generic:
+              - img
+            - generic: Bonus +1200
+          - button "Sync":
+            - generic:
+              - img
+            - generic: Sync
+          - button "Quitter":
+            - generic:
+              - img
+            - generic: Quitter
+      - generic [ref=e20]: 07:54
+      - generic "Solde du compte" [ref=e21]: 4 950 credits
+    - generic [ref=e101]:
+      - generic [ref=e103]:
+        - img [ref=e104]
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - generic [ref=e107]: Table des lanternes
+            - generic [ref=e108]:
+              - button "Informations blackjack" [ref=e109] [cursor=pointer]:
+                - img [ref=e111]
+              - generic "Timer de table en attente" [ref=e248]: Timer --:--
+          - strong [ref=e116]: Blackjack corsaire
+          - paragraph [ref=e117]: "Le croupier retourne sa main. La manche est reglee. Salon actif: Lantern Quay."
+      - generic [ref=e118]:
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - generic "Main du croupier" [ref=e122]:
+              - strong [ref=e123]: Croupier
+              - generic [ref=e124]: 20 points
+            - generic [ref=e196]:
+              - generic "10 de Elephant" [ref=e197]:
+                - generic [ref=e198]:
+                  - strong [ref=e199]: "10"
+                  - generic [ref=e200]: ◈
+                - generic [ref=e202]: ◈
+                - generic [ref=e203]:
+                  - strong [ref=e204]: "10"
+                  - generic [ref=e205]: ◈
+              - generic "V de Bat" [ref=e249]:
+                - generic [ref=e250]:
+                  - strong [ref=e251]: V
+                  - generic [ref=e252]: ✶
+                - generic [ref=e254]: ✶
+                - generic [ref=e255]:
+                  - strong [ref=e256]: V
+                  - generic [ref=e257]: ✶
+          - generic:
+            - article [ref=e125]:
+              - generic [ref=e126]:
+                - generic:
+                  - strong: LOSE
+                  - generic: "-50"
+                - generic [ref=e208]:
+                  - generic [ref=e209]:
+                    - generic "3 de Elephant" [ref=e210]:
+                      - generic [ref=e211]:
+                        - strong [ref=e212]: "3"
+                        - generic [ref=e213]: ◈
+                      - generic [ref=e215]: ◈
+                      - generic [ref=e216]:
+                        - strong [ref=e217]: "3"
+                        - generic [ref=e218]: ◈
+                    - generic "4 de Flintlock" [ref=e219]:
+                      - generic [ref=e220]:
+                        - strong [ref=e221]: "4"
+                        - generic [ref=e222]: ✦
+                      - generic [ref=e224]: ✦
+                      - generic [ref=e225]:
+                        - strong [ref=e226]: "4"
+                        - generic [ref=e227]: ✦
+                    - generic "5 de Elephant" [ref=e234]:
+                      - generic [ref=e235]:
+                        - strong [ref=e236]: "5"
+                        - generic [ref=e237]: ◈
+                      - generic [ref=e239]: ◈
+                      - generic [ref=e240]:
+                        - strong [ref=e241]: "5"
+                        - generic [ref=e242]: ◈
+                  - generic "Main de uiqa1776145391" [ref=e228]:
+                    - strong [ref=e229]: uiqa1776145391
+                    - generic [ref=e230]: 12 points
+            - generic "Pile de mise 20" [ref=e258]:
+              - button "Retirer le dernier jeton de la mise (20)" [ref=e259] [cursor=pointer]:
+                - strong [ref=e260]: "20"
+              - generic [ref=e134]: "20"
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - generic [ref=e138]: Table
+              - strong [ref=e139]: Commandes de table
+              - paragraph [ref=e140]: Le salon garde la meme table et se synchronise selon les joueurs presents.
+            - generic [ref=e141]:
+              - button "Rejouer" [ref=e261] [cursor=pointer]
+              - button "Tirer" [disabled] [ref=e143]
+              - button "Rester" [disabled] [ref=e144]
+              - button "Doubler" [disabled] [ref=e145]
+              - button "Split" [disabled] [ref=e146]
+            - generic [ref=e147]:
+              - generic "Jetons de mise blackjack" [ref=e148]:
+                - button "Ajouter un jeton de 10" [ref=e149] [cursor=pointer]:
+                  - strong [ref=e150]: "10"
+                  - generic [ref=e151]: x0
+                - button "Ajouter un jeton de 20" [ref=e152] [cursor=pointer]:
+                  - strong [ref=e153]: "20"
+                  - generic [ref=e154]: x1
+                - button "Ajouter un jeton de 50" [ref=e155] [cursor=pointer]:
+                  - strong [ref=e156]: "50"
+                  - generic [ref=e157]: x0
+                - button "Ajouter un jeton de 200" [ref=e158] [cursor=pointer]:
+                  - strong [ref=e159]: "200"
+                  - generic [ref=e160]: x0
+              - generic [ref=e161]:
+                - generic [ref=e162]: Total 20
+                - generic [ref=e163]: 1 jeton
+          - generic [ref=e164]:
+            - generic [ref=e165]:
+              - generic [ref=e166]: Table
+              - strong [ref=e167]: Carnet de bord
+            - tablist "Carnet de bord" [ref=e168]:
+              - tab "Salons 1" [selected] [ref=e169] [cursor=pointer]:
+                - generic [ref=e170]: Salons
+                - generic [ref=e171]: "1"
+              - tab "Regles" [ref=e172] [cursor=pointer]:
+                - generic [ref=e173]: Regles
+              - tab "Joueurs 1" [ref=e174] [cursor=pointer]:
+                - generic [ref=e175]: Joueurs
+                - generic [ref=e176]: "1"
+            - tabpanel "Salons" [ref=e177]:
+              - paragraph [ref=e178]: Change de table sans perdre la lisibilite du layout.
+              - generic [ref=e179]:
+                - button "Lantern Quay Table lisible, croupier en vue et flux calme pour jouer vite. 1 joueur" [ref=e180] [cursor=pointer]:
+                  - generic [ref=e181]:
+                    - strong [ref=e182]: Lantern Quay
+                    - generic [ref=e183]: Table lisible, croupier en vue et flux calme pour jouer vite.
+                  - generic [ref=e184]: 1 joueur
+                - button "Bat Parlor Cadence plus nerveuse, ambiance feutree et jetons qui tournent vite. 0 joueur" [ref=e185] [cursor=pointer]:
+                  - generic [ref=e186]:
+                    - strong [ref=e187]: Bat Parlor
+                    - generic [ref=e188]: Cadence plus nerveuse, ambiance feutree et jetons qui tournent vite.
+                  - generic [ref=e189]: 0 joueur
+                - button "Scream Lounge Salon nocturne pour suivre les autres joueurs sans perdre la lecture. 0 joueur" [ref=e190] [cursor=pointer]:
+                  - generic [ref=e191]:
+                    - strong [ref=e192]: Scream Lounge
+                    - generic [ref=e193]: Salon nocturne pour suivre les autres joueurs sans perdre la lecture.
+                  - generic [ref=e194]: 0 joueur

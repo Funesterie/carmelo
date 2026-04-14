@@ -1,0 +1,76 @@
+- main [ref=e3]:
+  - generic [ref=e34]:
+    - generic [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]: Salle privee
+        - heading "codex515178" [level=1] [ref=e50]
+      - generic [ref=e52]:
+        - button "Ouvrir le menu" [expanded] [active] [ref=e53] [cursor=pointer]
+        - generic [ref=e133]:
+          - tablist "Jeux casino" [ref=e134]:
+            - tab "Slots" [selected] [ref=e135] [cursor=pointer]:
+              - generic [ref=e137]: Slots
+            - tab "Carte" [ref=e138] [cursor=pointer]:
+              - generic [ref=e140]: Carte
+            - tab "Chasse" [ref=e141] [cursor=pointer]:
+              - generic [ref=e143]: Chasse
+            - tab "Blackjack" [ref=e144] [cursor=pointer]:
+              - generic [ref=e146]: Blackjack
+            - tab "Poker" [ref=e147] [cursor=pointer]:
+              - generic [ref=e149]: Poker
+            - tab "Roulette" [ref=e150] [cursor=pointer]:
+              - generic [ref=e152]: Roulette
+          - button "Bonus +1200" [ref=e153] [cursor=pointer]:
+            - img [ref=e155]
+            - generic [ref=e159]: Bonus +1200
+          - button "Sync" [ref=e160] [cursor=pointer]:
+            - img [ref=e162]
+            - generic [ref=e167]: Sync
+          - button "Quitter" [ref=e168] [cursor=pointer]:
+            - img [ref=e170]
+            - generic [ref=e173]: Quitter
+      - generic [ref=e55]: 17:33
+      - generic "Solde du compte" [ref=e56]: 5 000 credits
+    - generic [ref=e58]:
+      - generic [ref=e61]:
+        - generic [ref=e62]:
+          - generic [ref=e63]: Machine a sous
+          - button "Informations Slots" [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+        - strong [ref=e67]: Salon des machines
+      - generic [ref=e70]:
+        - generic [ref=e72]:
+          - generic [ref=e75]:
+            - img [ref=e77]
+            - img [ref=e79]
+            - img [ref=e81]
+          - generic [ref=e84]:
+            - img [ref=e86]
+            - img [ref=e88]
+            - img [ref=e90]
+          - generic [ref=e93]:
+            - img [ref=e95]
+            - img [ref=e97]
+            - img [ref=e99]
+          - generic [ref=e102]:
+            - img [ref=e104]
+            - img [ref=e106]
+            - img [ref=e108]
+          - generic [ref=e111]:
+            - img [ref=e113]
+            - img [ref=e115]
+            - img [ref=e117]
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - button "Lancer le spin" [ref=e120] [cursor=pointer]
+            - button "Auto Spin x10" [ref=e121] [cursor=pointer]
+            - combobox [ref=e122] [cursor=pointer]:
+              - option "5 spins"
+              - option "10 spins" [selected]
+              - option "25 spins"
+              - option "50 spins"
+          - generic [ref=e124]:
+            - button "20" [ref=e125] [cursor=pointer]
+            - button "50" [ref=e126] [cursor=pointer]
+            - button "100" [ref=e127] [cursor=pointer]
+            - button "200" [ref=e128] [cursor=pointer]

@@ -1,0 +1,677 @@
+{
+  "createdAt": "2026-04-13T10:41:37.177Z",
+  "users": {
+    "a": {
+      "username": "codex_seqa_1776076901375",
+      "id": 124
+    },
+    "b": {
+      "username": "codex_seqb_1776076902422",
+      "id": 125
+    }
+  },
+  "blackjack": {
+    "startA": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "lantern-quay",
+          "stage": "waiting",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:50.437Z",
+          "turnDeadlineAt": null,
+          "message": "Mises confirmees 2/3. La manche part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [
+            "V-bat",
+            "6-bat",
+            "D-elephant"
+          ],
+          "communityCards": [],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "readyAt": "2026-04-13T10:40:50.437Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "readyAt": "2026-04-13T10:41:38.191Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartA_A": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "lantern-quay",
+          "stage": "waiting",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:50.437Z",
+          "turnDeadlineAt": null,
+          "message": "Mises confirmees 2/3. La manche part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [
+            "V-bat",
+            "6-bat",
+            "D-elephant"
+          ],
+          "communityCards": [],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "readyAt": "2026-04-13T10:40:50.437Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "readyAt": "2026-04-13T10:41:38.191Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartA_B": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "lantern-quay",
+          "stage": "waiting",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:50.437Z",
+          "turnDeadlineAt": null,
+          "message": "Mises confirmees 2/3. La manche part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [
+            "V-bat",
+            "6-bat",
+            "D-elephant"
+          ],
+          "communityCards": [],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "readyAt": "2026-04-13T10:40:50.437Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "readyAt": "2026-04-13T10:41:38.191Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "startB": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "lantern-quay",
+          "stage": "player-turn",
+          "token": "bj:lantern-quay:48",
+          "selfSeatId": "125",
+          "activeSeatId": "122",
+          "waitingForPlayers": false,
+          "bettingClosesAt": null,
+          "turnDeadlineAt": "2026-04-13T10:46:39.259Z",
+          "message": "Les joueurs sont servis. Le premier a la parole.",
+          "playerCards": [
+            "4-legion",
+            "9-flintlock"
+          ],
+          "dealerCards": [
+            "V-flintlock",
+            "V-legion"
+          ],
+          "communityCards": [],
+          "pendingSeats": [],
+          "seats": [
+            {
+              "id": "122",
+              "userId": "122",
+              "name": "codex_a_1776076850954",
+              "active": true,
+              "wager": 50,
+              "cards": [
+                "6-bat",
+                "7-bat"
+              ]
+            },
+            {
+              "id": "124",
+              "userId": "124",
+              "name": "codex_seqa_1776076901375",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "D-legion",
+                "5-bat"
+              ]
+            },
+            {
+              "id": "125",
+              "userId": "125",
+              "name": "codex_seqb_1776076902422",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "4-legion",
+                "9-flintlock"
+              ]
+            }
+          ],
+          "aiSeats": [
+            {
+              "id": "122",
+              "userId": "122",
+              "name": "codex_a_1776076850954",
+              "active": true,
+              "wager": 50,
+              "cards": [
+                "6-bat",
+                "7-bat"
+              ]
+            },
+            {
+              "id": "124",
+              "userId": "124",
+              "name": "codex_seqa_1776076901375",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "D-legion",
+                "5-bat"
+              ]
+            }
+          ],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartB_A": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "lantern-quay",
+          "stage": "player-turn",
+          "token": "bj:lantern-quay:48",
+          "selfSeatId": "124",
+          "activeSeatId": "122",
+          "waitingForPlayers": false,
+          "bettingClosesAt": null,
+          "turnDeadlineAt": "2026-04-13T10:46:39.259Z",
+          "message": "Les joueurs sont servis. Le premier a la parole.",
+          "playerCards": [
+            "D-legion",
+            "5-bat"
+          ],
+          "dealerCards": [
+            "V-flintlock",
+            "V-legion"
+          ],
+          "communityCards": [],
+          "pendingSeats": [],
+          "seats": [
+            {
+              "id": "122",
+              "userId": "122",
+              "name": "codex_a_1776076850954",
+              "active": true,
+              "wager": 50,
+              "cards": [
+                "6-bat",
+                "7-bat"
+              ]
+            },
+            {
+              "id": "124",
+              "userId": "124",
+              "name": "codex_seqa_1776076901375",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "D-legion",
+                "5-bat"
+              ]
+            },
+            {
+              "id": "125",
+              "userId": "125",
+              "name": "codex_seqb_1776076902422",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "4-legion",
+                "9-flintlock"
+              ]
+            }
+          ],
+          "aiSeats": [
+            {
+              "id": "122",
+              "userId": "122",
+              "name": "codex_a_1776076850954",
+              "active": true,
+              "wager": 50,
+              "cards": [
+                "6-bat",
+                "7-bat"
+              ]
+            },
+            {
+              "id": "125",
+              "userId": "125",
+              "name": "codex_seqb_1776076902422",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "4-legion",
+                "9-flintlock"
+              ]
+            }
+          ],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartB_B": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "lantern-quay",
+          "stage": "player-turn",
+          "token": "bj:lantern-quay:48",
+          "selfSeatId": "125",
+          "activeSeatId": "122",
+          "waitingForPlayers": false,
+          "bettingClosesAt": null,
+          "turnDeadlineAt": "2026-04-13T10:46:39.259Z",
+          "message": "Les joueurs sont servis. Le premier a la parole.",
+          "playerCards": [
+            "4-legion",
+            "9-flintlock"
+          ],
+          "dealerCards": [
+            "V-flintlock",
+            "V-legion"
+          ],
+          "communityCards": [],
+          "pendingSeats": [],
+          "seats": [
+            {
+              "id": "122",
+              "userId": "122",
+              "name": "codex_a_1776076850954",
+              "active": true,
+              "wager": 50,
+              "cards": [
+                "6-bat",
+                "7-bat"
+              ]
+            },
+            {
+              "id": "124",
+              "userId": "124",
+              "name": "codex_seqa_1776076901375",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "D-legion",
+                "5-bat"
+              ]
+            },
+            {
+              "id": "125",
+              "userId": "125",
+              "name": "codex_seqb_1776076902422",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "4-legion",
+                "9-flintlock"
+              ]
+            }
+          ],
+          "aiSeats": [
+            {
+              "id": "122",
+              "userId": "122",
+              "name": "codex_a_1776076850954",
+              "active": true,
+              "wager": 50,
+              "cards": [
+                "6-bat",
+                "7-bat"
+              ]
+            },
+            {
+              "id": "124",
+              "userId": "124",
+              "name": "codex_seqa_1776076901375",
+              "active": false,
+              "wager": 50,
+              "cards": [
+                "D-legion",
+                "5-bat"
+              ]
+            }
+          ],
+          "legalActions": []
+        }
+      }
+    }
+  },
+  "poker": {
+    "startA": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "allmight-ring",
+          "stage": "waiting",
+          "stageLabel": "En attente",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:51.985Z",
+          "turnDeadlineAt": null,
+          "message": "Antes confirmees 2/6. La main part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [],
+          "communityCards": [
+            "4-flintlock",
+            "R-bat",
+            "V-flintlock",
+            "9-elephant",
+            "6-legion"
+          ],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:40:51.985Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:40.789Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartA_A": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "allmight-ring",
+          "stage": "waiting",
+          "stageLabel": "En attente",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:51.985Z",
+          "turnDeadlineAt": null,
+          "message": "Antes confirmees 2/6. La main part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [],
+          "communityCards": [
+            "4-flintlock",
+            "R-bat",
+            "V-flintlock",
+            "9-elephant",
+            "6-legion"
+          ],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:40:51.985Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:40.789Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartA_B": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "allmight-ring",
+          "stage": "waiting",
+          "stageLabel": "En attente",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:51.985Z",
+          "turnDeadlineAt": null,
+          "message": "Antes confirmees 2/6. La main part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [],
+          "communityCards": [
+            "4-flintlock",
+            "R-bat",
+            "V-flintlock",
+            "9-elephant",
+            "6-legion"
+          ],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:40:51.985Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:40.789Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "startB": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "allmight-ring",
+          "stage": "waiting",
+          "stageLabel": "En attente",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:51.985Z",
+          "turnDeadlineAt": null,
+          "message": "Antes confirmees 3/6. La main part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [],
+          "communityCards": [
+            "4-flintlock",
+            "R-bat",
+            "V-flintlock",
+            "9-elephant",
+            "6-legion"
+          ],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:40:51.985Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:40.789Z"
+            },
+            {
+              "userId": "125",
+              "username": "codex_seqb_1776076902422",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:41.820Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartB_A": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "allmight-ring",
+          "stage": "waiting",
+          "stageLabel": "En attente",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:51.985Z",
+          "turnDeadlineAt": null,
+          "message": "Antes confirmees 3/6. La main part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [],
+          "communityCards": [
+            "4-flintlock",
+            "R-bat",
+            "V-flintlock",
+            "9-elephant",
+            "6-legion"
+          ],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:40:51.985Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:40.789Z"
+            },
+            {
+              "userId": "125",
+              "username": "codex_seqb_1776076902422",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:41.820Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    },
+    "afterStartB_B": {
+      "status": 200,
+      "json": {
+        "ok": true,
+        "state": {
+          "roomId": "allmight-ring",
+          "stage": "waiting",
+          "stageLabel": "En attente",
+          "token": null,
+          "selfSeatId": null,
+          "activeSeatId": null,
+          "waitingForPlayers": true,
+          "bettingClosesAt": "2026-04-13T10:45:51.985Z",
+          "turnDeadlineAt": null,
+          "message": "Antes confirmees 3/6. La main part quand tout le monde a mise ou a la fin du chrono.",
+          "playerCards": [],
+          "dealerCards": [],
+          "communityCards": [
+            "4-flintlock",
+            "R-bat",
+            "V-flintlock",
+            "9-elephant",
+            "6-legion"
+          ],
+          "pendingSeats": [
+            {
+              "userId": "122",
+              "username": "codex_a_1776076850954",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:40:51.985Z"
+            },
+            {
+              "userId": "124",
+              "username": "codex_seqa_1776076901375",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:40.789Z"
+            },
+            {
+              "userId": "125",
+              "username": "codex_seqb_1776076902422",
+              "ante": 60,
+              "readyAt": "2026-04-13T10:41:41.820Z"
+            }
+          ],
+          "seats": [],
+          "aiSeats": [],
+          "legalActions": []
+        }
+      }
+    }
+  }
+}

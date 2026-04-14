@@ -1,0 +1,19 @@
+{
+  "remoteLabels": [
+    {
+      "text": "jj",
+      "display": "flex"
+    },
+    {
+      "text": "jeff",
+      "display": "flex"
+    }
+  ],
+  "buttons": [
+    {
+      "text": "Rejoindre ailleurs",
+      "disabled": false
+    }
+  ],
+  "headline": "Main externe en cours"
+}

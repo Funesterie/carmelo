@@ -1,0 +1,27 @@
+- main [ref=e3]:
+  - generic [ref=e5]:
+    - heading "TREASURE CRUISE" [level=1] [ref=e8]
+    - complementary [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Inscription" [level=2] [ref=e23]
+        - paragraph
+      - tablist "Modes d’authentification" [ref=e13]:
+        - button "Connexion" [ref=e14] [cursor=pointer]
+        - button "Inscription" [active] [ref=e15] [cursor=pointer]
+        - button "Recuperation" [ref=e16] [cursor=pointer]
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - text: Nom de joueur
+          - textbox "Nom de joueur" [ref=e26]:
+            - /placeholder: Capitaine Carmelo
+        - generic [ref=e27]:
+          - text: Email
+          - textbox "Email" [ref=e28]:
+            - /placeholder: joueur@exemple.com
+        - generic [ref=e29]:
+          - text: Mot de passe
+          - textbox "Mot de passe" [ref=e30]
+        - generic [ref=e31]:
+          - text: Confirmer le mot de passe
+          - textbox "Confirmer le mot de passe" [ref=e32]
+        - button "Creer le compte" [ref=e33] [cursor=pointer]

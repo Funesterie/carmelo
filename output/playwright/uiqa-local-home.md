@@ -1,0 +1,10 @@
+- main [ref=e3]:
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]
+      - generic [ref=e17]
+      - generic [ref=e20]: 07:45
+      - generic "Solde du compte" [ref=e21]: 5 000 credits
+    - generic [ref=e23]:
+      - generic [ref=e26]
+      - generic [ref=e37]

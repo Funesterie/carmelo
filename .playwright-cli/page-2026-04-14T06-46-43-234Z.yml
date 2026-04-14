@@ -1,0 +1,20 @@
+- main [ref=e3]:
+  - generic [ref=e5]:
+    - heading "TREASURE CRUISE" [level=1] [ref=e8]
+    - complementary [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Connexion" [level=2] [ref=e11]
+        - paragraph [ref=e12]: Reconnecte-toi avec tes identifiants pour retrouver instantanement ton solde.
+      - tablist "Modes d’authentification" [ref=e13]:
+        - button "Connexion" [ref=e14] [cursor=pointer]
+        - button "Inscription" [ref=e15] [cursor=pointer]
+        - button "Recuperation" [ref=e16] [cursor=pointer]
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - text: Identifiant
+          - textbox "Identifiant" [ref=e19]:
+            - /placeholder: Nom de joueur ou email
+        - generic [ref=e20]:
+          - text: Mot de passe
+          - textbox "Mot de passe" [ref=e21]
+        - button "Entrer dans le casino" [ref=e22] [cursor=pointer]

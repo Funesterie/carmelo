@@ -1,0 +1,612 @@
+{
+  "baseUrl": "http://127.0.0.1:5173/",
+  "mode": "mobile",
+  "consoleEntries": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/fresh.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/roulette-reload.mp4 :: net::ERR_ABORTED"
+    },
+    {
+      "type": "requestfailed",
+      "text": "http://127.0.0.1:5173/src/videos/roulette-tirage.mp4 :: net::ERR_ABORTED"
+    }
+  ],
+  "pageErrors": [],
+  "metrics": [
+    {
+      "room": "Slots",
+      "mode": "mobile",
+      "metrics": {
+        "viewportHeight": 844,
+        "bodyScrollHeight": 844,
+        "documentScrollHeight": 844,
+        "room": {
+          "width": 374,
+          "height": 619,
+          "top": 147,
+          "left": 8
+        },
+        "table": {
+          "width": 374,
+          "height": 530,
+          "top": 236,
+          "left": 8
+        },
+        "topdeck": null,
+        "header": {
+          "width": 374,
+          "height": 139,
+          "top": 8,
+          "left": 8
+        },
+        "sideRail": {
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "left": 0
+        },
+        "stageSidebar": null
+      }
+    },
+    {
+      "room": "Carte",
+      "mode": "mobile",
+      "metrics": {
+        "viewportHeight": 844,
+        "bodyScrollHeight": 844,
+        "documentScrollHeight": 844,
+        "room": {
+          "width": 374,
+          "height": 449,
+          "top": 110,
+          "left": 8
+        },
+        "table": {
+          "width": 374,
+          "height": 449,
+          "top": 110,
+          "left": 8
+        },
+        "topdeck": null,
+        "header": {
+          "width": 374,
+          "height": 102,
+          "top": 8,
+          "left": 8
+        },
+        "sideRail": null,
+        "stageSidebar": null
+      }
+    },
+    {
+      "room": "Chasse",
+      "mode": "mobile",
+      "metrics": {
+        "viewportHeight": 844,
+        "bodyScrollHeight": 844,
+        "documentScrollHeight": 844,
+        "room": {
+          "width": 374,
+          "height": 748,
+          "top": 110,
+          "left": 1
+        },
+        "table": {
+          "width": 374,
+          "height": 748,
+          "top": 110,
+          "left": 1
+        },
+        "topdeck": null,
+        "header": {
+          "width": 374,
+          "height": 102,
+          "top": 8,
+          "left": 1
+        },
+        "sideRail": null,
+        "stageSidebar": null
+      }
+    },
+    {
+      "room": "Blackjack",
+      "mode": "mobile",
+      "metrics": {
+        "viewportHeight": 844,
+        "bodyScrollHeight": 844,
+        "documentScrollHeight": 844,
+        "room": {
+          "width": 374,
+          "height": 836,
+          "top": 110,
+          "left": 1
+        },
+        "table": {
+          "width": 374,
+          "height": 836,
+          "top": 110,
+          "left": 1
+        },
+        "topdeck": null,
+        "header": {
+          "width": 374,
+          "height": 102,
+          "top": 8,
+          "left": 1
+        },
+        "sideRail": null,
+        "stageSidebar": {
+          "width": 330,
+          "height": 382,
+          "top": 681,
+          "left": 23
+        }
+      }
+    },
+    {
+      "room": "Poker",
+      "mode": "mobile",
+      "metrics": {
+        "viewportHeight": 844,
+        "bodyScrollHeight": 844,
+        "documentScrollHeight": 844,
+        "room": {
+          "width": 374,
+          "height": 836,
+          "top": 110,
+          "left": 1
+        },
+        "table": {
+          "width": 374,
+          "height": 836,
+          "top": 110,
+          "left": 1
+        },
+        "topdeck": null,
+        "header": {
+          "width": 374,
+          "height": 102,
+          "top": 8,
+          "left": 1
+        },
+        "sideRail": null,
+        "stageSidebar": {
+          "width": 330,
+          "height": 181,
+          "top": 763,
+          "left": 23
+        }
+      }
+    },
+    {
+      "room": "Roulette",
+      "mode": "mobile",
+      "metrics": {
+        "viewportHeight": 844,
+        "bodyScrollHeight": 844,
+        "documentScrollHeight": 844,
+        "room": {
+          "width": 374,
+          "height": 587,
+          "top": 147,
+          "left": 1
+        },
+        "table": {
+          "width": 374,
+          "height": 587,
+          "top": 147,
+          "left": 1
+        },
+        "topdeck": null,
+        "header": {
+          "width": 374,
+          "height": 139,
+          "top": 8,
+          "left": 1
+        },
+        "sideRail": null,
+        "stageSidebar": null
+      }
+    }
+  ]
+}

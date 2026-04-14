@@ -20,6 +20,7 @@ import {
   ROULETTE_AMOUNT_PRESETS,
   ROULETTE_TIRAGE_CANNON_DELAY_MS,
   SPIN_DURATION_MS,
+  WHEEL_POCKET_ANGLE,
   buildSettledAnimation,
   buildStaticAnimation,
   easeOutCubic,
