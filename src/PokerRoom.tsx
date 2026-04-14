@@ -35,7 +35,7 @@ const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
 const LIVE_ROOM_LOBBY_SYNC_INTERVAL_MS = 20_000;
 const POKER_MAX_PLAYERS = 6;
 const DEFAULT_POKER_PRESENCE_WINDOW_MS = 75_000;
-const POKER_SHOWDOWN_REVEAL_MS = 12_000;
+const POKER_SHOWDOWN_REVEAL_MS = 8_000;
 
 type PokerAction = "check" | "call" | "bet" | "raise" | "fold";
 
@@ -168,8 +168,17 @@ function isPokerSelfTurn(state: PokerState | null, currentUserId: string, player
   return Boolean(hasPokerHeroRound(state, currentUserId, playerName) && state.legalActions.length);
 }
 
+function getPokerShowdownReplayKey(state: PokerState | null) {
+  if (!state || state.stage !== "showdown") return "";
+  const roomKey = String(state.roomId || "").trim();
+  const handId = Number(state.handId || 0);
+  if (!roomKey && !handId) return "";
+  return `${roomKey || "room"}:${handId || 0}`;
+}
+
 function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string, playerName: string): PokerLastHandRecap | null {
-  if (!state?.token) return null;
+  const replayKey = getPokerShowdownReplayKey(state);
+  if (!replayKey) return null;
 
   const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
   const normalizedSelfSeatId = normalizeIdentity(selfSeat?.id || selfSeat?.userId || state.selfSeatId);
@@ -217,7 +226,7 @@ function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string
   });
 
   return {
-    handId: String(state.handId || state.token),
+    handId: String(state.handId || replayKey),
     resolvedAt: Date.now(),
     message: state.message || "Main terminee.",
     winners,
@@ -343,6 +352,7 @@ export default function PokerRoom({
   const previousCardKeysRef = useRef<string[]>([]);
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
   const clearShowdownReplayTimeoutRef = useRef<number | null>(null);
+  const lastShowdownReplayKeyRef = useRef("");
   const latestAppliedSyncAtRef = useRef(0);
   const latestStateRef = useRef<PokerState | null>(state);
   const latestRoomsRef = useRef<CasinoTableRoom[]>(rooms);
@@ -541,6 +551,7 @@ export default function PokerRoom({
     lastTurnSignatureRef.current = "";
     lastTimedOutSignatureRef.current = "";
     lastExpiredSyncSignatureRef.current = "";
+    lastShowdownReplayKeyRef.current = "";
     setTurnDeadlineAt(null);
     setShowdownReplayState(null);
     setLastResolvedHand(null);
@@ -769,9 +780,14 @@ export default function PokerRoom({
   }, []);
 
   useEffect(() => {
-    if (stage !== "showdown" || !state?.token) {
+    const showdownReplayKey = getPokerShowdownReplayKey(state);
+    if (stage !== "showdown" || !showdownReplayKey) {
       return;
     }
+    if (lastShowdownReplayKeyRef.current === showdownReplayKey) {
+      return;
+    }
+    lastShowdownReplayKeyRef.current = showdownReplayKey;
 
     setShowdownReplayState(state);
     const nextRecap = buildPokerLastHandRecap(state, profile.user.id, playerName);
@@ -783,9 +799,8 @@ export default function PokerRoom({
       window.clearTimeout(clearShowdownReplayTimeoutRef.current);
     }
 
-    const showdownToken = state.token;
     clearShowdownReplayTimeoutRef.current = window.setTimeout(() => {
-      setShowdownReplayState((current) => (current?.token === showdownToken ? null : current));
+      setShowdownReplayState((current) => (getPokerShowdownReplayKey(current) === showdownReplayKey ? null : current));
       clearShowdownReplayTimeoutRef.current = null;
     }, POKER_SHOWDOWN_REVEAL_MS);
   }, [playerName, profile.user.id, stage, state]);

@@ -4,11 +4,11 @@ import { formatCredits } from "../../../lib/casinoRoomState";
 import type { CasinoTableRoomParticipant, PokerPendingSeat, PokerSeat, PokerState } from "../../../lib/casinoApi";
 
 const POKER_SEAT_LAYOUT = [
-  { x: "18%", y: "68%", align: "start", tag: "BG" },
-  { x: "19%", y: "28%", align: "start", tag: "HG" },
-  { x: "50%", y: "15%", align: "center", tag: "HC" },
-  { x: "81%", y: "28%", align: "end", tag: "HD" },
-  { x: "82%", y: "68%", align: "end", tag: "BD" },
+  { x: "14%", y: "70%", align: "start", tag: "BG" },
+  { x: "15%", y: "24%", align: "start", tag: "HG" },
+  { x: "50%", y: "12%", align: "center", tag: "HC" },
+  { x: "85%", y: "24%", align: "end", tag: "HD" },
+  { x: "86%", y: "70%", align: "end", tag: "BD" },
 ] as const;
 const DEFAULT_ABSENT_SEAT_TIMEOUT_MS = 75_000;
 
@@ -19,25 +19,25 @@ function getPokerSeatLayout(count: number) {
 
   if (count === 2) {
     return [
-      { x: "28%", y: "26%", align: "start", tag: "P1" },
-      { x: "72%", y: "26%", align: "end", tag: "P2" },
+      { x: "15%", y: "24%", align: "start", tag: "P1" },
+      { x: "85%", y: "24%", align: "end", tag: "P2" },
     ] as const;
   }
 
   if (count === 3) {
     return [
-      { x: "20%", y: "34%", align: "start", tag: "P1" },
-      { x: "50%", y: "18%", align: "center", tag: "P2" },
-      { x: "80%", y: "34%", align: "end", tag: "P3" },
+      { x: "14%", y: "31%", align: "start", tag: "P1" },
+      { x: "50%", y: "13%", align: "center", tag: "P2" },
+      { x: "86%", y: "31%", align: "end", tag: "P3" },
     ] as const;
   }
 
   if (count === 4) {
     return [
-      { x: "18%", y: "62%", align: "start", tag: "P1" },
-      { x: "24%", y: "24%", align: "start", tag: "P2" },
-      { x: "76%", y: "24%", align: "end", tag: "P3" },
-      { x: "82%", y: "62%", align: "end", tag: "P4" },
+      { x: "13%", y: "66%", align: "start", tag: "P1" },
+      { x: "18%", y: "22%", align: "start", tag: "P2" },
+      { x: "82%", y: "22%", align: "end", tag: "P3" },
+      { x: "87%", y: "66%", align: "end", tag: "P4" },
     ] as const;
   }
 

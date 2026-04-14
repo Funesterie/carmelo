@@ -38,6 +38,19 @@ const BLACKJACK_RESULT_FLASH_MS = 8000;
 const LIVE_ROOM_POLL_INTERVAL_MS = 4000;
 const LIVE_ROOM_LOBBY_SYNC_INTERVAL_MS = 20_000;
 
+type BlackjackHistoryEntry = {
+  id: string;
+  resolvedAt: number;
+  roomId: string;
+  channelLabel: string;
+  outcomeLabel: string;
+  detail: string;
+  delta: number;
+  wager: number;
+  playerTotal: number;
+  dealerTotal: number;
+};
+
 function normalizeBlackjackIdentity(value: string | null | undefined) {
   return String(value || "").trim().toLowerCase();
 }
@@ -279,6 +292,40 @@ function getBlackjackPhaseDeadlineAt(state: BlackjackState | null) {
   return parseTableDeadline(state.turnDeadlineAt);
 }
 
+function getBlackjackResultReplayKey(state: BlackjackState | null) {
+  if (!state || state.stage !== "resolved") return "";
+  const roomKey = String(state.roomId || "").trim();
+  const roundId = Number(state.roundId || 0);
+  if (!roomKey && !roundId) return "";
+  return `${roomKey || "room"}:${roundId || 0}`;
+}
+
+function buildBlackjackHistoryEntry(
+  state: BlackjackState | null,
+  channelLabel: string,
+): BlackjackHistoryEntry | null {
+  const replayKey = getBlackjackResultReplayKey(state);
+  if (!replayKey) return null;
+  const hands = getNormalizedBlackjackHands(state);
+  const outcomeLabel = state.lastDelta > 0 ? "Gagne" : state.lastDelta < 0 ? "Perdu" : "Push";
+  const detail = hands
+    .map((hand, index) => hand.result || `Main ${index + 1}`)
+    .filter(Boolean)
+    .join(" / ") || state.message || "Main resolue.";
+  return {
+    id: replayKey,
+    resolvedAt: Date.now(),
+    roomId: String(state.roomId || "").trim(),
+    channelLabel: channelLabel || "Canal",
+    outcomeLabel,
+    detail,
+    delta: Number(state.lastDelta || 0),
+    wager: Number(state.wager || 0),
+    playerTotal: Number(state.playerScore?.total || 0),
+    dealerTotal: Number(state.dealerScore?.total || 0),
+  };
+}
+
 type BlackjackRoomProps = {
   playerName: string;
   profile: CasinoProfile;
@@ -302,10 +349,11 @@ export default function BlackjackRoom({
   const [rooms, setRooms] = useState<CasinoTableRoom[]>([]);
   const [infoTab, setInfoTab] = useState<"salons" | "regles" | "joueurs">("salons");
   const [showRoomInfo, setShowRoomInfo] = useState(false);
-  const [activeHeaderInfo, setActiveHeaderInfo] = useState<"table" | "mise" | "live">("table");
+  const [activeHeaderInfo, setActiveHeaderInfo] = useState<"table" | "mise" | "live" | "historique">("table");
   const [dealtCardDelays, setDealtCardDelays] = useState<Record<string, number>>({});
   const [resolvedReplayState, setResolvedReplayState] = useState<BlackjackState | null>(null);
   const [resultFlash, setResultFlash] = useState<{ label: string; detail?: string; tone: "win" | "lose" } | null>(null);
+  const [blackjackHistory, setBlackjackHistory] = useState<BlackjackHistoryEntry[]>([]);
   const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [isDocumentVisible, setIsDocumentVisible] = useState(() => {
@@ -314,6 +362,7 @@ export default function BlackjackRoom({
   });
   const previousCardKeysRef = useRef<string[]>([]);
   const previousStageRef = useRef<string>("idle");
+  const lastResolvedReplayKeyRef = useRef("");
   const clearDealAnimationTimeoutRef = useRef<number | null>(null);
   const clearResultFlashTimeoutRef = useRef<number | null>(null);
   const latestAppliedSyncAtRef = useRef(0);
@@ -506,6 +555,8 @@ export default function BlackjackRoom({
     lastTurnSignatureRef.current = "";
     lastTimedOutSignatureRef.current = "";
     lastExpiredSyncSignatureRef.current = "";
+    previousStageRef.current = "idle";
+    lastResolvedReplayKeyRef.current = "";
     setTurnDeadlineAt(null);
   }, [roomId]);
 
@@ -728,13 +779,21 @@ export default function BlackjackRoom({
   useEffect(() => {
     const previousStage = previousStageRef.current;
     previousStageRef.current = stage;
+    const resolvedReplayKey = getBlackjackResultReplayKey(state);
 
-    if (stage !== "resolved" || previousStage === "resolved" || !state?.token) {
+    if (stage !== "resolved" || !resolvedReplayKey) {
       return;
     }
+    if (previousStage === "resolved" && lastResolvedReplayKeyRef.current === resolvedReplayKey) {
+      return;
+    }
+    lastResolvedReplayKeyRef.current = resolvedReplayKey;
 
-    const resolvedToken = state.token;
     setResolvedReplayState(state);
+    const nextHistoryEntry = buildBlackjackHistoryEntry(state, activeChannelMeta.channelLabel);
+    if (nextHistoryEntry) {
+      setBlackjackHistory((current) => [nextHistoryEntry, ...current.filter((entry) => entry.id !== nextHistoryEntry.id)].slice(0, 12));
+    }
 
     const nextFlash =
       lastDelta > 0
@@ -743,37 +802,16 @@ export default function BlackjackRoom({
           ? { label: "LOSE", detail: `-${formatCredits(Math.abs(lastDelta))}`, tone: "lose" as const }
           : null;
 
-    if (!nextFlash) {
-      setResultFlash(null);
-      return;
-    }
-
     setResultFlash(nextFlash);
     if (clearResultFlashTimeoutRef.current) {
       window.clearTimeout(clearResultFlashTimeoutRef.current);
     }
     clearResultFlashTimeoutRef.current = window.setTimeout(() => {
       setResultFlash(null);
-      setResolvedReplayState((current) => (current?.token === resolvedToken ? null : current));
+      setResolvedReplayState((current) => (getBlackjackResultReplayKey(current) === resolvedReplayKey ? null : current));
       clearResultFlashTimeoutRef.current = null;
     }, BLACKJACK_RESULT_FLASH_MS);
-  }, [lastDelta, stage, state]);
-
-  useEffect(() => {
-    if (
-      state?.stage === "player-turn"
-      && state?.token
-      && resolvedReplayState?.token
-      && state.token !== resolvedReplayState.token
-    ) {
-      setResolvedReplayState(null);
-      setResultFlash(null);
-      if (clearResultFlashTimeoutRef.current) {
-        window.clearTimeout(clearResultFlashTimeoutRef.current);
-        clearResultFlashTimeoutRef.current = null;
-      }
-    }
-  }, [resolvedReplayState?.token, state?.stage, state?.token]);
+  }, [activeChannelMeta.channelLabel, lastDelta, stage, state]);
 
   useEffect(() => {
     const currentCardKeys = getBlackjackCardKeys(displayState);
@@ -1059,6 +1097,15 @@ export default function BlackjackRoom({
                   >
                     Live
                   </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`casino-topdeck__info-button ${activeHeaderInfo === "historique" ? "is-active" : ""}`}
+                    aria-selected={activeHeaderInfo === "historique"}
+                    onClick={() => setActiveHeaderInfo("historique")}
+                  >
+                    Historique
+                  </button>
                 </div>
                 <div className="casino-topdeck__info-body" role="tabpanel">
                   {activeHeaderInfo === "table" ? (
@@ -1096,6 +1143,33 @@ export default function BlackjackRoom({
                       <p>Joueurs presents: {Math.max(1, activePlayerCount)}</p>
                       <p>Places deja validees: {state?.pendingSeats?.length || 0}</p>
                     </div>
+                  ) : null}
+                  {activeHeaderInfo === "historique" ? (
+                    blackjackHistory.length ? (
+                      <div className="casino-history-list">
+                        {blackjackHistory.map((entry) => (
+                          <article key={entry.id} className={`casino-history-entry ${entry.delta >= 0 ? "is-positive" : "is-negative"}`}>
+                            <div>
+                              <span>
+                                {entry.channelLabel} · {new Date(entry.resolvedAt).toLocaleTimeString("fr-FR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                              <strong>{entry.outcomeLabel}</strong>
+                              <span>{entry.detail}</span>
+                              <span>Toi {entry.playerTotal} vs croupier {entry.dealerTotal}</span>
+                            </div>
+                            <div className={entry.delta >= 0 ? "is-positive" : "is-negative"}>
+                              <strong>{entry.delta > 0 ? `+${formatCredits(entry.delta)}` : entry.delta < 0 ? `-${formatCredits(Math.abs(entry.delta))}` : "0"}</strong>
+                              <span>Mise {formatCredits(entry.wager)}</span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="casino-history-empty">Aucune main blackjack resolue sur cette session pour le moment.</p>
+                    )
                   ) : null}
                 </div>
               </article>

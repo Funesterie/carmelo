@@ -19507,3 +19507,30 @@ button {
     padding: 7px 10px !important;
   }
 }
+
+/* Final poker spacing pass: lower the board and keep remote seats further from the flop on mobile. */
+.casino-stage--cards--poker .casino-table-core--poker {
+  top: 52.8% !important;
+}
+
+@media (max-width: 520px) {
+  .casino-stage--cards--poker .casino-table-core--poker {
+    top: 49% !important;
+    width: min(57%, 214px) !important;
+  }
+
+  .casino-stage--cards--poker .casino-oval-seat--player {
+    top: 75.5% !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .casino-stage--cards--poker .casino-table-core--poker {
+    top: 48.4% !important;
+    width: min(58%, 202px) !important;
+  }
+
+  .casino-stage--cards--poker .casino-oval-seat--player {
+    top: 75% !important;
+  }
+}
