@@ -24,6 +24,8 @@ import entryAudio from "../../audio/entrée.mp3";
 import fantomeAudio from "../../audio/fantome.mp3";
 import funesterieAudio from "../../audio/funesterie.mp3";
 import moussaillonAudio from "../../audio/moussaillon.mp3";
+// Son muet pour déverrouillage
+const silentAudio = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 import sharedAmbientMedia from "../../videos/fresh.mp4";
 import type { RoomId, RouletteSoundEvent } from "../casino/catalog";
 import {
@@ -148,12 +150,12 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
 
   useEffect(() => {
     const unlockOnFirstGesture = () => {
-      // Déverrouille l’audio funesterie.mp3 dès le premier geste utilisateur
+      // Déverrouille l’audio avec un son muet dès le premier geste utilisateur
       if (!mediaUnlockedRef.current) {
-        const audio = getAudio(introAudioRef, funesterieAudio);
-        audio.volume = 0.56;
+        const audio = new Audio(silentAudio);
+        audio.volume = 0;
         audio.muted = false;
-        safePlayMedia(audio, "unlockFunesterie");
+        safePlayMedia(audio, "unlockSilent");
       }
       void requestMediaPlayback();
     };
@@ -335,13 +337,25 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     }
 
 
-    // Ne pas jouer entryAudio si immersion en cours
-    if (!showImmersion) {
+    // Ne pas jouer entryAudio ni aucun son audible ici, juste déverrouiller si besoin
+    if (!showImmersion && activeCasinoRoom === "roulette") {
       const unlockAudio = getAudio(cueAudioRef, entryAudio);
-      unlockAudio.volume = 0;
+      unlockAudio.volume = 0.84;
       unlockAudio.muted = false;
       setMediaStatus("unlocking");
       const result = await safePlayMedia(unlockAudio, "unlockAudio");
+      unlockAudio.pause();
+      unlockAudio.currentTime = 0;
+      mediaUnlockedRef.current = !!result.ok;
+      setMediaReady(!!result.ok);
+      setMediaStatus(result.ok ? "ready" : "blocked");
+    } else if (!showImmersion) {
+      // Pour les autres cas, déverrouille avec un son muet
+      const unlockAudio = new Audio(silentAudio);
+      unlockAudio.volume = 0;
+      unlockAudio.muted = false;
+      setMediaStatus("unlocking");
+      const result = await safePlayMedia(unlockAudio, "unlockSilent");
       unlockAudio.pause();
       unlockAudio.currentTime = 0;
       mediaUnlockedRef.current = !!result.ok;
