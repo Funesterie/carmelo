@@ -148,6 +148,13 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
 
   useEffect(() => {
     const unlockOnFirstGesture = () => {
+      // Déverrouille l’audio funesterie.mp3 dès le premier geste utilisateur
+      if (!mediaUnlockedRef.current) {
+        const audio = getAudio(introAudioRef, funesterieAudio);
+        audio.volume = 0.56;
+        audio.muted = false;
+        safePlayMedia(audio, "unlockFunesterie");
+      }
       void requestMediaPlayback();
     };
     window.addEventListener("pointerdown", unlockOnFirstGesture, { once: true });
