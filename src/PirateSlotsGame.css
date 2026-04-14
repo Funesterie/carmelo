@@ -19369,7 +19369,7 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
-    width: min(24vw, 96px) !important;
+    width: min(26vw, 104px) !important;
     min-height: auto !important;
     padding: 0 !important;
     gap: 4px !important;
@@ -19393,7 +19393,7 @@ button {
     width: max-content !important;
     min-height: 0 !important;
     margin: 0 auto !important;
-    padding: 6px 8px !important;
+    padding: 7px 9px !important;
     border-radius: 16px !important;
     background:
       linear-gradient(180deg, rgba(12, 16, 22, 0.48), rgba(17, 11, 10, 0.6)) !important;
@@ -19404,9 +19404,9 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card {
-    width: 32px !important;
-    min-height: 48px !important;
-    margin-left: -9px !important;
+    width: 35px !important;
+    min-height: 52px !important;
+    margin-left: -10px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card:first-child {
@@ -19414,8 +19414,8 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-card-row--dealer .pirate-card {
-    width: 38px !important;
-    min-height: 56px !important;
+    width: 40px !important;
+    min-height: 59px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-player {
@@ -19469,23 +19469,23 @@ button {
   }
 
   .casino-stage--cards--blackjack .casino-oval-seat--blackjack-peer {
-    width: min(23vw, 90px) !important;
+    width: min(24vw, 96px) !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer {
-    padding: 5px 7px !important;
+    padding: 6px 8px !important;
     border-radius: 14px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-peer .pirate-card {
-    width: 30px !important;
-    min-height: 44px !important;
-    margin-left: -8px !important;
+    width: 32px !important;
+    min-height: 48px !important;
+    margin-left: -9px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--dealer .pirate-card {
-    width: 36px !important;
-    min-height: 52px !important;
+    width: 38px !important;
+    min-height: 55px !important;
   }
 
   .casino-stage--cards--blackjack .casino-card-row--fan-player .pirate-card {

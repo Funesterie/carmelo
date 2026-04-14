@@ -337,7 +337,7 @@ export default function BlackjackTableScene({
       ? "La table joue une donne multijoueur. Attends la prochaine phase de mise pour reprendre une place."
       : state?.stage === "resolved"
         ? "La donne se termine sur la table. La prochaine phase de mise va rouvrir pour tous les joueurs presents."
-        : "Valide ta mise pendant la phase commune pour rejoindre la prochaine donne de la table.";
+        : "";
 
   return (
     <div className={`casino-card-felt casino-card-felt--blackjack casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
@@ -508,7 +508,7 @@ export default function BlackjackTableScene({
               ) : showSpectatorBanner ? (
                 <div className="casino-blackjack-player-banner" aria-live="polite">
                   <strong>{spectatorBannerLabel}</strong>
-                  <span>{spectatorBannerDetail}</span>
+                  {spectatorBannerDetail ? <span>{spectatorBannerDetail}</span> : null}
                 </div>
               ) : (
                 <div className="casino-blackjack-player-banner" aria-live="polite">
