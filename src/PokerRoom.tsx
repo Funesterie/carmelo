@@ -4,6 +4,7 @@ import { useTableAudio } from "./audio/useTableAudio";
 import { ROOM_DEFINITIONS } from "./features/casino/catalog";
 import PokerSidebar from "./features/poker/components/PokerSidebar";
 import PokerTableScene from "./features/poker/components/PokerTableScene";
+import { buildPokerWinnerSummary, formatPokerHandLabel } from "./features/poker/handText";
 import pokerCaptainArt from "./images/poker-captain-art.png";
 import {
   actPokerRound,
@@ -184,7 +185,7 @@ function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string
   const normalizedSelfSeatId = normalizeIdentity(selfSeat?.id || selfSeat?.userId || state.selfSeatId);
   const normalizedPlayerName = normalizeIdentity(playerName);
   const heroName = String(playerName || selfSeat?.name || selfSeat?.username || "Toi").trim();
-  const heroHandLabel = state.playerHand?.label || selfSeat?.hand?.label || "";
+  const heroHandLabel = formatPokerHandLabel(state.playerHand || selfSeat?.hand) || "";
   const heroAmount = Number(state.lastDelta || state.payoutAmount || 0);
   const heroWon = Boolean(selfSeat?.isWinner || heroAmount > 0);
   const winners: PokerLastHandRecapWinner[] = [];
@@ -203,7 +204,7 @@ function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string
   [...(state.seats || []), ...(state.aiSeats || [])].forEach((seat) => {
     const seatId = normalizeIdentity(seat.id || seat.userId || seat.name || seat.username);
     const seatName = String(seat.name || seat.username || "Joueur").trim();
-    const seatHandLabel = seat.hand?.label || seat.read || "";
+    const seatHandLabel = formatPokerHandLabel(seat.hand) || seat.read || "";
     const seatAmount = Number(seat.lastDelta || seat.payoutAmount || 0);
     const isSeatSelf = Boolean(
       seat.isSelf
@@ -414,9 +415,7 @@ export default function PokerRoom({
   const connectedOpponentCount = tableParticipants.filter(
     (participant) => !participant.isSelf && isParticipantFresh(participant.updatedAt, presenceWindowMs),
   ).length;
-  const lastResolvedWinnersLabel = lastResolvedHand?.winners.length
-    ? lastResolvedHand.winners.map((winner) => winner.name).join(", ")
-    : "";
+  const lastResolvedWinnersLabel = buildPokerWinnerSummary(lastResolvedHand?.winners || []);
   const isLiveMultiplayerReady = connectedOpponentCount >= LIVE_MIN_OPPONENTS;
   const roomHasSelf = Boolean(activeRoom?.hasSelf || tableParticipants.some((participant) => participant.isSelf));
   const isTableFull = activePlayerCount >= POKER_MAX_PLAYERS && !roomHasSelf;
@@ -1110,7 +1109,7 @@ export default function PokerRoom({
                   {activeHeaderInfo === "structure" ? (
                     <div className="casino-rule-list">
                       <p>Texas hold'em 6-max uniquement, avec 5 places adverses visibles autour de toi et aucun bot affiche cote front.</p>
-                      <p>Tu rejoins d'abord la table, puis le backend t'ajoute a la prochaine main disponible.</p>
+                      <p>Quand tu t'inscris, ta place apparait tout de suite sur la table puis la prochaine main t'integre automatiquement.</p>
                       <p>Le backend gere les vraies decisions de check, call, bet, raise et fold, tour par tour.</p>
                     </div>
                   ) : null}
@@ -1142,7 +1141,7 @@ export default function PokerRoom({
                       {lastResolvedHand ? (
                         <div className="casino-last-hand-card">
                           <strong>Derniere main</strong>
-                          <p>{lastResolvedWinnersLabel ? `Gagnant${lastResolvedHand.winners.length > 1 ? "s" : ""}: ${lastResolvedWinnersLabel}.` : lastResolvedHand.message}</p>
+                          <p>{lastResolvedWinnersLabel || lastResolvedHand.message}</p>
                           {lastResolvedHand.heroHandLabel ? <span>Ta main: {lastResolvedHand.heroHandLabel}</span> : null}
                         </div>
                       ) : null}

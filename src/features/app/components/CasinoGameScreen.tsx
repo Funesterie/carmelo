@@ -148,7 +148,8 @@ export default function CasinoGameScreen({
   void mediaReady;
   const showHeaderAmbient = true;
   const usesDedicatedAmbient = activeCasinoRoom === "slots" || activeCasinoRoom === "roulette";
-  const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient;
+  const allowSharedAmbientVideo = activeCasinoRoom === "treasure-map" || activeCasinoRoom === "treasure-hunt";
+  const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient && allowSharedAmbientVideo;
   const showDedicatedAmbientPanel = !showImmersion && usesDedicatedAmbient && Boolean(ambientPanel);
   const tableGame = isTableChannelRoom(activeCasinoRoom) ? activeCasinoRoom : null;
   const channelRooms = tableGame ? tableLobby?.rooms || [] : [];

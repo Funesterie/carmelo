@@ -25,6 +25,24 @@ const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
 type UseCasinoSessionOptions = {
 };
 
+let bootProfilePromise: Promise<CasinoProfile | null> | null = null;
+
+async function loadBootCasinoProfile() {
+  if (!hasCasinoToken()) {
+    return null;
+  }
+
+  if (!bootProfilePromise) {
+    bootProfilePromise = fetchCasinoProfile()
+      .then((profile) => profile)
+      .finally(() => {
+        bootProfilePromise = null;
+      });
+  }
+
+  return bootProfilePromise;
+}
+
 export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [profile, setProfile] = useState<CasinoProfile | null>(null);
@@ -53,7 +71,11 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       }
 
       try {
-        const nextProfile = await fetchCasinoProfile();
+        const nextProfile = await loadBootCasinoProfile();
+        if (!nextProfile) {
+          if (!cancelled) setBooting(false);
+          return;
+        }
         if (cancelled) return;
         startTransition(() => setProfile(nextProfile));
         setNotice(`Bienvenue a bord, ${nextProfile.user.username}.`);

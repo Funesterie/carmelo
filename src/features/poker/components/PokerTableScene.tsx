@@ -2,6 +2,7 @@ import PiratePlayingCardView from "../../../PiratePlayingCard";
 import jetonImg from "../../../images/jeton.png";
 import { formatCredits } from "../../../lib/casinoRoomState";
 import type { CasinoTableRoomParticipant, PokerPendingSeat, PokerSeat, PokerState } from "../../../lib/casinoApi";
+import { buildPokerWinningHeadline, formatPokerHandLabel } from "../handText";
 
 const POKER_SEAT_LAYOUT = [
   { x: "14%", y: "70%", align: "start", tag: "BG" },
@@ -112,6 +113,26 @@ function findPendingSeat(
   );
 }
 
+function findSelfPendingSeat(
+  state: PokerState | null,
+  currentUserId: string,
+  playerName: string,
+) {
+  const normalizedCurrentUserId = normalizeSeatIdentity(currentUserId);
+  const normalizedPlayerName = normalizeSeatIdentity(playerName);
+
+  return (
+    (state?.pendingSeats || []).find((seat) => {
+      const seatUserId = normalizeSeatIdentity(seat.userId);
+      const seatName = normalizeSeatIdentity(seat.username);
+      return Boolean(
+        (normalizedCurrentUserId && seatUserId === normalizedCurrentUserId)
+        || (normalizedPlayerName && seatName === normalizedPlayerName),
+      );
+    }) || null
+  );
+}
+
 function getParticipantStatus(
   participantLabel: string,
   seat: PokerSeat | null,
@@ -124,10 +145,10 @@ function getParticipantStatus(
   if (absent) return "Absent";
   if (seat?.isActive) return "Tour actif";
   if (folded) return "Fold";
-  if (seat?.hand?.label) return seat.hand.label;
+  if (seat?.hand) return formatPokerHandLabel(seat.hand) || seat.hand.label;
   if (seat?.read) return seat.read;
   if (seat?.lastAction) return formatPokerActionLabel(seat.lastAction);
-  if (stage === "showdown") return "Showdown";
+  if (stage === "showdown") return "Main resolue";
   return `${participantLabel} en jeu`;
 }
 
@@ -287,30 +308,32 @@ export default function PokerTableScene({
   lastHandRecap,
   onRemoveAbsent,
 }: PokerTableSceneProps) {
-  void activeAnte;
   void smallBlind;
   const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
+  const selfPendingSeat = findSelfPendingSeat(state, currentUserId, playerName);
   const communityCards = stage === "waiting" ? [] : state?.communityCards || [];
   const remoteBindings = getRemotePokerBindings(state, participants, currentUserId, playerName, presenceWindowMs);
   const remoteSeatLayout = getPokerSeatLayout(remoteBindings.length);
   const heroCards = state?.playerCards?.length ? state.playerCards : selfSeat?.cards || [];
   const heroAbsent = Boolean(state?.playerFolded || selfSeat?.folded);
   const heroName = String(playerName || "Toi").trim();
-  const showHeroSeat = (!isSpectatingRound || Boolean(selfSeat) || Boolean(heroCards.length)) && !queuedForNextHand;
+  const showHeroSeat = queuedForNextHand || !isSpectatingRound || Boolean(selfSeat) || Boolean(heroCards.length);
   const displayedPotTotal = stage === "waiting" ? 0 : potTotal;
   const heroWon = Boolean(selfSeat?.isWinner || state?.lastDelta > 0 || state?.payoutAmount > 0);
   const heroStatus =
-    state?.playerFolded
+    queuedForNextHand
+      ? "Inscrit prochaine main"
+      : state?.playerFolded
       ? "Main couchee"
-      : state?.playerHand?.label || selfSeat?.hand?.label || (stage === "showdown"
-        ? "Showdown"
+      : formatPokerHandLabel(state?.playerHand || selfSeat?.hand) || state?.playerHand?.label || selfSeat?.hand?.label || (stage === "showdown"
+        ? "Main resolue"
         : stage === "waiting"
           ? "En attente"
           : "Decision ouverte");
-  const heroStake = state?.playerCommitted || selfSeat?.totalCommitted || heroCommitted;
-  const showdownWinnersLabel = lastHandRecap?.winners.length
-    ? lastHandRecap.winners.map((winner) => winner.name).join(", ")
-    : "";
+  const heroStake = queuedForNextHand
+    ? Number(selfPendingSeat?.ante || activeAnte || state?.ante || 0)
+    : state?.playerCommitted || selfSeat?.totalCommitted || heroCommitted;
+  const showdownWinnersLabel = buildPokerWinningHeadline(lastHandRecap?.winners || []);
 
   return (
     <>
@@ -408,7 +431,7 @@ export default function PokerTableScene({
             </div>
             {stage === "showdown" && lastHandRecap ? (
               <div className="casino-poker-showdown-banner" aria-live="polite">
-                <strong>{showdownWinnersLabel ? `Gagnant${lastHandRecap.winners.length > 1 ? "s" : ""}: ${showdownWinnersLabel}` : "Showdown"}</strong>
+                <strong>{showdownWinnersLabel || "Main gagnante"}</strong>
                 <span>{lastHandRecap.message}</span>
               </div>
             ) : null}
@@ -458,15 +481,18 @@ export default function PokerTableScene({
                       />
                     );
                   })
+                ) : queuedForNextHand ? (
+                  <div className="casino-empty-seat">Ta place est reservee pour la prochaine main.</div>
                 ) : (
                   <div className="casino-empty-seat">Le joueur n'a pas encore touche ses cartes.</div>
                 )}
               </div>
               <div className="casino-seat-role-row casino-seat-role-row--player casino-seat-role-row--stats" aria-label={`Mise de ${heroName}`}>
                 <span className="casino-seat-role-chip casino-seat-role-chip--stake">
-                  Mise {formatCredits(heroStake)}
+                  {queuedForNextHand ? `Inscrit ${formatCredits(heroStake)}` : `Mise ${formatCredits(heroStake)}`}
                 </span>
                 {heroWon ? <span className="casino-seat-role-chip casino-seat-role-chip--winner">Gagnant</span> : null}
+                {queuedForNextHand ? <span className="casino-seat-role-chip casino-seat-role-chip--action">Prochaine main</span> : null}
                 {heroAbsent ? <span className="casino-seat-role-chip casino-seat-role-chip--absent">Fold</span> : null}
               </div>
             </article>

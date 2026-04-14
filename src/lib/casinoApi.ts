@@ -132,6 +132,58 @@ const DISPLAY_NAME_KEY = 'funesterie-casino-display-name';
 const TAB_ID_KEY = "funesterie-casino-tab-id";
 let fallbackCasinoTabId = "";
 
+function decodeBase64UrlSegment(value: string) {
+  const normalized = String(value || "").trim().replace(/-/g, "+").replace(/_/g, "/");
+  if (!normalized) return "";
+  const padding = normalized.length % 4;
+  const padded = normalized + (padding ? "=".repeat(4 - padding) : "");
+
+  if (typeof window !== "undefined" && typeof window.atob === "function") {
+    return window.atob(padded);
+  }
+
+  return "";
+}
+
+function readJwtPayload(token: string) {
+  const normalized = String(token || "").trim();
+  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(normalized)) {
+    return null;
+  }
+
+  try {
+    const payloadSegment = normalized.split(".")[1] || "";
+    const decoded = decodeBase64UrlSegment(payloadSegment);
+    return decoded ? JSON.parse(decoded) : null;
+  } catch {
+    return null;
+  }
+}
+
+function isJwtExpired(payload: any) {
+  const expSeconds = Number(payload?.exp || 0);
+  if (!Number.isFinite(expSeconds) || expSeconds <= 0) return false;
+  return Date.now() >= expSeconds * 1000;
+}
+
+function getUsableCasinoToken() {
+  try {
+    const token = String(localStorage.getItem(TOKEN_KEY) || "").trim();
+    if (!token) return "";
+
+    const payload = readJwtPayload(token);
+    if (!payload || isJwtExpired(payload)) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(DISPLAY_NAME_KEY);
+      return "";
+    }
+
+    return token;
+  } catch {
+    return "";
+  }
+}
+
 function getApiUrl(path: string) {
   const normalizedPath = String(path || '').trim();
   if (!normalizedPath) return API_BASE;
@@ -196,15 +248,11 @@ export function isCasinoSessionError(error: unknown) {
 }
 
 export function getCasinoToken() {
-  try {
-    return String(localStorage.getItem(TOKEN_KEY) || '').trim();
-  } catch {
-    return '';
-  }
+  return getUsableCasinoToken();
 }
 
 export function hasCasinoToken() {
-  return Boolean(getCasinoToken());
+  return Boolean(getUsableCasinoToken());
 }
 
 export function setCasinoToken(token: string) {

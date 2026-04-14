@@ -274,7 +274,7 @@ export default function CasinoFloorShell({
             label: "Structure",
             content: (
               <div className="casino-rule-list">
-                <p>Format Texas hold'em rapide avec preflop, flop, turn, river et showdown.</p>
+                <p>Format Texas hold'em rapide avec preflop, flop, turn, river et fin de main detaillee.</p>
                 <p>Le backend gere check, call, bet, raise et fold avec sizing reel.</p>
                 <p>Le salon doit compter au moins 2 joueurs humains pour distribuer une main live.</p>
               </div>

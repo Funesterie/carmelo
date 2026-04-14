@@ -2,6 +2,7 @@ import PirateInspector from "../../../PirateInspector";
 import { formatCredits } from "../../../lib/casinoRoomState";
 import type { CasinoProfile, CasinoTableRoom, PokerState } from "../../../lib/casinoApi";
 import { getTableChannelDisplayMeta } from "../../../lib/tableSalons";
+import { buildPokerWinnerSummary } from "../handText";
 
 const STREET_LABELS = {
   waiting: { title: "Attente" },
@@ -9,7 +10,7 @@ const STREET_LABELS = {
   flop: { title: "Flop" },
   turn: { title: "Turn" },
   river: { title: "River" },
-  showdown: { title: "Showdown" },
+  showdown: { title: "Fin de main" },
 } as const;
 
 function getStreetTitle(stage: PokerState["stage"] | "idle" | string | null | undefined) {
@@ -172,9 +173,7 @@ export default function PokerSidebar({
       : waitingForTurn
       ? (state?.message || "La main continue. Les actions se debloquent des que le tour revient sur toi.")
       : getDecisionCaption(state);
-  const lastHandWinnersLabel = lastHandRecap?.winners.length
-    ? lastHandRecap.winners.map((winner) => winner.name).join(", ")
-    : "";
+  const lastHandWinnersLabel = buildPokerWinnerSummary(lastHandRecap?.winners || []);
 
   return (
     <div className="casino-stage-sidebar">
@@ -290,7 +289,7 @@ export default function PokerSidebar({
                 {lastHandRecap ? (
                   <div className="casino-last-hand-card">
                     <strong>Derniere main</strong>
-                    <p>{lastHandWinnersLabel ? `Gagnant${lastHandRecap.winners.length > 1 ? "s" : ""}: ${lastHandWinnersLabel}.` : lastHandRecap.message}</p>
+                    <p>{lastHandWinnersLabel || lastHandRecap.message}</p>
                     {lastHandRecap.heroHandLabel ? <span>Ta main: {lastHandRecap.heroHandLabel}</span> : null}
                   </div>
                 ) : null}
