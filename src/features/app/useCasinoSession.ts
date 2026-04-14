@@ -1,6 +1,10 @@
 import * as React from "react";
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { SLOT_VIDEO_INTRO_SESSION_KEY, type RoomId } from "../casino/catalog";
+import {
+  SLOT_VIDEO_INTRO_ARMED_SESSION_KEY,
+  SLOT_VIDEO_INTRO_SESSION_KEY,
+  type RoomId,
+} from "../casino/catalog";
 import { BLACKJACK_SALONS } from "../../lib/tableSalons";
 import { POKER_SALONS } from "../../lib/tableSalons";
 import {
@@ -116,6 +120,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
   function resetConnectedSessionMediaIntro() {
     try {
       sessionStorage.removeItem(SLOT_VIDEO_INTRO_SESSION_KEY);
+      sessionStorage.setItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY, "1");
       sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
     } catch {
       // ignore storage failures
@@ -247,6 +252,13 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
   function handleLogout() {
     setPendingImmersionName("");
     setActiveCasinoRoom("slots");
+    try {
+      sessionStorage.removeItem(SLOT_VIDEO_INTRO_SESSION_KEY);
+      sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
+      sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
+    } catch {
+      // ignore storage failures
+    }
     clearCasinoSession();
     setProfile(null);
     setNotice("Session fermee.");

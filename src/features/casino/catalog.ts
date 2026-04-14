@@ -49,6 +49,7 @@ export const BET_PRESETS = [20, 50, 100, 200];
 export const SPIN_ANIMATION_STEPS = 11;
 export const SPIN_ANIMATION_INTERVAL_MS = 95;
 export const SLOT_VIDEO_INTRO_SESSION_KEY = "funesterie-slots-intro-played-v2";
+export const SLOT_VIDEO_INTRO_ARMED_SESSION_KEY = "funesterie-slots-intro-armed-v1";
 export const CASINO_DISTRICT_ARTWORK = districtArtwork;
 
 export const SYMBOL_META: Record<string, { emoji: string; label: string; accent: string; image: string }> = {

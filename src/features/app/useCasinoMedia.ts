@@ -280,13 +280,13 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       return;
     }
 
-    const intro = getAudio(introAudioRef, funesterieAudio);
-    intro.volume = 0.01;
-    intro.muted = false;
+    const unlockAudio = getAudio(cueAudioRef, entryAudio);
+    unlockAudio.volume = 0;
+    unlockAudio.muted = false;
     try {
-      await intro.play();
-      intro.pause();
-      intro.currentTime = 0;
+      await unlockAudio.play();
+      unlockAudio.pause();
+      unlockAudio.currentTime = 0;
       mediaUnlockedRef.current = true;
       setMediaReady(true);
     } catch {

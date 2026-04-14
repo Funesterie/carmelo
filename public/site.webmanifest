@@ -1,0 +1,22 @@
+{
+  "name": "Casino Funesterie",
+  "short_name": "Funesterie",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#102030",
+  "theme_color": "#102030",
+  "description": "Casino pirate Treasor Cruse avec machine a sous, roulette, blackjack, poker et jeux de chasse au tresor.",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

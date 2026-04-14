@@ -1,4 +1,5 @@
 import { buildSettledAnimation } from "../model";
+import rouletteTurntableImg from "../../../images/roulette-tournante.png";
 
 type RouletteResultPreviewProps = {
   winningNumber: number;
@@ -16,13 +17,18 @@ export default function RouletteResultPreview({
   return (
     <div className={`casino-roulette-history-preview is-${winningColor}`}>
       <div className="casino-roulette-history-preview__wheel-shell" aria-hidden="true">
+        <img
+          className="casino-roulette-history-preview__base"
+          src={previewImageSrc}
+          alt=""
+        />
         <div
           className="casino-roulette-history-preview__wheel"
           style={{ transform: `translate(-50%, -50%) rotate(${settled.wheelRotation}deg)` }}
         >
           <img
-            className="casino-roulette-history-preview__plateau"
-            src={previewImageSrc}
+            className="casino-roulette-history-preview__plateau casino-roulette-history-preview__plateau--turntable"
+            src={rouletteTurntableImg}
             alt=""
           />
         </div>

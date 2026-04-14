@@ -17,6 +17,7 @@ import {
   SPIN_ANIMATION_STEPS,
   ROOM_DEFINITIONS,
   SLOT_AMBIENT_MEDIA,
+  SLOT_VIDEO_INTRO_ARMED_SESSION_KEY,
   SLOT_FEATURE_MEDIA,
   SLOT_INTRO_MEDIA,
   SLOT_VIDEO_INTRO_SESSION_KEY,
@@ -168,6 +169,13 @@ function SlotsRoom({
       return false;
     }
   });
+  const [slotIntroArmed, setSlotIntroArmed] = useState(() => {
+    try {
+      return sessionStorage.getItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [bonusHeldTurns, setBonusHeldTurns] = useState<BonusHeldTurns>({});
   const [goldRain, setGoldRain] = useState<SlotPrizeRainItem[]>([]);
   const [celebration, setCelebration] = useState<SlotCelebration | null>(null);
@@ -272,8 +280,9 @@ function SlotsRoom({
   const featureMedia = isAlertFeatureActive
     ? SLOT_FEATURE_MEDIA[activeFeature]
     : SLOT_INTRO_MEDIA;
-  const showAmbientLoop = slotIntroPlayed && !isAlertFeatureActive;
-  const showFeatureLayer = !slotIntroPlayed || isAlertFeatureActive;
+  const shouldShowSlotIntro = slotIntroArmed && !slotIntroPlayed;
+  const showAmbientLoop = (slotIntroPlayed || !slotIntroArmed) && !isAlertFeatureActive;
+  const showFeatureLayer = shouldShowSlotIntro || isAlertFeatureActive;
   const slotAmbientPanel = useMemo(() => (
     <div className="casino-slot-ambient-panel">
       <video
@@ -324,13 +333,19 @@ function SlotsRoom({
 
     ambientVideo.addEventListener("timeupdate", syncAmbientTime);
 
-    if (isAlertFeatureActive || connectionImmersionPending || slotsIntroDelayActive || immersionActive || !slotIntroPlayed) {
+    if (
+      isAlertFeatureActive
+      || connectionImmersionPending
+      || slotsIntroDelayActive
+      || immersionActive
+      || shouldShowSlotIntro
+    ) {
       if (isAlertFeatureActive && !ambientVideo.paused) {
         syncAmbientTime();
         ambientResumePendingRef.current = true;
       }
       ambientVideo.pause();
-      if (!slotIntroPlayed) {
+      if (shouldShowSlotIntro) {
         try {
           ambientVideo.currentTime = 0;
           ambientResumeTimeRef.current = 0;
@@ -372,7 +387,7 @@ function SlotsRoom({
       ambientVideo.removeEventListener("timeupdate", syncAmbientTime);
       ambientVideo.removeEventListener("loadedmetadata", restoreAmbientPosition);
     };
-  }, [connectionImmersionPending, immersionActive, isAlertFeatureActive, mediaReady, slotIntroPlayed, slotsIntroDelayActive]);
+  }, [connectionImmersionPending, immersionActive, isAlertFeatureActive, mediaReady, shouldShowSlotIntro, slotIntroArmed, slotIntroPlayed, slotsIntroDelayActive]);
 
   useEffect(() => {
     const video = featureVideoRef.current;
@@ -404,7 +419,7 @@ function SlotsRoom({
         setActiveFeature("idle");
         return;
       }
-      if (!isAlertFeatureActive && !slotIntroPlayed) {
+      if (!isAlertFeatureActive && shouldShowSlotIntro) {
         markSlotsIntroPlayed();
       }
     };
@@ -412,7 +427,7 @@ function SlotsRoom({
 
     if (connectionImmersionPending || slotsIntroDelayActive || immersionActive) {
       video.pause();
-      if (!slotIntroPlayed) {
+      if (shouldShowSlotIntro) {
         try {
           video.currentTime = 0;
         } catch {
@@ -425,7 +440,7 @@ function SlotsRoom({
     }
 
     const shouldUseAudio = mediaReady;
-    if (!isAlertFeatureActive && !slotIntroPlayed && !shouldUseAudio) {
+    if (!isAlertFeatureActive && shouldShowSlotIntro && !shouldUseAudio) {
       video.pause();
       try {
         video.currentTime = 0;
@@ -437,14 +452,14 @@ function SlotsRoom({
       };
     }
 
-    const volume = isAlertFeatureActive ? 0.5 : slotIntroPlayed ? 0.34 : 0.42;
+    const volume = isAlertFeatureActive ? 0.5 : shouldShowSlotIntro ? 0.42 : 0.34;
     video.muted = !shouldUseAudio;
     video.volume = shouldUseAudio ? volume : 0;
     void video.play().catch(() => undefined);
     return () => {
       video.removeEventListener("ended", handleEnded);
     };
-  }, [connectionImmersionPending, featureMedia.image, featureMedia.video, featurePlaybackNonce, immersionActive, isAlertFeatureActive, mediaReady, showFeatureLayer, slotIntroPlayed, slotsIntroDelayActive]);
+  }, [connectionImmersionPending, featureMedia.image, featureMedia.video, featurePlaybackNonce, immersionActive, isAlertFeatureActive, mediaReady, shouldShowSlotIntro, showFeatureLayer, slotIntroPlayed, slotsIntroDelayActive]);
 
   useEffect(() => {
     if (!autoSpinActive || spinState !== "idle" || busy) return;
@@ -471,11 +486,13 @@ function SlotsRoom({
       if (current) return current;
       try {
         sessionStorage.setItem(SLOT_VIDEO_INTRO_SESSION_KEY, "1");
+        sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
       } catch {
         // ignore storage failures
       }
       return true;
     });
+    setSlotIntroArmed(false);
   }
 
   function resumeSlotsAmbientForSpinStart() {

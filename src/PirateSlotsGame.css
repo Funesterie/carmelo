@@ -16641,6 +16641,69 @@ button {
   }
 }
 
+/* Roulette premium sync: same frame for base + turntable, clearer landing groove for the ball. */
+.casino-table-layout--roulette .casino-roulette-console__wheel-shell {
+  overflow: hidden !important;
+}
+
+.casino-table-layout--roulette .casino-roulette-console__wheel-base,
+.casino-roulette-history-preview__base {
+  position: absolute;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.casino-table-layout--roulette .casino-roulette-console__wheel,
+.casino-roulette-history-preview__wheel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100% !important;
+  aspect-ratio: 1;
+  transform-origin: center center;
+  z-index: 1;
+}
+
+.casino-table-layout--roulette .casino-roulette-wheel__plateau--turntable,
+.casino-roulette-history-preview__plateau--turntable {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+}
+
+.casino-table-layout--roulette .casino-roulette-console__pointer {
+  top: 3px;
+  height: 18px;
+  z-index: 5;
+}
+
+.casino-roulette-orb--console,
+.casino-roulette-orb--history {
+  width: 14px !important;
+  height: 14px !important;
+  z-index: 5;
+}
+
+.casino-roulette-orb--console::before,
+.casino-roulette-orb--history::before {
+  inset: -7px;
+}
+
+.casino-roulette-orb__trail {
+  width: 28px;
+  height: 7px;
+}
+
+.casino-roulette-history-preview__wheel-shell {
+  overflow: hidden;
+}
+
 /* Final slots asset fit: let the new vertical symbols occupy the whole tile. */
 .casino-table-layout--slots .casino-reel-shell__header {
   display: none !important;

@@ -18,15 +18,12 @@ import {
   HOLD_DURATION_MS,
   ROULETTE_ANNOUNCE_LEAD_IN_MS,
   ROULETTE_AMOUNT_PRESETS,
-  ROULETTE_ORDER,
   ROULETTE_TIRAGE_CANNON_DELAY_MS,
   SPIN_DURATION_MS,
-  WHEEL_POCKET_ANGLE,
   buildSettledAnimation,
   buildStaticAnimation,
   easeOutCubic,
   easeOutQuart,
-  getNumberColor,
   getBetLabel,
   getPocketIndex,
   lerp,
@@ -462,16 +459,6 @@ export default function RouletteRoom({
     const seconds = totalSeconds % 60;
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
   }, [remainingMs, tableHasServerActivity]);
-
-  const wheelPockets = useMemo(
-    () =>
-      ROULETTE_ORDER.map((number, index) => ({
-        number,
-        color: getNumberColor(number),
-        angle: index * WHEEL_POCKET_ANGLE - 90,
-      })),
-    [],
-  );
 
   const rouletteVisualAssets = useMemo(
     () => ({
@@ -1418,15 +1405,6 @@ export default function RouletteRoom({
                       alt=""
                       aria-hidden="true"
                     />
-                    {wheelPockets.map((pocket) => (
-                      <div
-                        key={`console-${pocket.number}`}
-                        className={`casino-roulette-pocket is-${pocket.color} ${animation.highlightedNumber === pocket.number ? "is-winning" : ""}`}
-                        style={{ ["--pocket-angle" as string]: `${pocket.angle}deg` }}
-                      >
-                        <span>{pocket.number}</span>
-                      </div>
-                    ))}
                   </div>
                   <span className="casino-roulette-console__pointer" aria-hidden="true" />
 
