@@ -1,3 +1,23 @@
+// Helper centralisé pour play() avec log et retour d'état
+export async function safePlayMedia(media: HTMLMediaElement, label: string) {
+  try {
+    await media.play();
+    return { ok: true, error: undefined };
+  } catch (error: any) {
+    const info = {
+      name: error?.name,
+      message: error?.message,
+      readyState: media.readyState,
+      muted: media.muted,
+      currentSrc: media.currentSrc || media.src,
+      label,
+    };
+    // Log console
+    // eslint-disable-next-line no-console
+    console.warn("[casino-media] play() refused", info);
+    return { ok: false, error: info };
+  }
+}
 import { useEffect, useMemo, useRef, useState } from "react";
 import canonAudio from "../../audio/canon.mp3";
 import entryAudio from "../../audio/entrée.mp3";
@@ -66,6 +86,8 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   const [ambientVideoAudible, setAmbientVideoAudible] = useState(false);
   const [mediaReady, setMediaReady] = useState(false);
   const [slotsIntroDelayActive, setSlotsIntroDelayActive] = useState(false);
+  // Nouvel état pour le statut média
+  const [mediaStatus, setMediaStatus] = useState<"locked"|"unlocking"|"ready"|"blocked">("locked");
 
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
   const cueAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -128,10 +150,15 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     const unlockOnFirstGesture = () => {
       void requestMediaPlayback();
     };
-
     window.addEventListener("pointerdown", unlockOnFirstGesture, { once: true });
+    window.addEventListener("click", unlockOnFirstGesture, { once: true });
+    window.addEventListener("touchend", unlockOnFirstGesture, { once: true });
+    window.addEventListener("keydown", unlockOnFirstGesture, { once: true });
     return () => {
       window.removeEventListener("pointerdown", unlockOnFirstGesture);
+      window.removeEventListener("click", unlockOnFirstGesture);
+      window.removeEventListener("touchend", unlockOnFirstGesture);
+      window.removeEventListener("keydown", unlockOnFirstGesture);
     };
   }, []);
 
@@ -240,11 +267,9 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     audio.volume = volume;
     audio.muted = false;
 
-    try {
-      await audio.play();
-    } catch {
-      return false;
-    }
+
+    const result = await safePlayMedia(audio, src);
+    if (!result.ok) return false;
 
     if (!waitUntilEnd) return true;
 
@@ -286,12 +311,8 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     video.volume = withSound ? 0.14 : 0;
     video.muted = !withSound;
 
-    try {
-      await video.play();
-      setAmbientVideoAudible(withSound);
-    } catch {
-      setAmbientVideoAudible(false);
-    }
+    const result = await safePlayMedia(video, "ambientVideo");
+    setAmbientVideoAudible(result.ok && withSound);
   }
 
   async function requestMediaPlayback() {
@@ -309,16 +330,13 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     const unlockAudio = getAudio(cueAudioRef, entryAudio);
     unlockAudio.volume = 0;
     unlockAudio.muted = false;
-    try {
-      await unlockAudio.play();
-      unlockAudio.pause();
-      unlockAudio.currentTime = 0;
-      mediaUnlockedRef.current = true;
-      setMediaReady(true);
-    } catch {
-      mediaUnlockedRef.current = false;
-      setMediaReady(false);
-    }
+    setMediaStatus("unlocking");
+    const result = await safePlayMedia(unlockAudio, "unlockAudio");
+    unlockAudio.pause();
+    unlockAudio.currentTime = 0;
+    mediaUnlockedRef.current = !!result.ok;
+    setMediaReady(!!result.ok);
+    setMediaStatus(result.ok ? "ready" : "blocked");
 
     if (activeCasinoRoom === "slots") {
       pauseMedia(ambientVideoRef.current);
@@ -393,7 +411,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       if (ambient) {
         ambient.volume = Math.max(0.03, previousAmbientVolume * 0.28);
         if (ambient.paused) {
-          void ambient.play().catch(() => undefined);
+          void safePlayMedia(ambient, "rouletteAmbient");
         }
       }
 
@@ -416,12 +434,12 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
         await playAudioClip(cannonAudioRef, canonAudio, 1, false);
       }
 
-      if (ambient && shouldResumeAmbient && scope === rouletteAudioScopeRef.current && activeRoomRef.current === "roulette") {
-        ambient.volume = previousAmbientVolume;
-        if (ambient.paused) {
-          void ambient.play().catch(() => undefined);
+        if (ambient && shouldResumeAmbient && scope === rouletteAudioScopeRef.current && activeRoomRef.current === "roulette") {
+          ambient.volume = previousAmbientVolume;
+          if (ambient.paused) {
+            void safePlayMedia(ambient, "rouletteAmbient");
+          }
         }
-      }
     });
   }
 
@@ -450,6 +468,8 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
 
   return {
     ...controls,
+    mediaStatus,
+    setMediaStatus,
     requestMediaPlayback,
     startConnectionImmersion,
     handleRouletteEvent,
