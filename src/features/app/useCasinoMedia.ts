@@ -339,8 +339,10 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
     }
 
     queueRouletteAudio(async () => {
+      const sequenceStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
       const introVoice = Math.random() > 0.5 ? fantomeAudio : moussaillonAudio;
       const cannonDelayMs = event.canonDelayMs || ROULETTE_TIRAGE_CANNON_DELAY_MS;
+      const targetCannonAtMs = Math.max(0, Number(event.cannonAtMs || 0));
       const ambient = rouletteAmbientAudioRef.current;
       const previousAmbientVolume = ambient?.volume ?? 0.14;
       const shouldResumeAmbient = Boolean(ambient && activeCasinoRoom === "roulette");
@@ -353,7 +355,12 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded }: UseCasinoMed
       }
 
       await playAudioClip(cueAudioRef, introVoice, 0.92, true);
-      await waitForMs(cannonDelayMs);
+      const elapsedSinceStartMs =
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) - sequenceStartedAt;
+      const remainingBeforeCannonMs = targetCannonAtMs > 0
+        ? Math.max(0, targetCannonAtMs - elapsedSinceStartMs)
+        : cannonDelayMs;
+      await waitForMs(remainingBeforeCannonMs);
       await playAudioClip(cannonAudioRef, canonAudio, 1, false);
 
       if (ambient && shouldResumeAmbient) {

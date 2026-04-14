@@ -425,6 +425,18 @@ function SlotsRoom({
     }
 
     const shouldUseAudio = mediaReady;
+    if (!isAlertFeatureActive && !slotIntroPlayed && !shouldUseAudio) {
+      video.pause();
+      try {
+        video.currentTime = 0;
+      } catch {
+        // ignore seek failures
+      }
+      return () => {
+        video.removeEventListener("ended", handleEnded);
+      };
+    }
+
     const volume = isAlertFeatureActive ? 0.5 : slotIntroPlayed ? 0.34 : 0.42;
     video.muted = !shouldUseAudio;
     video.volume = shouldUseAudio ? volume : 0;

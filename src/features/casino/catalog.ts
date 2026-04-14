@@ -48,7 +48,7 @@ import { formatCredits } from "../../lib/casinoRoomState";
 export const BET_PRESETS = [20, 50, 100, 200];
 export const SPIN_ANIMATION_STEPS = 11;
 export const SPIN_ANIMATION_INTERVAL_MS = 95;
-export const SLOT_VIDEO_INTRO_SESSION_KEY = "funesterie-slots-intro-played";
+export const SLOT_VIDEO_INTRO_SESSION_KEY = "funesterie-slots-intro-played-v2";
 export const CASINO_DISTRICT_ARTWORK = districtArtwork;
 
 export const SYMBOL_META: Record<string, { emoji: string; label: string; accent: string; image: string }> = {
@@ -234,7 +234,14 @@ export type SlotFeatureKey =
 
 export type RouletteSoundEvent =
   | { type: "enter" | "join"; roundId: number; participants: number }
-  | { type: "spin"; roundId: number; resultId: number; winningNumber: number | null; canonDelayMs?: number };
+  | {
+      type: "spin";
+      roundId: number;
+      resultId: number;
+      winningNumber: number | null;
+      canonDelayMs?: number;
+      cannonAtMs?: number;
+    };
 
 export const SLOT_INTRO_MEDIA = {
   title: "Introduction du salon",

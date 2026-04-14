@@ -915,14 +915,6 @@ export default function RouletteRoom({
     const shouldSkipIntro = catchupMs > 250;
     const shouldSkipReload = catchupMs > SPIN_DURATION_MS;
 
-    onRouletteEventRef.current?.({
-      type: "spin",
-      roundId: context.roundId,
-      resultId: context.resultId,
-      winningNumber,
-      canonDelayMs: ROULETTE_TIRAGE_CANNON_DELAY_MS,
-    });
-
     if (!shouldSkipIntro) {
       await waitForMs(ROULETTE_ANNOUNCE_LEAD_IN_MS);
       if (!mountedRef.current || token !== sequenceTokenRef.current) return;
@@ -933,6 +925,16 @@ export default function RouletteRoom({
       await playVideoForward(introVideo, 2200);
       if (!mountedRef.current || token !== sequenceTokenRef.current) return;
     }
+
+    const spinElapsedMs = syncStartAt ? Math.max(0, Date.now() - syncStartAt) : 0;
+    onRouletteEventRef.current?.({
+      type: "spin",
+      roundId: context.roundId,
+      resultId: context.resultId,
+      winningNumber,
+      canonDelayMs: ROULETTE_TIRAGE_CANNON_DELAY_MS,
+      cannonAtMs: Math.max(0, SPIN_DURATION_MS - 500 - spinElapsedMs),
+    });
 
     setSequencePhase("spin");
     await playWheelAnimation(winningNumber, token, syncStartAt);
