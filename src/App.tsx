@@ -49,6 +49,7 @@ export default function App() {
             displayName={session.displayName}
             activeCasinoRoom={session.activeCasinoRoom}
             showImmersion={media.showImmersion}
+            showImmersionOneVideo={media.showImmersionOneVideo}
             immersionLine={media.immersionLine}
             mediaReady={media.mediaReady}
             ambientVideoAudible={media.ambientVideoAudible}

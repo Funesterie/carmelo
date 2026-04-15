@@ -91,6 +91,7 @@ type CasinoGameScreenProps = {
   displayName: string;
   activeCasinoRoom: RoomId;
   showImmersion: boolean;
+  showImmersionOneVideo: boolean;
   immersionLine: string;
   mediaReady: boolean;
   mediaStatus: string;
@@ -120,6 +121,7 @@ export default function CasinoGameScreen({
   displayName,
   activeCasinoRoom,
   showImmersion,
+  showImmersionOneVideo,
   immersionLine,
   mediaReady,
   mediaStatus,
@@ -137,22 +139,11 @@ export default function CasinoGameScreen({
   requestMediaPlayback,
 }: CasinoGameScreenProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const [showOneVideo, setShowOneVideo] = React.useState(false);
   const oneVideoRef = React.useRef<HTMLVideoElement | null>(null);
-
-  React.useEffect(() => {
-    if (showImmersion) {
-      setShowOneVideo(false);
-      const timeout = setTimeout(() => setShowOneVideo(true), 10000);
-      return () => clearTimeout(timeout);
-    } else {
-      setShowOneVideo(false);
-    }
-  }, [showImmersion]);
 
   // Sur mobile, tente de jouer la vidéo one.mp4 explicitement
   React.useEffect(() => {
-    if (showOneVideo && oneVideoRef.current) {
+    if (showImmersionOneVideo && oneVideoRef.current) {
       const playPromise = oneVideoRef.current.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch((err) => {
@@ -161,7 +152,7 @@ export default function CasinoGameScreen({
         });
       }
     }
-  }, [showOneVideo]);
+  }, [showImmersionOneVideo]);
   const [clockLabel, setClockLabel] = React.useState(() =>
     new Date().toLocaleTimeString("fr-FR", {
       hour: "2-digit",
@@ -291,7 +282,7 @@ export default function CasinoGameScreen({
                 backgroundImage: `linear-gradient(180deg, rgba(4, 8, 14, 0.14), rgba(4, 8, 14, 0.84)), url("${districtArtwork}")`,
               }}
             >
-              {showOneVideo ? (
+              {showImmersionOneVideo ? (
                 <video
                   ref={oneVideoRef}
                   className="casino-immersion-overlay__video"
