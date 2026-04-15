@@ -284,11 +284,6 @@ export default function CasinoGameScreen({
                 <span>Tables ATS en cours d'arrimage</span>
                 <span>Canon live en veille sur la roulette</span>
               </div>
-              {!mediaReady ? (
-                <button className="casino-immersion-audio-btn" onClick={requestMediaPlayback}>
-                  Activer le son
-                </button>
-              ) : null}
             </div>
             <div
               className="casino-immersion-overlay__video-shell"
@@ -384,6 +379,7 @@ export default function CasinoGameScreen({
                     type="button"
                     className={`casino-ghost-button casino-ghost-button--menu ${room.id === activeCasinoRoom ? "is-active" : ""}`}
                     onClick={() => {
+                      void requestMediaPlayback();
                       onRoomChange(room.id);
                       setMenuOpen(false);
                     }}
@@ -485,15 +481,6 @@ export default function CasinoGameScreen({
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", position: "relative", width: "100%" }}>
           <div style={{ position: "absolute", right: 0, bottom: -36, display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              type="button"
-              className="casino-ghost-button casino-sound-unlock-btn"
-              onClick={requestMediaPlayback}
-              title="Activer le son"
-              style={{ fontSize: 18, padding: 0, background: "none", border: "none" }}
-            >
-              <span role="img" aria-label="Activer le son">🔊</span>
-            </button>
             <div className="casino-account-bar__clock">{clockLabel}</div>
           </div>
         </div>

@@ -25,7 +25,6 @@ type CasinoAuthScreenProps = Readonly<{
   onLoginSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onRegisterSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onForgotSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-  onRequestMediaPlayback?: () => void;
 }>;
 
 export default function CasinoAuthScreen({
@@ -51,7 +50,6 @@ export default function CasinoAuthScreen({
   onLoginSubmit,
   onRegisterSubmit,
   onForgotSubmit,
-  onRequestMediaPlayback,
 }: CasinoAuthScreenProps) {
   return (
     <div className="casino-auth-layout">
@@ -63,20 +61,6 @@ export default function CasinoAuthScreen({
       </section>
 
       <aside className="casino-auth-panel">
-        {/* Sound unlock button already added above */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          {onRequestMediaPlayback && (
-            <button
-              type="button"
-              className="casino-ghost-button casino-sound-unlock-btn"
-              onClick={onRequestMediaPlayback}
-              style={{ fontSize: 16, display: "flex", alignItems: "center", gap: 4 }}
-            >
-              <span role="img" aria-label="Activer le son">🔊</span>
-              <span>Activer le son</span>
-            </button>
-          )}
-        </div>
         <div className="casino-auth-panel__header">
           {(() => {
             let header = "";

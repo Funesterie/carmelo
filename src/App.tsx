@@ -30,8 +30,15 @@ export default function App() {
     return null;
   }
 
+  function handleMediaIntent() {
+    void media.requestMediaPlayback();
+  }
+
   return (
-    <main>
+    <main
+      onPointerDownCapture={media.mediaReady ? undefined : handleMediaIntent}
+      onKeyDownCapture={media.mediaReady ? undefined : handleMediaIntent}
+    >
       <div>
         {session.profile ? (
           <CasinoGameScreen
@@ -116,7 +123,6 @@ export default function App() {
               void media.requestMediaPlayback();
               session.handleForgot();
             }}
-            onRequestMediaPlayback={media.requestMediaPlayback}
           />
         )}
       </div>
