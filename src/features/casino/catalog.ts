@@ -38,9 +38,6 @@ import boobaVideo from "../../videos/booba.mp4";
 import deppVideo from "../../videos/depp.mp4";
 import expVideo from "../../videos/exp.mp4";
 import jokerVideo from "../../videos/joker.mp4";
-import oneVideo from "../../videos/one.mp4";
-
-export { oneVideo };
 import powerVideo from "../../videos/power.mp4";
 import rangerVideo from "../../videos/ranger.mp4";
 import spartaVideo from "../../videos/sparta.mp4";
@@ -50,8 +47,9 @@ import { formatCredits } from "../../lib/casinoRoomState";
 export const BET_PRESETS = [20, 50, 100, 200];
 export const SPIN_ANIMATION_STEPS = 11;
 export const SPIN_ANIMATION_INTERVAL_MS = 95;
-export const SLOT_VIDEO_INTRO_SESSION_KEY = "funesterie-slots-intro-played-v2";
-export const SLOT_VIDEO_INTRO_ARMED_SESSION_KEY = "funesterie-slots-intro-armed-v1";
+export const SLOT_VIDEO_INTRO_SESSION_KEY = "casino-slots-intro-played-v3";
+export const SLOT_VIDEO_INTRO_ARMED_SESSION_KEY = "casino-slots-intro-armed-v2";
+export const CASINO_INTRO_VIDEO_PUBLIC_SRC = "/videos/intro.mp4";
 export const CASINO_DISTRICT_ARTWORK = districtArtwork;
 
 export const SYMBOL_META: Record<string, { emoji: string; label: string; accent: string; image: string }> = {
@@ -250,7 +248,7 @@ export const SLOT_INTRO_MEDIA = {
   title: "Introduction du salon",
   body: "L'introduction passe une seule fois, puis la machine a sous bascule sur son ambiance video continue.",
   image: fondImg,
-  video: oneVideo,
+  video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
 } as const;
 
 export const SLOT_AMBIENT_MEDIA = {
@@ -273,7 +271,7 @@ export const SLOT_FEATURE_MEDIA: Record<
     title: "Ouverture du salon",
     body: "Le relais d'entree de la machine a sous tourne en boucle pendant que la cale se charge.",
     image: fondImg,
-    video: oneVideo,
+    video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
   },
   "joker-line": {
     title: "Alignement joker",
