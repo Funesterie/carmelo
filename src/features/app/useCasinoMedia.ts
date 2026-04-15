@@ -121,7 +121,11 @@ type UseCasinoMediaOptions = {
 };
 
 const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
+const CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY = "casino.immersion.one-video.played";
 const SLOT_ONE_START_DELAY_MS = 1_500;
+const IMMERSION_ONE_VIDEO_DELAY_MS = 10_000;
+const MOBILE_IMMERSION_MIN_DURATION_MS = 12_000;
+const DEFAULT_IMMERSION_DURATION_MS = 5_200;
 
 export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCount }: UseCasinoMediaOptions) {
   const [showImmersion, setShowImmersion] = useState(false);
@@ -129,6 +133,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   const [ambientVideoAudible, setAmbientVideoAudible] = useState(false);
   const [mediaReady, setMediaReady] = useState(false);
   const [slotsIntroDelayActive, setSlotsIntroDelayActive] = useState(false);
+  const [showImmersionOneVideo, setShowImmersionOneVideo] = useState(false);
   // Nouvel état pour le statut média
   const [mediaStatus, setMediaStatus] = useState<"locked"|"unlocking"|"ready"|"blocked">("locked");
 
@@ -140,6 +145,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   const ambientVideoRef = useRef<HTMLVideoElement | null>(null);
   const introHideTimeoutRef = useRef<number | null>(null);
   const slotsIntroDelayTimeoutRef = useRef<number | null>(null);
+  const immersionOneVideoTimeoutRef = useRef<number | null>(null);
   const unlockRequestRef = useRef<Promise<boolean> | null>(null);
   const mediaUnlockedRef = useRef(false);
   const rouletteQueueRef = useRef(Promise.resolve());
@@ -156,6 +162,15 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       }
     })(),
   );
+  const immersionOneVideoPlayedRef = useRef(
+    (() => {
+      try {
+        return sessionStorage.getItem(CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY) === "1";
+      } catch {
+        return false;
+      }
+    })(),
+  );
 
   const controls = useMemo(() => ({
     showImmersion,
@@ -163,8 +178,9 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     ambientVideoAudible,
     mediaReady,
     slotsIntroDelayActive,
+    showImmersionOneVideo,
     ambientVideoRef,
-  }), [ambientVideoAudible, immersionLine, mediaReady, showImmersion, slotsIntroDelayActive]);
+  }), [ambientVideoAudible, immersionLine, mediaReady, showImmersion, showImmersionOneVideo, slotsIntroDelayActive]);
 
   const shouldPlayHeaderVideo = profileLoaded && !showImmersion;
 
@@ -260,6 +276,40 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       window.clearTimeout(slotsIntroDelayTimeoutRef.current);
       slotsIntroDelayTimeoutRef.current = null;
     }
+    if (immersionOneVideoTimeoutRef.current) {
+      window.clearTimeout(immersionOneVideoTimeoutRef.current);
+      immersionOneVideoTimeoutRef.current = null;
+    }
+  }
+
+  function isMobileViewport() {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return false;
+    }
+    return window.matchMedia("(max-width: 920px)").matches;
+  }
+
+  function scheduleImmersionOneVideo() {
+    setShowImmersionOneVideo(false);
+    if (immersionOneVideoPlayedRef.current || !isMobileViewport()) {
+      return;
+    }
+
+    if (immersionOneVideoTimeoutRef.current) {
+      window.clearTimeout(immersionOneVideoTimeoutRef.current);
+      immersionOneVideoTimeoutRef.current = null;
+    }
+
+    immersionOneVideoTimeoutRef.current = window.setTimeout(() => {
+      setShowImmersionOneVideo(true);
+      immersionOneVideoPlayedRef.current = true;
+      immersionOneVideoTimeoutRef.current = null;
+      try {
+        sessionStorage.setItem(CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY, "1");
+      } catch {
+        // ignore storage failures
+      }
+    }, IMMERSION_ONE_VIDEO_DELAY_MS);
   }
 
   function scheduleSlotsIntroDelay() {
@@ -408,6 +458,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       const didPlay = await playAudioClip(introAudioRef, funesterieAudio, 0.56);
       if (didPlay) {
         scheduleSlotsIntroDelay();
+        scheduleImmersionOneVideo();
         immersionAudioPlayedRef.current = true;
         try {
           sessionStorage.setItem(CASINO_IMMERSION_AUDIO_SESSION_KEY, "1");
@@ -445,6 +496,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   async function startConnectionImmersion(playerName: string) {
     clearImmersionTimers();
     setSlotsIntroDelayActive(false);
+    setShowImmersionOneVideo(false);
     setImmersionLine(`Pont prive en preparation pour ${playerName || "le capitaine"}...`);
     setShowImmersion(true);
     await syncAmbientVideo(false, false);
@@ -452,6 +504,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       const didPlay = await playAudioClip(introAudioRef, funesterieAudio, 0.56);
       if (didPlay) {
         scheduleSlotsIntroDelay();
+        scheduleImmersionOneVideo();
         immersionAudioPlayedRef.current = true;
         try {
           sessionStorage.setItem(CASINO_IMMERSION_AUDIO_SESSION_KEY, "1");
@@ -461,10 +514,16 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       }
     }
 
+    const immersionDurationMs =
+      isMobileViewport() && !immersionOneVideoPlayedRef.current
+        ? MOBILE_IMMERSION_MIN_DURATION_MS
+        : DEFAULT_IMMERSION_DURATION_MS;
+
     introHideTimeoutRef.current = window.setTimeout(() => {
       setShowImmersion(false);
+      setShowImmersionOneVideo(false);
       introHideTimeoutRef.current = null;
-    }, 5200);
+    }, immersionDurationMs);
   }
 
   function queueRouletteAudio(scope: number, task: () => Promise<void>) {
@@ -544,6 +603,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     setAmbientVideoAudible(false);
     setMediaReady(false);
     setSlotsIntroDelayActive(false);
+    setShowImmersionOneVideo(false);
     mediaUnlockedRef.current = false;
     unlockRequestRef.current = null;
     rouletteAudioScopeRef.current += 1;
@@ -556,8 +616,10 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     stopMedia(ambientVideoRef.current);
     rouletteEntryPlayedRef.current = false;
     immersionAudioPlayedRef.current = false;
+    immersionOneVideoPlayedRef.current = false;
     try {
       sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
+      sessionStorage.removeItem(CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY);
     } catch {
       // ignore storage failures
     }
