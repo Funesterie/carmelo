@@ -3,9 +3,9 @@ import { formatCredits } from "../../../lib/casinoRoomState";
 import type { BlackjackSeat, BlackjackState, CasinoTableRoomParticipant } from "../../../lib/casinoApi";
 
 const CHIP_TONES: Record<number, "amber" | "cyan" | "crimson" | "ivory"> = {
-  10: "amber",
   20: "cyan",
   50: "crimson",
+  100: "amber",
   200: "ivory",
 };
 
@@ -30,7 +30,7 @@ function buildChipStackValues(total: number) {
 
   const values: number[] = [];
   let remaining = normalizedTotal;
-  [200, 50, 20, 10].forEach((chipValue) => {
+  [200, 100, 50, 20, 10].forEach((chipValue) => {
     while (remaining >= chipValue) {
       values.push(chipValue);
       remaining -= chipValue;

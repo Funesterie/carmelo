@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTableAudio } from "./audio/useTableAudio";
-import { ROOM_DEFINITIONS } from "./features/casino/catalog";
+import { BET_PRESETS, ROOM_DEFINITIONS } from "./features/casino/catalog";
 import BlackjackSidebar from "./features/blackjack/components/BlackjackSidebar";
 import BlackjackTableScene from "./features/blackjack/components/BlackjackTableScene";
 import blackjackCaptainArt from "./images/blackjack-captain-art.png";
@@ -31,7 +31,6 @@ import {
 } from "./lib/tableChannelSync";
 import { BLACKJACK_SALONS, getTableChannelDisplayMeta } from "./lib/tableSalons";
 
-const PLAYER_BETS = [10, 20, 50, 200];
 const TABLE_DEAL_STEP_MS = 96;
 const LIVE_MIN_PLAYERS = 2;
 const BLACKJACK_RESULT_FLASH_MS = 8000;
@@ -342,7 +341,7 @@ export default function BlackjackRoom({
   onError,
 }: BlackjackRoomProps) {
   const blackjackRoomMeta = ROOM_DEFINITIONS.find((roomEntry) => roomEntry.id === "blackjack");
-  const [betChips, setBetChips] = useState<number[]>([PLAYER_BETS[1]]);
+  const [betChips, setBetChips] = useState<number[]>([BET_PRESETS[0]]);
   const [state, setState] = useState<BlackjackState | null>(null);
   const [working, setWorking] = useState(false);
   const [roomId, setRoomId] = useState(() => readSyncedTableSelection("blackjack") || BLACKJACK_SALONS[0].id);
@@ -386,7 +385,15 @@ export default function BlackjackRoom({
   const queuedForNextRound = Boolean(hasPendingSeat && stage === "player-turn" && !hasHeroRound);
   const isBettingPhase = stage === "waiting" || Boolean(state?.waitingForPlayers);
   const roomSwitchLocked = stage === "player-turn" && hasHeroRound;
-  const betLocked = roomSwitchLocked || working;
+  const lockedRoundWager = useMemo(() => {
+    const totalHandWager = getNormalizedBlackjackHands(state).reduce(
+      (sum, hand) => sum + Math.max(0, Number(hand.wager || 0)),
+      0,
+    );
+    return totalHandWager || Math.max(0, Number(state?.wager || 0));
+  }, [state]);
+  const betLocked = roomSwitchLocked || working || hasPendingSeat;
+  const displayedBetAmount = hasPendingSeat || roomSwitchLocked ? lockedRoundWager || bet : bet;
   const availableRooms = useMemo(() => {
     if (rooms.length) return rooms;
     return [
@@ -907,8 +914,11 @@ export default function BlackjackRoom({
         return;
       }
     } catch (error_) {
-      if (error_ instanceof Error && error_.message.trim().toLowerCase() === "table_full") {
+      const normalizedError = error_ instanceof Error ? error_.message.trim().toLowerCase() : "";
+      if (normalizedError === "table_full") {
         onError("Cette table blackjack est deja complete. Maximum 3 joueurs en plus du croupier.");
+      } else if (normalizedError === "invalid_bet" || normalizedError === "invalid bet") {
+        onError(`Mise invalide. Choisis un montant exact parmi ${BET_PRESETS.join(", ")} credits.`);
       } else {
         onError(error_ instanceof Error ? error_.message : "La donne n'a pas pu commencer.");
       }
@@ -1007,14 +1017,12 @@ export default function BlackjackRoom({
 
   function handleBetChipAdd(chipValue: number) {
     if (betLocked) return;
-    setBetChips((current) => {
-      const currentTotal = current.reduce((total, chip) => total + chip, 0);
-      if (currentTotal + chipValue > profile.wallet.balance) {
-        onError("Le total des jetons depasse ton solde disponible.");
-        return current;
-      }
-      return [...current, chipValue];
-    });
+    if (chipValue > profile.wallet.balance) {
+      onError("Le total des jetons depasse ton solde disponible.");
+      return;
+    }
+    onError("");
+    setBetChips((current) => (current.length === 1 && current[0] === chipValue ? [] : [chipValue]));
   }
 
   function handleBetChipRemove() {
@@ -1119,11 +1127,11 @@ export default function BlackjackRoom({
                     <div className="casino-metric-list">
                       <div>
                         <span>Presets</span>
-                        <strong>50 / 100 / 200 / 400</strong>
+                        <strong>{BET_PRESETS.join(" / ")}</strong>
                       </div>
                       <div>
                         <span>Mise active</span>
-                        <strong>{formatCredits(state?.wager || bet)}</strong>
+                        <strong>{formatCredits(displayedBetAmount)}</strong>
                       </div>
                       <div>
                         <span>Payout</span>

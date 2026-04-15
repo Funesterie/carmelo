@@ -1,12 +1,12 @@
 import PirateInspector from "../../../PirateInspector";
+import { BET_PRESETS } from "../../casino/catalog";
 import type { BlackjackAction, BlackjackState, CasinoProfile, CasinoTableRoom, CasinoTableRoomParticipant } from "../../../lib/casinoApi";
 import { getTableChannelDisplayMeta } from "../../../lib/tableSalons";
 
-const PLAYER_BETS = [10, 20, 50, 200];
 const CHIP_TONES: Record<number, "amber" | "cyan" | "crimson" | "ivory"> = {
-  10: "amber",
   20: "cyan",
   50: "crimson",
+  100: "amber",
   200: "ivory",
 };
 
@@ -107,10 +107,7 @@ export default function BlackjackSidebar({
       : stage === "resolved"
         ? "Rejouer"
         : "Valider la mise";
-  const selectedCounts = betChips.reduce<Record<number, number>>((accumulator, chip) => {
-    accumulator[chip] = (accumulator[chip] || 0) + 1;
-    return accumulator;
-  }, {});
+  const betSelectionLocked = hasPendingSeat || working || (stage === "player-turn" && !isSpectatingRound);
 
   return (
     <div className="casino-stage-sidebar">
@@ -196,23 +193,23 @@ export default function BlackjackSidebar({
 
         <div className="casino-command-dock__betline">
           <div className="casino-chip-stack-picker" aria-label="Jetons de mise blackjack">
-            {PLAYER_BETS.map((preset) => (
+            {BET_PRESETS.map((preset) => (
               <button
                 key={preset}
                 type="button"
-                className={`casino-stack-chip casino-stack-chip--picker casino-stack-chip--${CHIP_TONES[preset]} ${(selectedCounts[preset] || 0) > 0 ? "is-active" : ""}`}
+                className={`casino-stack-chip casino-stack-chip--picker casino-stack-chip--${CHIP_TONES[preset]} ${bet === preset ? "is-active" : ""}`}
                 onClick={() => onBetChipAdd(preset)}
-                disabled={(stage === "player-turn" && !isSpectatingRound) || working || bet + preset > profile.wallet.balance}
-                aria-label={`Ajouter un jeton de ${preset}`}
+                disabled={betSelectionLocked || preset > profile.wallet.balance}
+                aria-label={`Choisir une mise de ${preset}`}
               >
                 <strong>{preset}</strong>
-                <span>x{selectedCounts[preset] || 0}</span>
+                <span>{bet === preset ? "Actif" : "Choisir"}</span>
               </button>
             ))}
           </div>
           <div className="casino-command-dock__betline-meta">
             <span>Total {bet}</span>
-            <span>{betChips.length || 0} jeton{betChips.length > 1 ? "s" : ""}</span>
+            <span>{betChips.length ? "Preset selectionne" : "Aucune mise"}</span>
           </div>
         </div>
       </div>

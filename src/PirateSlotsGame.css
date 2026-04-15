@@ -678,6 +678,36 @@ button {
   color: rgba(246, 239, 224, 0.92);
 }
 
+.casino-immersion-overlay__actions {
+  display: grid;
+  gap: 12px;
+}
+
+.casino-immersion-overlay__room-pills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.casino-immersion-overlay__room-button {
+  justify-content: flex-start;
+  min-height: 56px;
+  padding: 0 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.casino-immersion-overlay__room-button.is-active {
+  border-color: rgba(246, 198, 89, 0.56);
+  background: rgba(246, 198, 89, 0.14);
+  box-shadow: 0 0 0 1px rgba(246, 198, 89, 0.14) inset;
+}
+
+.casino-immersion-overlay__skip {
+  width: 100%;
+  justify-content: center;
+}
+
 .casino-immersion-overlay__video-shell {
   position: relative;
   overflow: hidden;
@@ -3625,6 +3655,10 @@ button {
 
   .casino-poker-street-rail {
     grid-template-columns: 1fr;
+  }
+
+  .casino-immersion-overlay__room-pills {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .casino-account-bar__actions {

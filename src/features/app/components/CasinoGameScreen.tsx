@@ -104,6 +104,7 @@ type CasinoGameScreenProps = {
   onRefreshProfile: () => void;
   onLogout: () => void;
   onRoomChange: (roomId: RoomId) => void;
+  onSkipImmersion: () => void;
   gameTable: ReactNode;
   requestMediaPlayback: () => void;
   onIntroVideoEnd: () => void;
@@ -135,6 +136,7 @@ export default function CasinoGameScreen({
   onRefreshProfile,
   onLogout,
   onRoomChange,
+  onSkipImmersion,
   gameTable,
   requestMediaPlayback,
   onIntroVideoEnd,
@@ -189,6 +191,12 @@ export default function CasinoGameScreen({
   const [tableSelectionFallback, setTableSelectionFallback] = React.useState(() =>
     isTableChannelRoom(activeCasinoRoom) ? readSyncedTableSelection(activeCasinoRoom) : "",
   );
+
+  function handleRoomSelection(roomId: RoomId) {
+    void requestMediaPlayback();
+    onRoomChange(roomId);
+    setMenuOpen(false);
+  }
 
   void mediaReady;
   const showHeaderAmbient = true;
@@ -297,6 +305,35 @@ export default function CasinoGameScreen({
                 <span>Tables ATS en cours d'arrimage</span>
                 <span>Canon live en veille sur la roulette</span>
               </div>
+              <div className="casino-immersion-overlay__actions">
+                <div className="casino-immersion-overlay__room-pills" role="tablist" aria-label="Acces direct aux jeux">
+                  {ROOM_DEFINITIONS.map((room) => {
+                    const roomIcon = HAMBURGER_ROOM_ICONS[room.id] || room.icon;
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        className={`casino-ghost-button casino-immersion-overlay__room-button ${room.id === activeCasinoRoom ? "is-active" : ""}`}
+                        onClick={() => handleRoomSelection(room.id)}
+                        role="tab"
+                        aria-selected={room.id === activeCasinoRoom}
+                      >
+                        <span className="casino-button-icon casino-button-icon--room" aria-hidden="true">
+                          <img src={roomIcon} alt="" />
+                        </span>
+                        <span className="casino-button-label">{room.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  className="casino-primary-button casino-primary-button--cyan casino-immersion-overlay__skip"
+                  onClick={onSkipImmersion}
+                >
+                  Passer l'intro
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -393,11 +430,7 @@ export default function CasinoGameScreen({
                     key={room.id}
                     type="button"
                     className={`casino-ghost-button casino-ghost-button--menu ${room.id === activeCasinoRoom ? "is-active" : ""}`}
-                    onClick={() => {
-                      void requestMediaPlayback();
-                      onRoomChange(room.id);
-                      setMenuOpen(false);
-                    }}
+                    onClick={() => handleRoomSelection(room.id)}
                     role="tab"
                     aria-selected={room.id === activeCasinoRoom}
                   >

@@ -7,6 +7,7 @@ import CasinoGameScreen from "./features/app/components/CasinoGameScreen";
 import LoadingPanel from "./features/app/components/LoadingPanel";
 import { useCasinoMedia } from "./features/app/useCasinoMedia";
 import { useCasinoSession } from "./features/app/useCasinoSession";
+import type { RoomId } from "./features/casino/catalog";
 
 const PirateSlotsGame = lazy(() => import("./PirateSlotsGame"));
 
@@ -32,6 +33,15 @@ export default function App() {
 
   function handleMediaIntent() {
     void media.requestMediaPlayback();
+  }
+
+  function handleRoomChange(nextRoomId: RoomId) {
+    media.finishConnectionImmersion();
+    session.handleRoomChange(nextRoomId);
+  }
+
+  function handleSkipImmersion() {
+    media.finishConnectionImmersion();
   }
 
   return (
@@ -64,7 +74,8 @@ export default function App() {
               media.resetMediaSession();
               session.handleLogout();
             }}
-            onRoomChange={session.handleRoomChange}
+            onRoomChange={handleRoomChange}
+            onSkipImmersion={handleSkipImmersion}
             mediaStatus={media.mediaStatus}
             requestMediaPlayback={media.requestMediaPlayback}
             onIntroVideoEnd={media.finishConnectionImmersion}
@@ -87,7 +98,7 @@ export default function App() {
                   }}
                   onProfileChange={session.handleProfileChange}
                   onError={session.setError}
-                  onRoomChange={session.handleRoomChange}
+                  onRoomChange={handleRoomChange}
                 />
               </Suspense>
             )}
