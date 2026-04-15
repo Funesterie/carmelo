@@ -1,17 +1,59 @@
 // Helper centralisé pour play() avec log et retour d'état
 export async function safePlayMedia(media: HTMLMediaElement, label: string) {
+  const waitForReady = () =>
+    new Promise<void>((resolve) => {
+      if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        resolve();
+        return;
+      }
+
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        media.removeEventListener("loadeddata", finish);
+        media.removeEventListener("canplay", finish);
+        media.removeEventListener("error", finish);
+        resolve();
+      };
+
+      media.addEventListener("loadeddata", finish, { once: true });
+      media.addEventListener("canplay", finish, { once: true });
+      media.addEventListener("error", finish, { once: true });
+      window.setTimeout(finish, 1400);
+      media.load();
+    });
+
+  const toInfo = (error: any) => ({
+    name: error?.name,
+    message: error?.message,
+    readyState: media.readyState,
+    muted: media.muted,
+    currentSrc: media.currentSrc || media.src,
+    label,
+  });
+
   try {
     await media.play();
     return { ok: true, error: undefined };
   } catch (error: any) {
-    const info = {
-      name: error?.name,
-      message: error?.message,
-      readyState: media.readyState,
-      muted: media.muted,
-      currentSrc: media.currentSrc || media.src,
-      label,
-    };
+    const errorName = String(error?.name || "");
+    const canRetry = errorName === "AbortError" || errorName === "NotSupportedError" || media.readyState < HTMLMediaElement.HAVE_CURRENT_DATA;
+    if (canRetry) {
+      await waitForReady();
+      try {
+        await media.play();
+        return { ok: true, error: undefined };
+      } catch (retryError: any) {
+        const info = toInfo(retryError);
+        // Log console
+        // eslint-disable-next-line no-console
+        console.warn("[casino-media] play() refused", info);
+        return { ok: false, error: info };
+      }
+    }
+
+    const info = toInfo(error);
     // Log console
     // eslint-disable-next-line no-console
     console.warn("[casino-media] play() refused", info);
@@ -309,8 +351,10 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     for (const src of unlockSources) {
       const unlockAudio = getAudio(unlockAudioRef, src);
       unlockAudio.loop = false;
-      unlockAudio.volume = 0;
+      unlockAudio.volume = 0.01;
       unlockAudio.muted = false;
+      unlockAudio.preload = "auto";
+      unlockAudio.load();
 
       const result = await safePlayMedia(unlockAudio, `unlock:${src}`);
       unlockAudio.pause();
@@ -375,6 +419,28 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
 
     return true;
   }
+
+  useEffect(() => {
+    if (mediaUnlockedRef.current) return;
+
+    const onUserIntent = () => {
+      if (mediaUnlockedRef.current) return;
+      void requestMediaPlayback();
+    };
+
+    const listenerOptions: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener("pointerdown", onUserIntent, listenerOptions);
+    window.addEventListener("touchstart", onUserIntent, listenerOptions);
+    window.addEventListener("click", onUserIntent, listenerOptions);
+    window.addEventListener("keydown", onUserIntent, { capture: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", onUserIntent, listenerOptions);
+      window.removeEventListener("touchstart", onUserIntent, listenerOptions);
+      window.removeEventListener("click", onUserIntent, listenerOptions);
+      window.removeEventListener("keydown", onUserIntent, { capture: true });
+    };
+  }, [mediaStatus]);
 
   async function startConnectionImmersion(playerName: string) {
     clearImmersionTimers();
