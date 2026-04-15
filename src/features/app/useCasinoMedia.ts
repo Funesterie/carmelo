@@ -73,6 +73,8 @@ import {
   ROULETTE_TIRAGE_CANNON_DELAY_MS,
 } from "../roulette/model";
 
+const CUSTOM_INTRO_MEDIA_PUBLIC_SRC = "/videos/intro.mp4";
+
 function waitForMs(durationMs: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, durationMs);
@@ -332,24 +334,33 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
 
   async function playAudioClip(
     ref: React.MutableRefObject<HTMLAudioElement | null>,
-    src: string,
+    src: string | string[],
     volume: number,
     waitUntilEnd = false,
   ) {
     if (!mediaUnlockedRef.current) return false;
-    const audio = getAudio(ref, src);
-    audio.pause();
-    try {
-      audio.currentTime = 0;
-    } catch {
-      // ignore reset errors
+    const sources = Array.isArray(src) ? src.filter(Boolean) : [src];
+    let audio: HTMLAudioElement | null = null;
+
+    for (const source of sources) {
+      const candidate = getAudio(ref, source);
+      candidate.pause();
+      try {
+        candidate.currentTime = 0;
+      } catch {
+        // ignore reset errors
+      }
+      candidate.volume = volume;
+      candidate.muted = false;
+
+      const result = await safePlayMedia(candidate, source);
+      if (result.ok) {
+        audio = candidate;
+        break;
+      }
     }
-    audio.volume = volume;
-    audio.muted = false;
 
-
-    const result = await safePlayMedia(audio, src);
-    if (!result.ok) return false;
+    if (!audio) return false;
 
     if (!waitUntilEnd) return true;
 
@@ -455,7 +466,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     }
 
     if (showImmersion && !immersionAudioPlayedRef.current) {
-      const didPlay = await playAudioClip(introAudioRef, funesterieAudio, 0.56);
+      const didPlay = await playAudioClip(introAudioRef, [CUSTOM_INTRO_MEDIA_PUBLIC_SRC, funesterieAudio], 0.56);
       if (didPlay) {
         scheduleSlotsIntroDelay();
         scheduleImmersionOneVideo();
@@ -501,7 +512,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     setShowImmersion(true);
     await syncAmbientVideo(false, false);
     if (mediaUnlockedRef.current && !immersionAudioPlayedRef.current) {
-      const didPlay = await playAudioClip(introAudioRef, funesterieAudio, 0.56);
+      const didPlay = await playAudioClip(introAudioRef, [CUSTOM_INTRO_MEDIA_PUBLIC_SRC, funesterieAudio], 0.56);
       if (didPlay) {
         scheduleSlotsIntroDelay();
         scheduleImmersionOneVideo();

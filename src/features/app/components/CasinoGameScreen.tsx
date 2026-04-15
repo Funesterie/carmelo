@@ -21,6 +21,8 @@ import { getTableChannelDisplayMeta, type TableSalonGame } from "../../../lib/ta
 import LoadingPanel from "./LoadingPanel";
 import { oneVideo } from "../../casino/catalog";
 
+const CUSTOM_INTRO_VIDEO_PUBLIC_SRC = "/videos/intro.mp4";
+
 const HAMBURGER_ROOM_ICONS: Record<RoomId, string> = {
   slots: icoSlotsImg,
   "treasure-map": icoMapImg,
@@ -286,13 +288,15 @@ export default function CasinoGameScreen({
                 <video
                   ref={oneVideoRef}
                   className="casino-immersion-overlay__video"
-                  src={oneVideo}
                   autoPlay
                   loop
                   playsInline
                   muted
                   preload="metadata"
-                />
+                >
+                  <source src={CUSTOM_INTRO_VIDEO_PUBLIC_SRC} type="video/mp4" />
+                  <source src={oneVideo} type="video/mp4" />
+                </video>
               ) : null}
             </div>
           </div>
