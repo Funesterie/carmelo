@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src", "src/env.d.ts", "src/vite-env.d.ts"]
 }

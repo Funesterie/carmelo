@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { CASINO_INTRO_VIDEO_PUBLIC_SRC, type RoomId, ROOM_DEFINITIONS } from "../../casino/catalog";
 import type { MutableRefObject, ReactNode } from "react";
+// Utilisation du chemin public pour la vidéo d'intro
 import icoSlotsImg from "../../../images/icomachine.png";
 import icoMapImg from "../../../images/icochassetresor.png";
 import icoHuntImg from "../../../images/icochassenaval.png";
@@ -31,7 +32,7 @@ const HAMBURGER_ROOM_ICONS: Record<RoomId, string> = {
 
 type MenuIconKind = "bonus" | "sync" | "logout";
 
-function HeaderActionIcon({ kind }: { kind: MenuIconKind }) {
+function HeaderActionIcon({ kind }: Readonly<{ kind: MenuIconKind }>) {
   switch (kind) {
     case "bonus":
       return (
@@ -136,18 +137,36 @@ export default function CasinoGameScreen({
   onRoomChange,
   gameTable,
   requestMediaPlayback,
-}: CasinoGameScreenProps) {
+}: Readonly<CasinoGameScreenProps>) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const introVideoRef = React.useRef<HTMLVideoElement | null>(null);
 
   // Sur mobile, tente de jouer explicitement la video d'intro
   React.useEffect(() => {
+<<<<<<< HEAD
     if (showImmersionOneVideo && introVideoRef.current) {
       const playPromise = introVideoRef.current.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch((err) => {
           // eslint-disable-next-line no-console
           console.warn("[casino-media] intro video play() refused", err);
+=======
+    if (showImmersion) {
+      setShowOneVideo(false);
+      const timeout = setTimeout(() => setShowOneVideo(true), 10000);
+      return () => clearTimeout(timeout);
+    } else {
+      setShowOneVideo(false);
+    }
+  }, [showImmersion]);
+
+  React.useEffect(() => {
+    if (showOneVideo && oneVideoRef.current) {
+      const playPromise = oneVideoRef.current.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch((err) => {
+          // eslint-disable-next-line no-console
+>>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
         });
       }
     }
@@ -172,6 +191,11 @@ export default function CasinoGameScreen({
   const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient;
   const showDedicatedAmbientPanel = !showImmersion && usesDedicatedAmbient && Boolean(ambientPanel);
   const showAmbientUnderlay = !showImmersion && activeCasinoRoom === "roulette";
+
+  // Accès à media.playIntroInAmbient et media.onIntroEnd via props ou via hook selon ton wiring
+  // Ici on suppose que tu passes media comme prop ou que tu peux l'importer
+  // Remplace media.playIntroInAmbient et media.onIntroEnd par le bon accès si besoin
+  const media = (globalThis as any).casinoMedia || {};
   const tableGame = isTableChannelRoom(activeCasinoRoom) ? activeCasinoRoom : null;
   const channelRooms = tableGame ? tableLobby?.rooms || [] : [];
   const joinedTableRoomId =
@@ -307,7 +331,20 @@ export default function CasinoGameScreen({
 
         {showHeaderAmbient ? (
           <div className={`casino-account-bar__ambient ${usesDedicatedAmbient ? "is-custom-ambient" : ""}`}>
-            {showSharedAmbientVideo ? (
+            {media.playIntroInAmbient ? (
+              <video
+                className="casino-account-bar__ambient-video"
+                src="/videos/intro.mp4"
+                autoPlay
+                onEnded={media.onIntroEnd}
+                playsInline
+                muted={true}
+                preload="auto"
+                style={{ objectFit: "cover", width: "100%", height: "100%" }}
+              >
+                <track kind="captions" label="Intro" />
+              </video>
+            ) : showSharedAmbientVideo ? (
               <video
                 ref={ambientVideoRef}
                 className="casino-account-bar__ambient-video"
@@ -316,7 +353,9 @@ export default function CasinoGameScreen({
                 playsInline
                 muted={!ambientVideoAudible}
                 preload="none"
-              />
+              >
+                <track kind="captions" label="Ambiance" />
+              </video>
             ) : showDedicatedAmbientPanel || showAmbientUnderlay ? (
               <>
                 {showAmbientUnderlay ? (
@@ -328,7 +367,9 @@ export default function CasinoGameScreen({
                     playsInline
                     muted={!ambientVideoAudible}
                     preload="none"
-                  />
+                  >
+                    <track kind="captions" label="Ambiance" />
+                  </video>
                 ) : null}
                 <div className="casino-account-bar__ambient-overlay">
                   {showDedicatedAmbientPanel ? ambientPanel : <div className="casino-account-bar__ambient--placeholder" aria-hidden="true" />}

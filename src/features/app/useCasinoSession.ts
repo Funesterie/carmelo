@@ -258,6 +258,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       sessionStorage.removeItem(SLOT_VIDEO_INTRO_SESSION_KEY);
       sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
       sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
+      sessionStorage.removeItem("casino.intro.video.played"); // Reset intro video for next login
     } catch {
       // ignore storage failures
     }

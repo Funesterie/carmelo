@@ -38,6 +38,10 @@ import boobaVideo from "../../videos/booba.mp4";
 import deppVideo from "../../videos/depp.mp4";
 import expVideo from "../../videos/exp.mp4";
 import jokerVideo from "../../videos/joker.mp4";
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
 import powerVideo from "../../videos/power.mp4";
 import rangerVideo from "../../videos/ranger.mp4";
 import spartaVideo from "../../videos/sparta.mp4";
@@ -248,7 +252,10 @@ export const SLOT_INTRO_MEDIA = {
   title: "Introduction du salon",
   body: "L'introduction passe une seule fois, puis la machine a sous bascule sur son ambiance video continue.",
   image: fondImg,
+<<<<<<< HEAD
   video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
+=======
+>>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
 } as const;
 
 export const SLOT_AMBIENT_MEDIA = {
@@ -271,7 +278,10 @@ export const SLOT_FEATURE_MEDIA: Record<
     title: "Ouverture du salon",
     body: "Le relais d'entree de la machine a sous tourne en boucle pendant que la cale se charge.",
     image: fondImg,
+<<<<<<< HEAD
     video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
+=======
+>>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
   },
   "joker-line": {
     title: "Alignement joker",
@@ -392,7 +402,7 @@ export function getSlotGridSymbolAtIndex(grid: string[][], reelCount: number, in
   return grid[rowIndex]?.[columnIndex] || null;
 }
 
-function normalizeBonusFeatureKey(feature: CasinoSpin["bonus"]["feature"] | string | null | undefined) {
+function normalizeBonusFeatureKey(feature: string | null | undefined) {
   const normalized = String(feature || "").trim().toLowerCase();
   if (!normalized) return "";
   return SLOT_BONUS_FEATURE_ALIASES[normalized] || normalized;
@@ -411,7 +421,7 @@ export function buildGoldRainDrops(totalPayout: number, bet: number) {
   }));
 }
 
-export function getSlotFeatureForBonusFeature(feature: CasinoSpin["bonus"]["feature"] | null | undefined): SlotFeatureKey {
+export function getSlotFeatureForBonusFeature(feature: string | null | undefined): SlotFeatureKey {
   switch (normalizeBonusFeatureKey(feature)) {
     case "joker_cross":
       return "joker-cross";
@@ -461,7 +471,7 @@ export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
     const bonusFeature = getSlotFeatureForBonusGrid(spin.bonus.openingGrid);
     if (bonusFeature !== "idle") return bonusFeature;
 
-    const mappedBonusFeature = getSlotFeatureForBonusFeature(spin.bonus.feature);
+    const mappedBonusFeature = getSlotFeatureForBonusFeature(spin.bonus?.feature);
     if (mappedBonusFeature !== "idle") return mappedBonusFeature;
   }
 
@@ -480,7 +490,7 @@ export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
 }
 
 export function getBonusNarration(spin: CasinoSpin) {
-  const normalizedBonusFeature = normalizeBonusFeatureKey(spin.bonus?.feature);
+  const normalizedBonusFeature = spin.bonus?.feature ? normalizeBonusFeatureKey(spin.bonus.feature) : "";
   if (normalizedBonusFeature === "joker_full") {
     return "Full joker verrouille. Toute la grille bascule sous le ranger.";
   }

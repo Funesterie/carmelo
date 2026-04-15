@@ -114,6 +114,8 @@ export function useTableAudio(enabled = true) {
 
   function playCheck(volume = 0.68) {
     if (!enabledRef.current) return;
+    // eslint-disable-next-line no-console
+    console.log(`[casino-audit] playCheck: checkSound=${checkSound}, volume=${volume}`);
     playFromSource(checkAudioRef, checkSound, volume);
   }
 
