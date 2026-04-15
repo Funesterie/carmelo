@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { ROOM_DEFINITIONS, type RoomId } from "../../casino/catalog";
+import { CASINO_INTRO_VIDEO_PUBLIC_SRC, type RoomId, ROOM_DEFINITIONS } from "../../casino/catalog";
 import type { MutableRefObject, ReactNode } from "react";
 import icoSlotsImg from "../../../images/icomachine.png";
 import icoMapImg from "../../../images/icochassetresor.png";
@@ -19,7 +19,6 @@ import {
 } from "../../../lib/tableChannelSync";
 import { getTableChannelDisplayMeta, type TableSalonGame } from "../../../lib/tableSalons";
 import LoadingPanel from "./LoadingPanel";
-import { oneVideo } from "../../casino/catalog";
 
 const HAMBURGER_ROOM_ICONS: Record<RoomId, string> = {
   slots: icoSlotsImg,
@@ -139,16 +138,16 @@ export default function CasinoGameScreen({
   requestMediaPlayback,
 }: CasinoGameScreenProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const oneVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const introVideoRef = React.useRef<HTMLVideoElement | null>(null);
 
-  // Sur mobile, tente de jouer la vidéo one.mp4 explicitement
+  // Sur mobile, tente de jouer explicitement la video d'intro
   React.useEffect(() => {
-    if (showImmersionOneVideo && oneVideoRef.current) {
-      const playPromise = oneVideoRef.current.play();
+    if (showImmersionOneVideo && introVideoRef.current) {
+      const playPromise = introVideoRef.current.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch((err) => {
           // eslint-disable-next-line no-console
-          console.warn("[casino-media] one.mp4 play() refused", err);
+          console.warn("[casino-media] intro video play() refused", err);
         });
       }
     }
@@ -271,7 +270,7 @@ export default function CasinoGameScreen({
               <h2>Cap sur le pont pirate</h2>
               <p>{immersionLine}</p>
               <div className="casino-immersion-overlay__stats">
-                <span>Musique d'ouverture Funesterie</span>
+                <span>Musique d'ouverture intro</span>
                 <span>Tables ATS en cours d'arrimage</span>
                 <span>Canon live en veille sur la roulette</span>
               </div>
@@ -284,15 +283,16 @@ export default function CasinoGameScreen({
             >
               {showImmersionOneVideo ? (
                 <video
-                  ref={oneVideoRef}
+                  ref={introVideoRef}
                   className="casino-immersion-overlay__video"
-                  src={oneVideo}
                   autoPlay
                   loop
                   playsInline
                   muted
                   preload="metadata"
-                />
+                >
+                  <source src={CASINO_INTRO_VIDEO_PUBLIC_SRC} type="video/mp4" />
+                </video>
               ) : null}
             </div>
           </div>

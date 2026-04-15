@@ -24,7 +24,7 @@ import { readSyncedTableSelection } from "../../lib/tableChannelSync";
 
 export type AuthMode = "login" | "register" | "forgot";
 
-const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
+const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.intro-audio.played";
 
 type UseCasinoSessionOptions = {
 };
