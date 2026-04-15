@@ -332,14 +332,14 @@ export default function CasinoFloorShell({
           },
         ];
     }
-  }, [currentRoom, profile.wallet, recentTransactions]);
+  }, [currentRoom.id]);
   const [activeInfoSectionId, setActiveInfoSectionId] = React.useState(infoSections[0]?.id ?? "overview");
   const activeInfoSection = infoSections.find((section) => section.id === activeInfoSectionId) ?? infoSections[0];
 
   React.useEffect(() => {
     setShowRoomInfo(false);
     setActiveInfoSectionId(infoSections[0]?.id ?? "overview");
-  }, [currentRoom.id, infoSections]);
+  }, [currentRoom.id]);
 
   return (
     <section
@@ -355,14 +355,31 @@ export default function CasinoFloorShell({
           <section className="casino-topdeck__summary casino-topdeck__summary--embedded-widget casino-topdeck__summary--fused">
             <div className="casino-topdeck__lead">
               <div className="casino-topdeck__copy">
-                <div className="casino-topdeck__chip-row">
+                <div
+                  className="casino-topdeck__chip-row"
+                  style={{ position: "relative", zIndex: 10020, pointerEvents: "auto" }}
+                >
                   <span className="casino-chip">{currentRoom.chip}</span>
                   <button
                     type="button"
                     className={`casino-ghost-button casino-topdeck__info-toggle ${showRoomInfo ? "is-open" : ""}`}
-                    onClick={() => setShowRoomInfo((value) => !value)}
                     aria-label={`Informations ${currentRoom.label}`}
                     aria-expanded={showRoomInfo}
+                    tabIndex={0}
+                    style={{
+                      zIndex: 10021,
+                      position: "relative",
+                      pointerEvents: "auto",
+                      outline: showRoomInfo ? "2px solid #ffc857" : undefined,
+                      touchAction: "manipulation",
+                    }}
+                    onClick={() => setShowRoomInfo((value) => !value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setShowRoomInfo((value) => !value);
+                      }
+                    }}
                   >
                     <span className="casino-button-icon" aria-hidden="true">
                       <svg viewBox="0 0 24 24">

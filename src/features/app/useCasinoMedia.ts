@@ -67,16 +67,14 @@ import entryAudio from "../../audio/entrée.mp3";
 import fantomeAudio from "../../audio/fantome.mp3";
 import moussaillonAudio from "../../audio/moussaillon.mp3";
 import sharedAmbientMedia from "../../videos/fresh.mp4";
-import introVideo from "../../videos/intro.mp4";
 import type { RoomId, RouletteSoundEvent } from "../casino/catalog";
-import { CASINO_INTRO_VIDEO_PUBLIC_SRC } from "../casino/catalog";
 import {
   ROULETTE_TIRAGE_CANNON_DELAY_MS,
 } from "../roulette/model";
 
 function waitForMs(durationMs: number) {
   return new Promise<void>((resolve) => {
-    globalThis.setTimeout(resolve, durationMs);
+    window.setTimeout(resolve, durationMs);
   });
 }
 
@@ -100,12 +98,9 @@ function normalizeMediaSource(value: string | null | undefined) {
   if (!normalized) return "";
 
   try {
-    let resolved;
-    if (globalThis.window) {
-      resolved = new URL(normalized, globalThis.window.location.origin);
-    } else {
-      resolved = new URL(normalized);
-    }
+    const resolved = typeof window !== "undefined"
+      ? new URL(normalized, window.location.origin)
+      : new URL(normalized);
     return `${resolved.origin}${resolved.pathname}`;
   } catch {
     return normalized;
@@ -124,40 +119,10 @@ type UseCasinoMediaOptions = {
   roomChangeCount: number;
 };
 
-<<<<<<< HEAD
-const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.intro-audio.played";
-const CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY = "casino.immersion.intro-video.played";
-const SLOT_INTRO_START_DELAY_MS = 1_500;
-const IMMERSION_INTRO_VIDEO_DELAY_MS = 10_000;
-const MOBILE_IMMERSION_MIN_DURATION_MS = 12_000;
-const DEFAULT_IMMERSION_DURATION_MS = 5_200;
-=======
-const CASINO_INTRO_VIDEO_SESSION_KEY = "casino.intro.video.played";
 const SLOT_ONE_START_DELAY_MS = 1_500;
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
+const INTRO_FALLBACK_HIDE_MS = 45_000;
 
 export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCount }: UseCasinoMediaOptions) {
-  // Contrôle de la lecture de l'intro dans le lecteur d'ambiance
-  const [playIntroInAmbient, setPlayIntroInAmbient] = useState(false);
-  useEffect(() => {
-    if (profileLoaded && sessionStorage.getItem(CASINO_INTRO_VIDEO_SESSION_KEY) !== "1") {
-      setPlayIntroInAmbient(true);
-    }
-  }, [profileLoaded]);
-
-  // Débloque la session média dès qu'on veut jouer l'intro
-  useEffect(() => {
-    if (playIntroInAmbient) {
-      void requestMediaPlayback();
-    }
-  }, [playIntroInAmbient]);
-
-  function onIntroEnd() {
-    setPlayIntroInAmbient(false);
-    try {
-      sessionStorage.setItem(CASINO_INTRO_VIDEO_SESSION_KEY, "1");
-    } catch {}
-  }
   const [showImmersion, setShowImmersion] = useState(false);
   const [immersionLine, setImmersionLine] = useState("Ouverture du pont prive...");
   const [ambientVideoAudible, setAmbientVideoAudible] = useState(false);
@@ -167,7 +132,6 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   // Nouvel état pour le statut média
   const [mediaStatus, setMediaStatus] = useState<"locked"|"unlocking"|"ready"|"blocked">("locked");
 
-  const introAudioRef = useRef<HTMLAudioElement | null>(null);
   const cueAudioRef = useRef<HTMLAudioElement | null>(null);
   const cannonAudioRef = useRef<HTMLAudioElement | null>(null);
   const unlockAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -175,39 +139,13 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   const ambientVideoRef = useRef<HTMLVideoElement | null>(null);
   const introHideTimeoutRef = useRef<number | null>(null);
   const slotsIntroDelayTimeoutRef = useRef<number | null>(null);
-  const immersionOneVideoTimeoutRef = useRef<number | null>(null);
   const unlockRequestRef = useRef<Promise<boolean> | null>(null);
   const mediaUnlockedRef = useRef(false);
   const rouletteQueueRef = useRef(Promise.resolve());
+  const rouletteEntryPlayedRef = useRef(false);
   const activeRoomRef = useRef(activeCasinoRoom);
   const rouletteAudioScopeRef = useRef(0);
-<<<<<<< HEAD
   const lastRouletteEntryRoomChangeCountRef = useRef(roomChangeCount);
-  const immersionAudioPlayedRef = useRef(
-    (() => {
-      try {
-        return sessionStorage.getItem(CASINO_IMMERSION_AUDIO_SESSION_KEY) === "1";
-      } catch {
-        return false;
-      }
-    })(),
-  );
-  const immersionOneVideoPlayedRef = useRef(
-    (() => {
-      try {
-        return sessionStorage.getItem(CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY) === "1";
-      } catch {
-        return false;
-      }
-    })(),
-  );
-=======
-  // immersionAudioPlayedRef et rouletteEntryPlayedRef supprimés (doublons)
-  // Effet pour jouer funesterieAudio une seule fois par connexion, sans timer
-  useEffect(() => {
-    // (logique funesterieAudio supprimée)
-  }, [profileLoaded]);
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
 
   const controls = useMemo(() => ({
     showImmersion,
@@ -224,7 +162,6 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   useEffect(() => {
     return () => {
       clearImmersionTimers();
-      stopMedia(introAudioRef.current);
       stopMedia(cueAudioRef.current);
       stopMedia(cannonAudioRef.current);
       stopMedia(unlockAudioRef.current);
@@ -237,6 +174,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     activeRoomRef.current = activeCasinoRoom;
     rouletteAudioScopeRef.current += 1;
     if (activeCasinoRoom !== "roulette") {
+      rouletteEntryPlayedRef.current = false;
       rouletteQueueRef.current = Promise.resolve();
       stopMedia(cueAudioRef.current);
       stopMedia(cannonAudioRef.current);
@@ -275,8 +213,22 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       pauseMedia(rouletteAmbientAudioRef.current);
       return;
     }
-    // Plus de logique de son ici
-  }, [activeCasinoRoom, profileLoaded, mediaReady]);
+
+    if (roomChangeCount === lastRouletteEntryRoomChangeCountRef.current) {
+      return;
+    }
+
+    if (!rouletteEntryPlayedRef.current && !showImmersion) {
+      const scope = rouletteAudioScopeRef.current;
+      rouletteEntryPlayedRef.current = true;
+      lastRouletteEntryRoomChangeCountRef.current = roomChangeCount;
+      queueRouletteAudio(scope, async () => {
+        if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
+        await playAudioClip(cueAudioRef, entryAudio, 0.84, true);
+        if (scope !== rouletteAudioScopeRef.current || activeRoomRef.current !== "roulette") return;
+      });
+    }
+  }, [activeCasinoRoom, profileLoaded, mediaReady, roomChangeCount]);
 
   function getAudio(ref: React.MutableRefObject<HTMLAudioElement | null>, src: string) {
     if (!ref.current) {
@@ -291,47 +243,13 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
 
   function clearImmersionTimers() {
     if (introHideTimeoutRef.current) {
-      globalThis.clearTimeout(introHideTimeoutRef.current);
+      window.clearTimeout(introHideTimeoutRef.current);
       introHideTimeoutRef.current = null;
     }
     if (slotsIntroDelayTimeoutRef.current) {
-      globalThis.clearTimeout(slotsIntroDelayTimeoutRef.current);
+      window.clearTimeout(slotsIntroDelayTimeoutRef.current);
       slotsIntroDelayTimeoutRef.current = null;
     }
-    if (immersionOneVideoTimeoutRef.current) {
-      window.clearTimeout(immersionOneVideoTimeoutRef.current);
-      immersionOneVideoTimeoutRef.current = null;
-    }
-  }
-
-  function isMobileViewport() {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return false;
-    }
-    return window.matchMedia("(max-width: 920px)").matches;
-  }
-
-  function scheduleImmersionOneVideo() {
-    setShowImmersionOneVideo(false);
-    if (immersionOneVideoPlayedRef.current || !isMobileViewport()) {
-      return;
-    }
-
-    if (immersionOneVideoTimeoutRef.current) {
-      window.clearTimeout(immersionOneVideoTimeoutRef.current);
-      immersionOneVideoTimeoutRef.current = null;
-    }
-
-    immersionOneVideoTimeoutRef.current = window.setTimeout(() => {
-      setShowImmersionOneVideo(true);
-      immersionOneVideoPlayedRef.current = true;
-      immersionOneVideoTimeoutRef.current = null;
-      try {
-        sessionStorage.setItem(CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY, "1");
-      } catch {
-        // ignore storage failures
-      }
-    }, IMMERSION_INTRO_VIDEO_DELAY_MS);
   }
 
   function scheduleSlotsIntroDelay() {
@@ -341,59 +259,37 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     }
 
     if (slotsIntroDelayTimeoutRef.current) {
-      globalThis.clearTimeout(slotsIntroDelayTimeoutRef.current);
+      window.clearTimeout(slotsIntroDelayTimeoutRef.current);
       slotsIntroDelayTimeoutRef.current = null;
     }
 
     setSlotsIntroDelayActive(true);
-    slotsIntroDelayTimeoutRef.current = Number(globalThis.setTimeout(() => {
+    slotsIntroDelayTimeoutRef.current = window.setTimeout(() => {
       setSlotsIntroDelayActive(false);
       slotsIntroDelayTimeoutRef.current = null;
-<<<<<<< HEAD
-    }, SLOT_INTRO_START_DELAY_MS);
-=======
-    }, SLOT_ONE_START_DELAY_MS));
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
+    }, SLOT_ONE_START_DELAY_MS);
   }
 
   async function playAudioClip(
     ref: React.MutableRefObject<HTMLAudioElement | null>,
-    src: string | string[],
+    src: string,
     volume: number,
     waitUntilEnd = false,
   ) {
     if (!mediaUnlockedRef.current) return false;
-    const sources = Array.isArray(src) ? src.filter(Boolean) : [src];
-    let audio: HTMLAudioElement | null = null;
-
-    for (const source of sources) {
-      const candidate = getAudio(ref, source);
-      candidate.pause();
-      try {
-        candidate.currentTime = 0;
-      } catch {
-        // ignore reset errors
-      }
-      candidate.volume = volume;
-      candidate.muted = false;
-
-      const result = await safePlayMedia(candidate, source);
-      if (result.ok) {
-        audio = candidate;
-        break;
-      }
+    const audio = getAudio(ref, src);
+    audio.pause();
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // ignore reset errors
     }
+    audio.volume = volume;
+    audio.muted = false;
 
-<<<<<<< HEAD
-    if (!audio) return false;
-=======
-    // Ajout log
-    // eslint-disable-next-line no-console
-    console.log(`[casino-audit] playAudioClip: src=${src}, volume=${volume}, waitUntilEnd=${waitUntilEnd}`);
 
     const result = await safePlayMedia(audio, src);
     if (!result.ok) return false;
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
 
     if (!waitUntilEnd) return true;
 
@@ -411,7 +307,7 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
       audio.addEventListener("ended", finish, { once: true });
       audio.addEventListener("error", finish, { once: true });
       audio.addEventListener("pause", finish, { once: true });
-      globalThis.setTimeout(finish, Math.max(1800, Math.ceil((audio.duration || 0) * 1000) + 300));
+      window.setTimeout(finish, Math.max(1800, Math.ceil((audio.duration || 0) * 1000) + 300));
     });
 
     return true;
@@ -494,28 +390,9 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     if (activeCasinoRoom === "slots") {
       pauseMedia(ambientVideoRef.current);
       setAmbientVideoAudible(false);
-      // La vidéo one.mp4 sera lancée par l'effet useEffect ci-dessus
     } else {
       await syncAmbientVideo(true, shouldPlayHeaderVideo);
     }
-
-<<<<<<< HEAD
-    if (showImmersion && !immersionAudioPlayedRef.current) {
-      const didPlay = await playAudioClip(introAudioRef, CASINO_INTRO_VIDEO_PUBLIC_SRC, 0.56);
-      if (didPlay) {
-        scheduleSlotsIntroDelay();
-        scheduleImmersionOneVideo();
-        immersionAudioPlayedRef.current = true;
-        try {
-          sessionStorage.setItem(CASINO_IMMERSION_AUDIO_SESSION_KEY, "1");
-        } catch {
-          // ignore storage failures
-        }
-      }
-    }
-=======
-    // funesterieAudio et entryAudio sont maintenant joués une seule fois par connexion via useEffect
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
 
     return true;
   }
@@ -545,43 +422,26 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   async function startConnectionImmersion(playerName: string) {
     clearImmersionTimers();
     setSlotsIntroDelayActive(false);
-    setShowImmersionOneVideo(false);
+    setShowImmersionOneVideo(true);
     setImmersionLine(`Pont prive en preparation pour ${playerName || "le capitaine"}...`);
     setShowImmersion(true);
     await syncAmbientVideo(false, false);
-<<<<<<< HEAD
-    if (mediaUnlockedRef.current && !immersionAudioPlayedRef.current) {
-      const didPlay = await playAudioClip(introAudioRef, CASINO_INTRO_VIDEO_PUBLIC_SRC, 0.56);
-      if (didPlay) {
-        scheduleSlotsIntroDelay();
-        scheduleImmersionOneVideo();
-        immersionAudioPlayedRef.current = true;
-        try {
-          sessionStorage.setItem(CASINO_IMMERSION_AUDIO_SESSION_KEY, "1");
-        } catch {
-          // ignore storage failures
-        }
-      }
-    }
-
-    const immersionDurationMs =
-      isMobileViewport() && !immersionOneVideoPlayedRef.current
-        ? MOBILE_IMMERSION_MIN_DURATION_MS
-        : DEFAULT_IMMERSION_DURATION_MS;
+    scheduleSlotsIntroDelay();
 
     introHideTimeoutRef.current = window.setTimeout(() => {
-=======
-    // funesterieAudio est maintenant joué une seule fois par connexion via useEffect
-    introHideTimeoutRef.current = Number(globalThis.setTimeout(() => {
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
       setShowImmersion(false);
       setShowImmersionOneVideo(false);
       introHideTimeoutRef.current = null;
-<<<<<<< HEAD
-    }, immersionDurationMs);
-=======
-    }, 5200));
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
+    }, INTRO_FALLBACK_HIDE_MS);
+  }
+
+  function finishConnectionImmersion() {
+    if (introHideTimeoutRef.current) {
+      window.clearTimeout(introHideTimeoutRef.current);
+      introHideTimeoutRef.current = null;
+    }
+    setShowImmersion(false);
+    setShowImmersionOneVideo(false);
   }
 
   function queueRouletteAudio(scope: number, task: () => Promise<void>) {
@@ -666,26 +526,12 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     unlockRequestRef.current = null;
     rouletteAudioScopeRef.current += 1;
     rouletteQueueRef.current = Promise.resolve();
-    stopMedia(introAudioRef.current);
     stopMedia(cueAudioRef.current);
     stopMedia(cannonAudioRef.current);
     stopMedia(unlockAudioRef.current);
     stopMedia(rouletteAmbientAudioRef.current);
     stopMedia(ambientVideoRef.current);
-<<<<<<< HEAD
     rouletteEntryPlayedRef.current = false;
-    immersionAudioPlayedRef.current = false;
-    immersionOneVideoPlayedRef.current = false;
-    try {
-      sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
-      sessionStorage.removeItem(CASINO_IMMERSION_ONE_VIDEO_SESSION_KEY);
-=======
-    try {
-      sessionStorage.removeItem(CASINO_INTRO_VIDEO_SESSION_KEY);
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
-    } catch {
-      // ignore storage failures
-    }
   }
 
   return {
@@ -694,10 +540,8 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
     setMediaStatus,
     requestMediaPlayback,
     startConnectionImmersion,
+    finishConnectionImmersion,
     handleRouletteEvent,
     resetMediaSession,
-    playIntroInAmbient,
-    onIntroEnd,
-    introVideo,
   };
 }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import {
   SLOT_VIDEO_INTRO_ARMED_SESSION_KEY,
   SLOT_VIDEO_INTRO_SESSION_KEY,
@@ -24,7 +24,7 @@ import { readSyncedTableSelection } from "../../lib/tableChannelSync";
 
 export type AuthMode = "login" | "register" | "forgot";
 
-const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.intro-audio.played";
+const CASINO_IMMERSION_AUDIO_SESSION_KEY = "casino.immersion.funesterie.played";
 
 type UseCasinoSessionOptions = {
 };
@@ -56,6 +56,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
   const [notice, setNotice] = useState("");
   const [activeCasinoRoom, setActiveCasinoRoom] = useState<RoomId>("slots");
   const [pendingImmersionName, setPendingImmersionName] = useState("");
+  const pendingImmersionNameRef = useRef("");
   const [roomChangeCount, setRoomChangeCount] = useState(0);
 
   const [loginName, setLoginName] = useState("");
@@ -76,6 +77,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       }
 
       try {
+        disableLegacySlotsRoomIntro();
         const nextProfile = await loadBootCasinoProfile();
         if (!nextProfile) {
           if (!cancelled) setBooting(false);
@@ -114,18 +116,40 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
     };
   }, [notice]);
 
+  useEffect(() => {
+    pendingImmersionNameRef.current = pendingImmersionName;
+  }, [pendingImmersionName]);
+
   const displayName = useMemo(() => {
     return profile?.user?.username || getCasinoDisplayName() || "Capitaine";
   }, [profile]);
 
+  function disableLegacySlotsRoomIntro() {
+    try {
+      sessionStorage.setItem(SLOT_VIDEO_INTRO_SESSION_KEY, "1");
+      sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
+    } catch {
+      // ignore storage failures
+    }
+  }
+
   function resetConnectedSessionMediaIntro() {
     try {
-      sessionStorage.removeItem(SLOT_VIDEO_INTRO_SESSION_KEY);
-      sessionStorage.setItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY, "1");
+      disableLegacySlotsRoomIntro();
       sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
     } catch {
       // ignore storage failures
     }
+  }
+
+  function stagePendingImmersionName(value: string) {
+    pendingImmersionNameRef.current = value;
+    setPendingImmersionName(value);
+  }
+
+  function clearPendingImmersionName() {
+    pendingImmersionNameRef.current = "";
+    setPendingImmersionName("");
   }
 
   async function refreshProfile(message = "") {
@@ -158,7 +182,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       resetConnectedSessionMediaIntro();
       setActiveCasinoRoom("slots");
       startTransition(() => setProfile(nextProfile));
-      setPendingImmersionName(nextProfile.user.username);
+      stagePendingImmersionName(nextProfile.user.username);
       setNotice(`Bienvenue a bord, ${nextProfile.user.username}.`);
       setLoginPassword("");
     } catch (error_) {
@@ -184,7 +208,7 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
       resetConnectedSessionMediaIntro();
       setActiveCasinoRoom("slots");
       startTransition(() => setProfile(nextProfile));
-      setPendingImmersionName(nextProfile.user.username);
+      stagePendingImmersionName(nextProfile.user.username);
       setNotice(`Compte cree. Bon vent, ${nextProfile.user.username}.`);
       setRegisterPassword("");
       setRegisterPasswordConfirm("");
@@ -252,25 +276,28 @@ export function useCasinoSession(_: UseCasinoSessionOptions = {}) {
   }
 
   function handleLogout() {
-    setPendingImmersionName("");
+    clearPendingImmersionName();
     setActiveCasinoRoom("slots");
     try {
       sessionStorage.removeItem(SLOT_VIDEO_INTRO_SESSION_KEY);
       sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
       sessionStorage.removeItem(CASINO_IMMERSION_AUDIO_SESSION_KEY);
-      sessionStorage.removeItem("casino.intro.video.played"); // Reset intro video for next login
     } catch {
       // ignore storage failures
     }
     clearCasinoSession();
     setProfile(null);
-    setNotice("Session fermee.");
+    setNotice("");
     setError("");
     setLoginPassword("");
   }
 
   function consumePendingImmersionName() {
-    const nextValue = pendingImmersionName;
+    const nextValue = pendingImmersionNameRef.current;
+    if (!nextValue) {
+      return "";
+    }
+    pendingImmersionNameRef.current = "";
     setPendingImmersionName("");
     return nextValue;
   }

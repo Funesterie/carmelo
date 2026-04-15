@@ -640,6 +640,11 @@ button {
   backdrop-filter: blur(18px);
 }
 
+.casino-immersion-overlay__panel--copy-only {
+  width: min(720px, 100%);
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .casino-immersion-overlay__copy {
   display: grid;
   align-content: center;
@@ -12087,6 +12092,7 @@ button {
     inset 0 1px 0 rgba(255, 235, 190, 0.08),
     0 12px 28px rgba(0, 0, 0, 0.26);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transform: translateY(-4px) scale(0.98);
   transition:
@@ -12096,6 +12102,7 @@ button {
 
 .casino-account-bar__menu.is-open .casino-account-bar__actions {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
   transform: translateY(0) scale(1);
 }
@@ -12887,6 +12894,13 @@ button {
 .casino-account-bar__channel-copy small {
   color: rgba(246, 239, 224, 0.68);
   font-size: 0.76rem;
+}
+
+.casino-account-bar__menu-note {
+  margin: 0;
+  color: rgba(246, 239, 224, 0.82);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .casino-account-bar__channel-list {
@@ -19645,15 +19659,16 @@ button {
   .casino-account-bar__menu {
     position: relative;
     z-index: 130 !important;
-    pointer-events: none;
+    pointer-events: auto;
   }
 
   .casino-account-bar__actions {
     z-index: 130 !important;
+    pointer-events: none;
   }
 
   .casino-account-bar__menu-toggle,
-  .casino-account-bar__actions {
+  .casino-account-bar__menu.is-open .casino-account-bar__actions {
     pointer-events: auto;
   }
 

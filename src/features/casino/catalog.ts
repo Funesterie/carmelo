@@ -38,10 +38,6 @@ import boobaVideo from "../../videos/booba.mp4";
 import deppVideo from "../../videos/depp.mp4";
 import expVideo from "../../videos/exp.mp4";
 import jokerVideo from "../../videos/joker.mp4";
-<<<<<<< HEAD
-=======
-
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
 import powerVideo from "../../videos/power.mp4";
 import rangerVideo from "../../videos/ranger.mp4";
 import spartaVideo from "../../videos/sparta.mp4";
@@ -252,10 +248,7 @@ export const SLOT_INTRO_MEDIA = {
   title: "Introduction du salon",
   body: "L'introduction passe une seule fois, puis la machine a sous bascule sur son ambiance video continue.",
   image: fondImg,
-<<<<<<< HEAD
   video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
-=======
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
 } as const;
 
 export const SLOT_AMBIENT_MEDIA = {
@@ -278,10 +271,7 @@ export const SLOT_FEATURE_MEDIA: Record<
     title: "Ouverture du salon",
     body: "Le relais d'entree de la machine a sous tourne en boucle pendant que la cale se charge.",
     image: fondImg,
-<<<<<<< HEAD
-    video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
-=======
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
+  video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
   },
   "joker-line": {
     title: "Alignement joker",

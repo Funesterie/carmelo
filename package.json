@@ -10,19 +10,19 @@
   },
   "dependencies": {
     "concurrently": "^9.2.1",
-    "electron": "^40.0.0",
-    "electron-builder": "^26.4.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "wait-on": "^9.0.3"
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "wait-on": "^9.0.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@types/node": "^25.0.9",
-    "@types/react": "^18.3.27",
-    "@types/react-dom": "^18.3.7",
-    "@vitejs/plugin-react": "^5.1.2",
-    "typescript": "^5.9.3",
-    "vite": "^4.5.14"
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8"
   }
 }

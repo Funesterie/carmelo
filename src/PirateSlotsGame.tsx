@@ -201,6 +201,18 @@ function SlotsRoom({
   const powerFeaturePlayedForBonusRef = useRef(false);
 
   useEffect(() => {
+    if (slotIntroPlayed && !slotIntroArmed) return;
+    try {
+      sessionStorage.setItem(SLOT_VIDEO_INTRO_SESSION_KEY, "1");
+      sessionStorage.removeItem(SLOT_VIDEO_INTRO_ARMED_SESSION_KEY);
+    } catch {
+      // ignore storage failures
+    }
+    setSlotIntroPlayed(true);
+    setSlotIntroArmed(false);
+  }, [slotIntroArmed, slotIntroPlayed]);
+
+  useEffect(() => {
     if (bet !== undefined) {
       setBet((current) => {
         if (current === undefined) return undefined;
@@ -708,6 +720,16 @@ function SlotsRoom({
         return;
       }
       powerFeaturePlayedForBonusRef.current = true;
+    }
+    const ambientVideo = ambientLoopVideoRef.current;
+    if (ambientVideo && !ambientVideo.paused) {
+      try {
+        ambientResumeTimeRef.current = ambientVideo.currentTime;
+      } catch {
+        // ignore seek read failures
+      }
+      ambientResumePendingRef.current = true;
+      ambientVideo.pause();
     }
     markSlotsIntroPlayed();
     setActiveFeature(nextFeature);

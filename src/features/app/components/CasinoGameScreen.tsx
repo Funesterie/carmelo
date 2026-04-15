@@ -1,8 +1,7 @@
 import * as React from "react";
 
-import { CASINO_INTRO_VIDEO_PUBLIC_SRC, type RoomId, ROOM_DEFINITIONS } from "../../casino/catalog";
+import { CASINO_INTRO_VIDEO_PUBLIC_SRC, ROOM_DEFINITIONS, type RoomId } from "../../casino/catalog";
 import type { MutableRefObject, ReactNode } from "react";
-// Utilisation du chemin public pour la vidéo d'intro
 import icoSlotsImg from "../../../images/icomachine.png";
 import icoMapImg from "../../../images/icochassetresor.png";
 import icoHuntImg from "../../../images/icochassenaval.png";
@@ -32,7 +31,7 @@ const HAMBURGER_ROOM_ICONS: Record<RoomId, string> = {
 
 type MenuIconKind = "bonus" | "sync" | "logout";
 
-function HeaderActionIcon({ kind }: Readonly<{ kind: MenuIconKind }>) {
+function HeaderActionIcon({ kind }: { kind: MenuIconKind }) {
   switch (kind) {
     case "bonus":
       return (
@@ -107,6 +106,7 @@ type CasinoGameScreenProps = {
   onRoomChange: (roomId: RoomId) => void;
   gameTable: ReactNode;
   requestMediaPlayback: () => void;
+  onIntroVideoEnd: () => void;
 };
 
 function isTableChannelRoom(roomId: RoomId): roomId is TableSalonGame {
@@ -137,40 +137,45 @@ export default function CasinoGameScreen({
   onRoomChange,
   gameTable,
   requestMediaPlayback,
-}: Readonly<CasinoGameScreenProps>) {
+  onIntroVideoEnd,
+}: CasinoGameScreenProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const introVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const currentRoom = React.useMemo(
+    () => ROOM_DEFINITIONS.find((room) => room.id === activeCasinoRoom) ?? ROOM_DEFINITIONS[0],
+    [activeCasinoRoom],
+  );
 
-  // Sur mobile, tente de jouer explicitement la video d'intro
+  // Ne lance l'intro qu'une fois le media vraiment debloque.
   React.useEffect(() => {
-<<<<<<< HEAD
-    if (showImmersionOneVideo && introVideoRef.current) {
-      const playPromise = introVideoRef.current.play();
-      if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch((err) => {
-          // eslint-disable-next-line no-console
-          console.warn("[casino-media] intro video play() refused", err);
-=======
-    if (showImmersion) {
-      setShowOneVideo(false);
-      const timeout = setTimeout(() => setShowOneVideo(true), 10000);
-      return () => clearTimeout(timeout);
-    } else {
-      setShowOneVideo(false);
-    }
-  }, [showImmersion]);
+    const video = introVideoRef.current;
+    if (!video) return;
 
-  React.useEffect(() => {
-    if (showOneVideo && oneVideoRef.current) {
-      const playPromise = oneVideoRef.current.play();
-      if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch((err) => {
-          // eslint-disable-next-line no-console
->>>>>>> 0abc0f7 (Fix: move intro.mp4 to public/videos for correct path)
-        });
+    if (!showImmersionOneVideo) {
+      video.pause();
+      try {
+        video.currentTime = 0;
+      } catch {
+        // ignore reset errors
       }
+      return;
     }
-  }, [showImmersionOneVideo]);
+
+    if (!mediaReady) return;
+
+    try {
+      video.currentTime = 0;
+    } catch {
+      // ignore reset errors
+    }
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn("[casino-media] intro.mp4 play() refused", err);
+      });
+    }
+  }, [mediaReady, showImmersionOneVideo]);
   const [clockLabel, setClockLabel] = React.useState(() =>
     new Date().toLocaleTimeString("fr-FR", {
       hour: "2-digit",
@@ -188,14 +193,10 @@ export default function CasinoGameScreen({
   void mediaReady;
   const showHeaderAmbient = true;
   const usesDedicatedAmbient = activeCasinoRoom === "slots" || activeCasinoRoom === "roulette";
+  const showImmersionAmbientVideo = showImmersion && showImmersionOneVideo;
   const showSharedAmbientVideo = !showImmersion && !usesDedicatedAmbient;
   const showDedicatedAmbientPanel = !showImmersion && usesDedicatedAmbient && Boolean(ambientPanel);
   const showAmbientUnderlay = !showImmersion && activeCasinoRoom === "roulette";
-
-  // Accès à media.playIntroInAmbient et media.onIntroEnd via props ou via hook selon ton wiring
-  // Ici on suppose que tu passes media comme prop ou que tu peux l'importer
-  // Remplace media.playIntroInAmbient et media.onIntroEnd par le bon accès si besoin
-  const media = (globalThis as any).casinoMedia || {};
   const tableGame = isTableChannelRoom(activeCasinoRoom) ? activeCasinoRoom : null;
   const channelRooms = tableGame ? tableLobby?.rooms || [] : [];
   const joinedTableRoomId =
@@ -218,7 +219,7 @@ export default function CasinoGameScreen({
   }, [channelRooms, tableGame]);
 
   React.useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
+    function handlePointerDown(event: PointerEvent) {
       if (!profileMenuRef.current?.contains(event.target as Node)) {
         setMenuOpen(false);
       }
@@ -230,10 +231,10 @@ export default function CasinoGameScreen({
       }
     }
 
-    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
@@ -285,39 +286,17 @@ export default function CasinoGameScreen({
           style={{
             backgroundImage: `linear-gradient(140deg, rgba(5, 8, 12, 0.86), rgba(7, 12, 20, 0.94)), radial-gradient(circle at top left, rgba(255, 200, 87, 0.18), transparent 24%), url("${cardArtwork}")`,
           }}
-          onPointerDown={mediaReady ? undefined : requestMediaPlayback}
-          onClick={mediaReady ? undefined : requestMediaPlayback}
         >
-          <div className="casino-immersion-overlay__panel">
+          <div className="casino-immersion-overlay__panel casino-immersion-overlay__panel--copy-only">
             <div className="casino-immersion-overlay__copy">
               <span className="casino-chip">Connexion rituelle</span>
               <h2>Cap sur le pont pirate</h2>
               <p>{immersionLine}</p>
               <div className="casino-immersion-overlay__stats">
-                <span>Musique d'ouverture intro</span>
+                <span>Intro video unique</span>
                 <span>Tables ATS en cours d'arrimage</span>
                 <span>Canon live en veille sur la roulette</span>
               </div>
-            </div>
-            <div
-              className="casino-immersion-overlay__video-shell"
-              style={{
-                backgroundImage: `linear-gradient(180deg, rgba(4, 8, 14, 0.14), rgba(4, 8, 14, 0.84)), url("${districtArtwork}")`,
-              }}
-            >
-              {showImmersionOneVideo ? (
-                <video
-                  ref={introVideoRef}
-                  className="casino-immersion-overlay__video"
-                  autoPlay
-                  loop
-                  playsInline
-                  muted
-                  preload="metadata"
-                >
-                  <source src={CASINO_INTRO_VIDEO_PUBLIC_SRC} type="video/mp4" />
-                </video>
-              ) : null}
             </div>
           </div>
         </div>
@@ -331,19 +310,15 @@ export default function CasinoGameScreen({
 
         {showHeaderAmbient ? (
           <div className={`casino-account-bar__ambient ${usesDedicatedAmbient ? "is-custom-ambient" : ""}`}>
-            {media.playIntroInAmbient ? (
+            {showImmersionAmbientVideo ? (
               <video
+                ref={introVideoRef}
                 className="casino-account-bar__ambient-video"
-                src="/videos/intro.mp4"
-                autoPlay
-                onEnded={media.onIntroEnd}
+                src={CASINO_INTRO_VIDEO_PUBLIC_SRC}
                 playsInline
-                muted={true}
                 preload="auto"
-                style={{ objectFit: "cover", width: "100%", height: "100%" }}
-              >
-                <track kind="captions" label="Intro" />
-              </video>
+                onEnded={onIntroVideoEnd}
+              />
             ) : showSharedAmbientVideo ? (
               <video
                 ref={ambientVideoRef}
@@ -402,6 +377,14 @@ export default function CasinoGameScreen({
           </button>
 
           <div className="casino-account-bar__actions">
+            <section className="casino-account-bar__channel-panel" aria-label={`Informations ${currentRoom.label}`}>
+              <div className="casino-account-bar__channel-copy">
+                <span className="casino-chip">{currentRoom.chip}</span>
+                <strong>{currentRoom.title}</strong>
+                <small>{currentRoom.costLabel}</small>
+              </div>
+              <p className="casino-account-bar__menu-note">{currentRoom.body}</p>
+            </section>
             <div className="casino-account-bar__room-list" role="tablist" aria-label="Jeux casino">
               {ROOM_DEFINITIONS.map((room) => {
                 const roomIcon = HAMBURGER_ROOM_ICONS[room.id] || room.icon;

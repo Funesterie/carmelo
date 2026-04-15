@@ -67,6 +67,7 @@ export default function App() {
             onRoomChange={session.handleRoomChange}
             mediaStatus={media.mediaStatus}
             requestMediaPlayback={media.requestMediaPlayback}
+            onIntroVideoEnd={media.finishConnectionImmersion}
             gameTable={(
               <Suspense fallback={<LoadingPanel label="Chargement de la table..." />}>
                 <PirateSlotsGame
