@@ -6,8 +6,7 @@ export function playAudio(src: string) {
     const audio = new window.Audio(src);
     audio.volume = 0.8;
     void safePlayMedia(audio, src);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error("[casino-audio] playAudio failed", error);
+  } catch {
+    // ignore playback bootstrap failures
   }
 }

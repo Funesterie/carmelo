@@ -116,6 +116,15 @@ function SlotsRoom({
   onRequestMediaPlayback,
 }: PirateSlotsGameProps) {
   void ambientVideoRef;
+  function stopAmbientMedia(media: HTMLMediaElement | null) {
+    if (!media) return;
+    media.pause();
+    try {
+      media.currentTime = 0;
+    } catch {
+      // ignore seek failures
+    }
+  }
   const BIG_WIN_MULTIPLIER = 8;
   const SLOT_CELEBRATION_FLASH_MS = 3_400;
   const SLOT_BIG_RAIN_MS = 4_800;
@@ -252,6 +261,8 @@ function SlotsRoom({
       if (goldRainTimeoutRef.current) window.clearTimeout(goldRainTimeoutRef.current);
       if (celebrationTimeoutRef.current) window.clearTimeout(celebrationTimeoutRef.current);
       if (autoSpinTimeoutRef.current) window.clearTimeout(autoSpinTimeoutRef.current);
+      stopAmbientMedia(featureVideoRef.current);
+      stopAmbientMedia(ambientLoopVideoRef.current);
       alertAudioRef.current?.pause();
     };
   }, []);
@@ -355,6 +366,8 @@ function SlotsRoom({
     });
     return () => {
       window.cancelAnimationFrame(mountTick);
+      stopAmbientMedia(featureVideoRef.current);
+      stopAmbientMedia(ambientLoopVideoRef.current);
       onAmbientPanelChange?.(null);
     };
   }, [onAmbientPanelChange, slotAmbientPanel]);
@@ -685,7 +698,7 @@ function SlotsRoom({
   }
 
   function getSlotCelebrationCaption(spin: CasinoSpin, tone: SlotCelebrationTone) {
-    if (tone === "epic") return "Jackpot full wild";
+    if (tone === "epic") return "Jackpot Full Wild Joker";
     if (isParrotJackpotSpin(spin)) return "Jackpot perroquet 777";
     if (tone === "big") return "La cale deborde d'or et de diamants";
     if (spin.wins.length > 1) return `${spin.wins.length} lignes payeuses`;
@@ -835,8 +848,8 @@ function SlotsRoom({
       const totalStages = Math.max(1, Number(bonus.totalStages || 5));
       const bonusMessage =
         bonus.trigger === "joker_count"
-          ? `Bonus wild arme avec ${bonus.initialJokerCount} wilds. ${totalStages} tours bonus a reveler, relance pour continuer.`
-          : `Alignement wild detecte. ${totalStages} tours bonus a jouer, sans spoiler avant la fin.`;
+          ? `Bonus Wild Joker arme avec ${bonus.initialJokerCount} symbole${bonus.initialJokerCount > 1 ? "s" : ""} Wild Joker. ${totalStages} tours bonus a reveler, relance pour continuer.`
+          : `Alignement Wild Joker detecte. ${totalStages} tours bonus a jouer, sans spoiler avant la fin.`;
       setLastMessage(bonusMessage);
       onProfileChange(result.profile, bonusMessage);
       await waitForMs(Math.min(1800, Math.max(480, bonus.holdDurationMs || 0)));
@@ -899,17 +912,19 @@ function SlotsRoom({
     setBonusHeldTurns((current) =>
       buildBonusHeldTurns(stage.heldIndexes.length ? stage.heldIndexes : getJokerIndexes(stage.grid), current),
     );
-    const stageFeature = getSlotFeatureForBonusGrid(stage.grid);
-    activateFeature(
-      stageFeature !== "idle"
-        ? stageFeature
-        : bonusFlow.featureHint,
-      { isBonusFeature: true },
-    );
-
     const responseBonus = result.spin.bonus;
     const nextStageNumber = Math.max(1, Number(responseBonus?.completedStages || bonusFlow.completedStages + 1));
     const hasMoreStages = Boolean(responseBonus?.pending && responseBonus?.token);
+
+    if (hasMoreStages) {
+      const stageFeature = getSlotFeatureForBonusGrid(stage.grid);
+      activateFeature(
+        stageFeature !== "idle"
+          ? stageFeature
+          : bonusFlow.featureHint,
+        { isBonusFeature: true },
+      );
+    }
 
     setPendingBonusFlow(
       hasMoreStages
@@ -936,7 +951,7 @@ function SlotsRoom({
     setLastMessage(
       hasMoreStages
         ? `Tour bonus ${nextStageNumber}/${bonusFlow.totalStages}. Relance pour la prochaine volee.`
-        : "Bonus wild resolu. Les gains finaux sont maintenant reveles.",
+        : "Bonus Wild Joker resolu. Les gains finaux sont maintenant reveles.",
     );
   }
 
@@ -1021,7 +1036,7 @@ function SlotsRoom({
         }}
       >
         <img className={`casino-reel-cell__art casino-reel-cell__art--${displaySymbolId.toLowerCase()}`} src={meta.image} alt="" aria-hidden="true" />
-        {isWildHighlight ? <span className="casino-reel-cell__badge">Wild</span> : null}
+        {isWildHighlight ? <span className="casino-reel-cell__badge">Wild Joker</span> : null}
         <span className="casino-reel-cell__label">{meta.label}</span>
       </div>
     );

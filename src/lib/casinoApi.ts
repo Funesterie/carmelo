@@ -114,6 +114,47 @@ type SpinResponse = {
   error?: string;
 };
 
+const LOCAL_API_PORT = String(import.meta.env.VITE_A11_LOCAL_API_PORT || "3000").trim() || "3000";
+const LOCAL_PROXY_RETRY_STATUSES = new Set([502, 503, 504]);
+
+function isLoopbackHost(host: string) {
+  return host === "localhost" || host === "::1" || host === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(host);
+}
+
+function isPrivateIpv4Host(host: string) {
+  if (/^10(?:\.\d{1,3}){3}$/.test(host)) return true;
+  if (/^192\.168(?:\.\d{1,3}){2}$/.test(host)) return true;
+  const match = host.match(/^172\.(\d{1,3})(?:\.\d{1,3}){2}$/);
+  if (!match) return false;
+  const secondOctet = Number(match[1]);
+  return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+}
+
+function isLocalLikeHost(host: string) {
+  const normalizedHost = String(host || "").trim().toLowerCase();
+  if (!normalizedHost) return false;
+  return isLoopbackHost(normalizedHost) || isPrivateIpv4Host(normalizedHost);
+}
+
+function normalizeLocalApiHost(host: string) {
+  const normalizedHost = String(host || "").trim().toLowerCase();
+  if (!normalizedHost || normalizedHost === "[::1]" || normalizedHost === "::1") {
+    return "127.0.0.1";
+  }
+  return normalizedHost;
+}
+
+function getLocalApiOrigin(host: string) {
+  return `http://${normalizeLocalApiHost(host)}:${LOCAL_API_PORT}`;
+}
+
+function joinApiUrl(base: string, path: string) {
+  const normalizedBase = String(base || "").trim().replace(/\/$/, "");
+  const normalizedPath = String(path || "").trim();
+  if (!normalizedPath) return normalizedBase;
+  return `${normalizedBase}${normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`}`;
+}
+
 function getDefaultApiBase() {
   if (typeof window !== "undefined") {
     const host = String(window.location.hostname || "").trim().toLowerCase();
@@ -125,6 +166,9 @@ function getDefaultApiBase() {
       || host.endsWith(".funesterie.pro")
     ) {
       return "https://api.funesterie.pro";
+    }
+    if (isLocalLikeHost(host)) {
+      return getLocalApiOrigin(host);
     }
     return window.location.origin;
   }
@@ -194,6 +238,66 @@ function getApiUrl(path: string) {
   const normalizedPath = String(path || '').trim();
   if (!normalizedPath) return API_BASE;
   return `${API_BASE}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`;
+}
+
+function getApiRequestUrls(path: string) {
+  const normalizedPath = String(path || "").trim();
+  const urls: string[] = [];
+  const pushUrl = (url: string) => {
+    const normalizedUrl = String(url || "").trim();
+    if (!normalizedUrl || urls.includes(normalizedUrl)) return;
+    urls.push(normalizedUrl);
+  };
+
+  pushUrl(getApiUrl(normalizedPath));
+
+  if (typeof window === "undefined") {
+    return urls;
+  }
+
+  const host = String(window.location.hostname || "").trim().toLowerCase();
+  if (!isLocalLikeHost(host)) {
+    return urls;
+  }
+
+  pushUrl(joinApiUrl(window.location.origin, normalizedPath));
+  pushUrl(joinApiUrl(getLocalApiOrigin(host), normalizedPath));
+  return urls;
+}
+
+function buildLocalApiUnavailableError() {
+  return new CasinoApiError(
+    `Connexion locale indisponible. Lance le backend Funesterie sur le port ${LOCAL_API_PORT}.`,
+    { status: 0, code: "local_api_unreachable" },
+  );
+}
+
+async function fetchCasinoApi(path: string, init?: RequestInit) {
+  const urls = getApiRequestUrls(path);
+  let lastNetworkError: unknown = null;
+  let lastRetryableResponse: Response | null = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, init);
+      if (!LOCAL_PROXY_RETRY_STATUSES.has(response.status)) {
+        return response;
+      }
+      lastRetryableResponse = response;
+    } catch (error_) {
+      lastNetworkError = error_;
+    }
+  }
+
+  if (lastRetryableResponse) {
+    return lastRetryableResponse;
+  }
+
+  if (typeof window !== "undefined" && isLocalLikeHost(String(window.location.hostname || "").trim().toLowerCase())) {
+    throw buildLocalApiUnavailableError();
+  }
+
+  throw lastNetworkError instanceof Error ? lastNetworkError : new Error("Connexion API impossible");
 }
 
 async function readJsonSafe(response: Response) {
@@ -312,7 +416,7 @@ function buildAuthHeaders() {
 }
 
 export async function loginCasino(username: string, password: string) {
-  const response = await fetch(getApiUrl('/api/auth/login'), {
+  const response = await fetchCasinoApi('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -332,7 +436,7 @@ export async function loginCasino(username: string, password: string) {
 }
 
 export async function registerCasino(username: string, email: string, password: string) {
-  const response = await fetch(getApiUrl('/api/auth/register'), {
+  const response = await fetchCasinoApi('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -353,7 +457,7 @@ export async function registerCasino(username: string, email: string, password: 
 }
 
 export async function requestCasinoPasswordReset(email: string) {
-  const response = await fetch(getApiUrl('/api/auth/forgot-password'), {
+  const response = await fetchCasinoApi('/api/auth/forgot-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: String(email || '').trim() }),
@@ -366,7 +470,7 @@ export async function requestCasinoPasswordReset(email: string) {
 }
 
 export async function fetchCasinoProfile() {
-  const response = await fetch(getApiUrl('/api/casino/me'), {
+  const response = await fetchCasinoApi('/api/casino/me', {
     headers: buildAuthHeaders(),
   });
 
@@ -381,7 +485,7 @@ export async function fetchCasinoProfile() {
 }
 
 export async function claimCasinoDailyBonus() {
-  const response = await fetch(getApiUrl('/api/casino/daily-bonus'), {
+  const response = await fetchCasinoApi('/api/casino/daily-bonus', {
     method: 'POST',
     headers: buildAuthHeaders(),
     body: '{}',
@@ -403,7 +507,7 @@ export async function continueCasinoSlotsBonus(bonusToken: string) {
 }
 
 async function spinCasinoSlotsRequest(body: { bet?: number; bonusToken?: string | null }) {
-  const response = await fetch(getApiUrl('/api/casino/slots/spin'), {
+  const response = await fetchCasinoApi('/api/casino/slots/spin', {
     method: 'POST',
     headers: buildAuthHeaders(),
     body: JSON.stringify(body),
@@ -731,7 +835,7 @@ type TableLobbyResponse = {
 };
 
 async function postCasinoAuthed<T>(path: string, body: unknown) {
-  const response = await fetch(getApiUrl(path), {
+  const response = await fetchCasinoApi(path, {
     method: "POST",
     headers: buildAuthHeaders(),
     body: JSON.stringify(body),
@@ -744,7 +848,7 @@ async function postCasinoAuthed<T>(path: string, body: unknown) {
 }
 
 async function getCasinoAuthed<T>(path: string) {
-  const response = await fetch(getApiUrl(path), {
+  const response = await fetchCasinoApi(path, {
     headers: buildAuthHeaders(),
   });
   const payload = (await readJsonSafe(response)) as T | { error?: string } | null;
@@ -755,7 +859,7 @@ async function getCasinoAuthed<T>(path: string) {
 }
 
 async function getCasinoAuthedOptionalState<T>(path: string) {
-  const response = await fetch(getApiUrl(path), {
+  const response = await fetchCasinoApi(path, {
     headers: buildAuthHeaders(),
   });
 
@@ -845,7 +949,7 @@ export async function leaveCasinoTableRoom(
   roomId: string,
   options: { keepalive?: boolean } = {},
 ) {
-  const response = await fetch(getApiUrl("/api/casino/table-presence/leave"), {
+  const response = await fetchCasinoApi("/api/casino/table-presence/leave", {
     method: "POST",
     headers: buildAuthHeaders(),
     body: JSON.stringify({

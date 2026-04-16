@@ -19,6 +19,7 @@ const CHIP_TONES: Record<number, "amber" | "cyan" | "crimson" | "ivory"> = {
 type BlackjackSidebarProps = {
   profile: CasinoProfile;
   state: BlackjackState | null;
+  showResolvedReplay: boolean;
   bet: number;
   betChips: number[];
   working: boolean;
@@ -55,6 +56,7 @@ function playerTurnLabel(state: BlackjackState | null, userId: string) {
 export default function BlackjackSidebar({
   profile,
   state,
+  showResolvedReplay,
   bet,
   betChips,
   working,
@@ -82,6 +84,7 @@ export default function BlackjackSidebar({
   const stage = state?.stage || "idle";
   const showBettingPhase = isBettingPhase || stage === "waiting";
   const canDeal = !hasPendingSeat && (stage !== "player-turn" || isSpectatingRound);
+  const showingResolvedReplay = showResolvedReplay && stage === "waiting";
 
   const availableRooms = rooms.length
     ? rooms
@@ -117,10 +120,12 @@ export default function BlackjackSidebar({
   const canSplit = legalActions.includes("split");
 
   const isReplayPending =
-    queuedForNextRound || (hasPendingSeat && stage === "resolved");
+    queuedForNextRound || (hasPendingSeat && (stage === "resolved" || showingResolvedReplay));
 
   const primaryActionLabel = isReplayPending
     ? "En attente..."
+    : showingResolvedReplay
+      ? "Rejouer"
     : isSpectatingRound && stage === "player-turn"
       ? "Prochaine donne"
       : isSpectatingRound
@@ -157,6 +162,8 @@ export default function BlackjackSidebar({
               ? `Main a ${state?.playerScore.total || 0} points`
               : isReplayPending
                 ? "Action en attente"
+                : showingResolvedReplay
+                  ? "Rejouer cette donne"
                 : hasPendingSeat && showBettingPhase
                   ? "Mise enregistree"
                   : isSpectatingRound && stage === "player-turn"
@@ -173,6 +180,8 @@ export default function BlackjackSidebar({
               ? "Concentre-toi sur ta main, la carte visible du croupier et les vraies options de blackjack ouvertes pour cette combinaison."
               : isReplayPending
                 ? "Ton clic a bien ete pris en compte. La prochaine donne partira automatiquement des que la phase de revelation sera terminee."
+                : showingResolvedReplay
+                  ? "La revelation est encore affichee a l'ecran. Tu peux rejouer tout de suite, ou attendre la prochaine validation de table."
                 : hasPendingSeat && showBettingPhase
                   ? "Ta mise est deja posee. La table attend les autres confirmations ou la fin du timer serveur."
                   : isSpectatingRound && stage === "player-turn"

@@ -27,6 +27,12 @@ export default function App() {
     void media.startConnectionImmersion(nextImmersionName);
   }, [session.profile, session.pendingImmersionName]);
 
+  useEffect(() => {
+    if (session.profile) return;
+    setAmbientPanel(null);
+    media.resetMediaSession();
+  }, [media, session.profile]);
+
   if (session.booting) {
     return null;
   }

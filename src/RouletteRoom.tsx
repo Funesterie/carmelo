@@ -85,9 +85,9 @@ type ActiveRouletteBet = {
 
 
 
-const ROULETTE_POLL_NEAR_CLOSE_INTERVAL_MS = 1200;
-const ROULETTE_POLL_ACTIVE_INTERVAL_MS = 3000;
-const ROULETTE_POLL_IDLE_INTERVAL_MS = 15000;
+const ROULETTE_POLL_NEAR_CLOSE_INTERVAL_MS = 2000;
+const ROULETTE_POLL_ACTIVE_INTERVAL_MS = 5000;
+const ROULETTE_POLL_IDLE_INTERVAL_MS = 30000;
 // Intervalle de tirage numéro réglé à 2 minutes (120 000 ms)
 const ROULETTE_FALLBACK_DRAW_INTERVAL_MS = 120_000;
 const ROULETTE_CELEBRATION_FLASH_MS = 3_200;
@@ -1109,13 +1109,15 @@ export default function RouletteRoom({
       const payoutTotal = (room.round.myBets || []).reduce((sum, bet) => sum + Math.max(0, Number(bet.payout || 0)), 0);
       const wageredTotal = (room.round.myBets || []).reduce((sum, bet) => sum + Math.max(0, Number(bet.amount || 0)), 0);
       setLastResolvedPayout(payoutTotal);
-      void fetchCasinoProfile()
-        .then((nextProfile) => {
-          if (nextProfile) {
-            onProfileChangeRef.current(nextProfile);
-          }
-        })
-        .catch(() => {});
+      if (wageredTotal > 0) {
+        void fetchCasinoProfile()
+          .then((nextProfile) => {
+            if (nextProfile) {
+              onProfileChangeRef.current(nextProfile);
+            }
+          })
+          .catch(() => {});
+      }
       if (payoutTotal > 0 && typeof resolved?.winningNumber === "number") {
         const tone = getRouletteCelebrationTone(payoutTotal, wageredTotal);
         triggerCelebration({

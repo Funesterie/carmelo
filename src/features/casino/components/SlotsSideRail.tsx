@@ -107,7 +107,7 @@ export default function SlotsSideRail({
         <section className="casino-panel">
           <div className="casino-panel__header">
             <span className="casino-chip">Phase bonus</span>
-            <h3>Wilds verrouilles</h3>
+            <h3>Wild Joker verrouilles</h3>
           </div>
 
           <p className="casino-history-empty">
@@ -158,7 +158,7 @@ export default function SlotsSideRail({
                         </span>
                         {resolvedWin.wildCount ? (
                           <span className="casino-win-entry__note">
-                            {resolvedWin.wildCount} wild{resolvedWin.wildCount > 1 ? "s" : ""} complete
+                            {resolvedWin.wildCount} symbole{resolvedWin.wildCount > 1 ? "s" : ""} Wild Joker complete
                             {resolvedWin.wildCount > 1 ? "nt" : ""} la ligne
                           </span>
                         ) : null}
@@ -183,7 +183,7 @@ export default function SlotsSideRail({
                             aria-hidden="true"
                           />
                           <span>{entry.meta.label}</span>
-                          {entry.isWild ? <small>Wild</small> : null}
+                          {entry.isWild ? <small>Wild Joker</small> : null}
                         </div>
                       ))}
                     </div>

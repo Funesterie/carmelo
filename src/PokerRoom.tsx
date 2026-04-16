@@ -883,31 +883,8 @@ export default function PokerRoom({
         return;
       }
 
-      try {
-        const sharedState = await fetchPokerRoomState(joinedRoomId);
-        if (sharedState) {
-          applySyncedState(sharedState, Date.now(), getPokerPhaseDeadlineAt(sharedState));
-          if (hasPokerPendingSeat(sharedState, profile.user.id, playerName)) {
-            onError("");
-            return;
-          }
-        }
-      } catch {
-        // If the shared room state is briefly unavailable, keep going with the start call.
-      }
-
       const result = await startPokerRound(ante, joinedRoomId);
-      let nextState = result.state;
-      if (result.state.roomId && result.state.token) {
-        try {
-          const sharedState = await fetchPokerRoomState(result.state.roomId);
-          if (sharedState?.token === result.state.token) {
-            nextState = sharedState;
-          }
-        } catch {
-          // The normal polling loop will recover if the immediate sync fails.
-        }
-      }
+      const nextState = result.state;
       setState(nextState);
       if (result.profile) {
         onProfileChange(result.profile);

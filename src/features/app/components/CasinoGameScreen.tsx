@@ -172,10 +172,7 @@ export default function CasinoGameScreen({
 
     const playPromise = video.play();
     if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch((err) => {
-        // eslint-disable-next-line no-console
-        console.warn("[casino-media] intro.mp4 play() refused", err);
-      });
+      playPromise.catch(() => undefined);
     }
   }, [mediaReady, showImmersionOneVideo]);
 

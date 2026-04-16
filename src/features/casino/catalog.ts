@@ -76,7 +76,7 @@ export const SYMBOL_META: Record<string, { emoji: string; label: string; accent:
   PARROT: { emoji: "🦜", label: "Perroquet 777", accent: "var(--casino-lime)", image: slot777ParrotImg },
   SOLDAT: { emoji: "🛡️", label: "Spartiate", accent: "var(--casino-silver)", image: slotSoldatImg },
   ELEPHANT: { emoji: "🐘", label: "Elephant royal", accent: "var(--casino-ice)", image: slotElephantImg },
-  JOKER: { emoji: "🃏", label: "Wild royal", accent: "var(--casino-violet)", image: slotJokerImg },
+  JOKER: { emoji: "🃏", label: "Wild Joker", accent: "var(--casino-violet)", image: slotJokerImg },
 };
 
 const SLOT_SYMBOL_DISPLAY_ALIASES: Record<string, string> = {
@@ -296,8 +296,8 @@ export const SLOT_FEATURE_MEDIA: Record<
   video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
   },
   "joker-line": {
-    title: "Alignement wild",
-    body: "Les wilds ouvrent la phase bonus et gardent chaque symbole royal a sa place.",
+    title: "Alignement Wild Joker",
+    body: "Les Wild Joker ouvrent la phase bonus et gardent chaque symbole royal a sa place.",
     image: drapImg,
     video: jokerVideo,
   },
@@ -326,14 +326,14 @@ export const SLOT_FEATURE_MEDIA: Record<
     video: expVideo,
   },
   "joker-cross": {
-    title: "Ligne wild power",
-    body: "Les wilds alignes sur 5 rouleaux declenchent la phase power.",
+    title: "Ligne Wild Joker power",
+    body: "Les Wild Joker alignes sur 5 rouleaux declenchent la phase power.",
     image: drapImg,
     video: powerVideo,
   },
   "joker-full": {
-    title: "Full wild",
-    body: "La grille entiere se transforme en wilds. Le ranger prend le pont pour la pluie de lingots.",
+    title: "Full Wild Joker",
+    body: "La grille entiere se transforme en Wild Joker. Le ranger prend le pont pour la pluie de lingots.",
     image: drapImg,
     video: rangerVideo,
   },
@@ -525,15 +525,15 @@ export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
 export function getBonusNarration(spin: CasinoSpin) {
   const normalizedBonusFeature = spin.bonus?.feature ? normalizeBonusFeatureKey(spin.bonus.feature) : "";
   if (normalizedBonusFeature === "joker_full") {
-    return "Full wild verrouille. Toute la grille bascule sous le ranger.";
+    return "Full Wild Joker verrouille. Toute la grille bascule sous le ranger.";
   }
   if (normalizedBonusFeature === "joker_cross") {
-    return "Ligne wild detectee. La phase power prend la main.";
+    return "Ligne Wild Joker detectee. La phase power prend la main.";
   }
   if (spin.bonus?.triggered) {
     return spin.bonus.trigger === "joker_count"
-      ? "Quatre wilds ouvrent la phase bonus."
-      : "Alignement wild detecte. Les symboles royaux restent figes.";
+      ? "Quatre Wild Joker ouvrent la phase bonus."
+      : "Alignement Wild Joker detecte. Les symboles royaux restent figes.";
   }
   return spin.totalPayout > 0
     ? `Table gagnee: +${formatCredits(spin.totalPayout)} credits.`

@@ -253,6 +253,57 @@ function buildBlackjackSyncSignature(state: BlackjackState | null, currentUserId
   });
 }
 
+function buildBlackjackStateSignature(state: BlackjackState | null, currentUserId: string, playerName: string) {
+  if (!state) return "";
+  const normalizedHands = getNormalizedBlackjackHands(state);
+  return JSON.stringify({
+    token: state.token || null,
+    roomId: state.roomId || null,
+    stage: state.stage || "idle",
+    roundId: Number(state.roundId || 0),
+    waitingForPlayers: Boolean(state.waitingForPlayers),
+    bettingClosesAt: state.bettingClosesAt || null,
+    turnDeadlineAt: state.turnDeadlineAt || null,
+    selfSeatId: state.selfSeatId || null,
+    activeSeatId: state.activeSeatId || null,
+    pendingSeats: (state.pendingSeats || []).map((seat) => ({
+      userId: String(seat.userId || ""),
+      username: String(seat.username || ""),
+      wager: Number((seat as { wager?: number }).wager || 0),
+      readyAt: String((seat as { readyAt?: string | null }).readyAt || ""),
+    })),
+    dealerCards: (state.dealerCards || []).map((card) => card.id),
+    playerCards: (state.playerCards || []).map((card) => card.id),
+    playerHands: normalizedHands.map((hand) => ({
+      id: hand.id || "",
+      cards: hand.cards.map((card) => card.id),
+      wager: Number(hand.wager || 0),
+      result: hand.result || "",
+      active: Boolean(hand.isActive),
+    })),
+    seats: (state.seats || []).map((seat) => ({
+      userId: String(seat.userId || seat.id || ""),
+      cards: (seat.cards || []).map((card) => card.id),
+      wager: Number(seat.wager || 0),
+      result: seat.result || "",
+      lastDelta: Number(seat.lastDelta || 0),
+      isActive: Boolean(seat.isActive),
+    })),
+    aiSeats: (state.aiSeats || []).map((seat) => ({
+      userId: String(seat.userId || seat.id || ""),
+      cards: (seat.cards || []).map((card) => card.id),
+      wager: Number(seat.wager || 0),
+      result: seat.result || "",
+      lastDelta: Number(seat.lastDelta || 0),
+      isActive: Boolean(seat.isActive),
+    })),
+    legalActions: getBlackjackLegalActions(state, currentUserId, playerName),
+    message: state.message || "",
+    lastDelta: Number(state.lastDelta || 0),
+    payoutAmount: Number(state.payoutAmount || 0),
+  });
+}
+
 function formatTurnClock(remainingMs: number) {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -332,6 +383,7 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
   const [blackjackHistory, setBlackjackHistory] = useState<BlackjackHistoryEntry[]>([]);
   const [turnDeadlineAt, setTurnDeadlineAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [optimisticPendingSeat, setOptimisticPendingSeat] = useState(false);
   const [isDocumentVisible, setIsDocumentVisible] = useState(() => {
     if (typeof document === "undefined") return true;
     return document.visibilityState !== "hidden";
@@ -357,7 +409,8 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
   const lastDelta = state?.lastDelta || 0;
   const hasHeroRound = hasBlackjackHeroRound(state, profile.user.id, playerName);
   const isSpectatingRound = isBlackjackSpectatorRound(state, profile.user.id, playerName);
-  const hasPendingSeat = hasBlackjackPendingSeat(state, profile.user.id, playerName);
+  const serverHasPendingSeat = hasBlackjackPendingSeat(state, profile.user.id, playerName);
+  const hasPendingSeat = serverHasPendingSeat || optimisticPendingSeat;
   const queuedForNextRound = Boolean(
     hasPendingSeat && ((stage === "player-turn" && !hasHeroRound) || stage === "resolved"),
   );
@@ -446,6 +499,15 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+  useEffect(() => {
+    if (serverHasPendingSeat && optimisticPendingSeat) {
+      setOptimisticPendingSeat(false);
+      return;
+    }
+    if (hasHeroRound && stage === "player-turn" && !isSpectatingRound && optimisticPendingSeat) {
+      setOptimisticPendingSeat(false);
+    }
+  }, [hasHeroRound, isSpectatingRound, optimisticPendingSeat, serverHasPendingSeat, stage]);
   async function refreshBlackjackLobby(targetRoomId: string) {
     const result = await joinBlackjackRoom(targetRoomId);
     setRooms(result.rooms);
@@ -462,6 +524,13 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
   function applySyncedState(nextState: BlackjackState | null, syncedAt: number, nextDeadlineAt: number | null) {
     if (!nextState?.roomId) return;
     if (syncedAt <= latestAppliedSyncAtRef.current) return;
+    const currentSignature = buildBlackjackStateSignature(latestStateRef.current, profile.user.id, playerName);
+    const nextSignature = buildBlackjackStateSignature(nextState, profile.user.id, playerName);
+    const currentDeadlineAt = getBlackjackPhaseDeadlineAt(latestStateRef.current);
+    if (currentSignature && currentSignature === nextSignature && currentDeadlineAt === nextDeadlineAt) {
+      latestAppliedSyncAtRef.current = syncedAt;
+      return;
+    }
     latestAppliedSyncAtRef.current = syncedAt;
     skipNextSyncPublishRef.current = true;
     setState(nextState);
@@ -534,6 +603,7 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
     lastExpiredSyncSignatureRef.current = "";
     previousStageRef.current = "idle";
     lastResolvedReplayKeyRef.current = "";
+    setOptimisticPendingSeat(false);
     setTurnDeadlineAt(null);
   }, [roomId]);
   useEffect(() => {
@@ -861,31 +931,15 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
         onError(error_ instanceof Error ? error_.message : "Le salon blackjack ne repond pas.");
         return;
       }
-      try {
-        const sharedState = await fetchBlackjackRoomState(joinedRoomId);
-        if (sharedState) {
-          applySyncedState(sharedState, Date.now(), getBlackjackPhaseDeadlineAt(sharedState));
-          if (hasBlackjackPendingSeat(sharedState, profile.user.id, playerName)) {
-            onError("");
-            return;
-          }
-        }
-      } catch {
-        // If the live room state is temporarily unavailable, keep going with the start call.
-      }
       const result = await startBlackjackRound(bet, joinedRoomId);
-      let nextState = result.state;
-      if (result.state.roomId && result.state.token) {
-        try {
-          const sharedState = await fetchBlackjackRoomState(result.state.roomId);
-          if (sharedState?.token === result.state.token) {
-            nextState = sharedState;
-          }
-        } catch {
-          // Keep the local response if the immediate room sync is temporarily unavailable.
-        }
-      }
+      const nextState = result.state;
       setState(nextState);
+      const nextIsPending =
+        hasBlackjackPendingSeat(nextState, profile.user.id, playerName)
+        || nextState.stage === "waiting"
+        || (nextState.stage === "resolved" && !hasBlackjackHeroRound(nextState, profile.user.id, playerName))
+        || isBlackjackSpectatorRound(nextState, profile.user.id, playerName);
+      setOptimisticPendingSeat(nextIsPending && !hasBlackjackHeroRound(nextState, profile.user.id, playerName));
       if (result.profile) {
         onProfileChange(result.profile);
       }
@@ -916,6 +970,8 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
   }
   async function act(action: BlackjackAction) {
     if (!state?.token || stage !== "player-turn" || working) return;
+    if (!isBlackjackSelfTurn(state, profile.user.id, playerName)) return;
+    if (!legalActions.includes(action)) return;
     if (turnDeadlineAt && turnDeadlineAt <= Date.now()) {
       onError("Le chrono vient d'expirer. Synchronisation de la table...");
       setWorking(true);
@@ -936,17 +992,7 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
     setWorking(true);
     try {
       const result = await actBlackjackRound(state.token, action);
-      let nextState = result.state;
-      if (result.state.roomId && result.state.token) {
-        try {
-          const sharedState = await fetchBlackjackRoomState(result.state.roomId);
-          if (sharedState?.token === result.state.token) {
-            nextState = sharedState;
-          }
-        } catch {
-          // The normal polling loop will recover if the immediate sync fails.
-        }
-      }
+      const nextState = result.state;
       if (isBlackjackSpectatorRound(nextState, profile.user.id, playerName)) {
         onError(
           "Le serveur a renvoye une manche qui ne t'appartient pas. La table reste verrouillee jusqu'a la prochaine donne.",
@@ -986,6 +1032,7 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
     setDealtCardDelays({});
     setResolvedReplayState(null);
     setResultFlash(null);
+    setOptimisticPendingSeat(false);
     setTurnDeadlineAt(null);
     if (clearDealAnimationTimeoutRef.current) {
       window.clearTimeout(clearDealAnimationTimeoutRef.current);
@@ -1221,6 +1268,7 @@ export default function BlackjackRoom({ playerName, profile, mediaReady, onProfi
             <BlackjackSidebar
               profile={profile}
               state={state}
+              showResolvedReplay={Boolean(resolvedReplayState)}
               bet={bet}
               betChips={betChips}
               working={working}

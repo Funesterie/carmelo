@@ -46,17 +46,11 @@ export async function safePlayMedia(media: HTMLMediaElement, label: string) {
         return { ok: true, error: undefined };
       } catch (retryError: any) {
         const info = toInfo(retryError);
-        // Log console
-        // eslint-disable-next-line no-console
-        console.warn("[casino-media] play() refused", info);
         return { ok: false, error: info };
       }
     }
 
     const info = toInfo(error);
-    // Log console
-    // eslint-disable-next-line no-console
-    console.warn("[casino-media] play() refused", info);
     return { ok: false, error: info };
   }
 }
@@ -158,6 +152,11 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   }), [ambientVideoAudible, immersionLine, mediaReady, showImmersion, showImmersionOneVideo, slotsIntroDelayActive]);
 
   const shouldPlayHeaderVideo = profileLoaded && !showImmersion;
+
+  useEffect(() => {
+    if (profileLoaded) return;
+    resetMediaSession();
+  }, [profileLoaded]);
 
   useEffect(() => {
     return () => {
@@ -518,14 +517,18 @@ export function useCasinoMedia({ activeCasinoRoom, profileLoaded, roomChangeCoun
   function resetMediaSession() {
     clearImmersionTimers();
     setShowImmersion(false);
+    setImmersionLine("Ouverture du pont prive...");
     setAmbientVideoAudible(false);
     setMediaReady(false);
+    setMediaStatus("locked");
     setSlotsIntroDelayActive(false);
     setShowImmersionOneVideo(false);
     mediaUnlockedRef.current = false;
     unlockRequestRef.current = null;
     rouletteAudioScopeRef.current += 1;
     rouletteQueueRef.current = Promise.resolve();
+    activeRoomRef.current = "slots";
+    lastRouletteEntryRoomChangeCountRef.current = roomChangeCount;
     stopMedia(cueAudioRef.current);
     stopMedia(cannonAudioRef.current);
     stopMedia(unlockAudioRef.current);

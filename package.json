@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently --kill-others-on-fail --names api,ui \"npm run dev:backend\" \"wait-on tcp:127.0.0.1:3000 && npm run dev:ui\"",
+    "dev:ui": "vite",
+    "dev:backend": "npm --prefix ..\\funesterie\\a11\\backend\\apps\\server run dev",
     "build": "vite build",
     "preview": "vite preview",
     "playtest:smoke": "node scripts/playtest-smoke.mjs"
