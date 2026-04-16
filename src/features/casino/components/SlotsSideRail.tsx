@@ -24,6 +24,7 @@ type SlotsSideRailProps = {
   isAlertFeatureActive: boolean;
   featureVideoRef: { current: HTMLVideoElement | null };
   lastSpin: CasinoSpin | null;
+  bonusPending?: boolean;
   recapGrid?: string[][] | null;
   onMarkSlotsIntroPlayed: () => void;
   onRequestMediaPlayback?: () => void;
@@ -85,6 +86,7 @@ export default function SlotsSideRail({
   isAlertFeatureActive,
   featureVideoRef,
   lastSpin,
+  bonusPending = false,
   recapGrid = null,
   onMarkSlotsIntroPlayed,
   onRequestMediaPlayback,
@@ -100,7 +102,20 @@ export default function SlotsSideRail({
 
   return (
     <aside className="casino-side-rail casino-side-rail--slots">
-      {lastSpin ? (
+      {bonusPending ? (
+        <section className="casino-panel">
+          <div className="casino-panel__header">
+            <span className="casino-chip">Phase bonus</span>
+            <h3>Jokers verrouilles</h3>
+          </div>
+
+          <p className="casino-history-empty">
+            Les tours bonus se jouent un par un. Les lignes gagnantes et le total final restent caches jusqu'a la derniere volee.
+          </p>
+        </section>
+      ) : null}
+
+      {lastSpin && !bonusPending ? (
         <section className="casino-panel">
           <div className="casino-panel__header">
             <span className="casino-chip">Dernier spin</span>
