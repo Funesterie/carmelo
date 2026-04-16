@@ -76,16 +76,16 @@ function findBlackjackSelfSeat(
   const candidates = [...(state?.seats || []), ...(state?.aiSeats || [])];
 
   const explicitSeat = candidates.find((seat) => {
-      const seatId = normalizeBlackjackIdentity(seat.id);
-      const seatUserId = normalizeBlackjackIdentity(seat.userId);
-      const seatName = normalizeBlackjackIdentity(seat.name || seat.username);
-      return Boolean(
-        seat.isSelf
+    const seatId = normalizeBlackjackIdentity(seat.id);
+    const seatUserId = normalizeBlackjackIdentity(seat.userId);
+    const seatName = normalizeBlackjackIdentity(seat.name || seat.username);
+    return Boolean(
+      seat.isSelf
         || (normalizedSelfSeatId && seatId === normalizedSelfSeatId)
         || (normalizedCurrentUserId && (seatId === normalizedCurrentUserId || seatUserId === normalizedCurrentUserId))
         || (normalizedPlayerName && seatName === normalizedPlayerName),
-      );
-    }) || null;
+    );
+  }) || null;
 
   if (explicitSeat) return explicitSeat;
   return null;
@@ -96,7 +96,7 @@ function getRenderableHands(state: BlackjackState | null, selfSeat: BlackjackSea
 
   const hasHeroPayload = Boolean(
     state.playerCards.length
-    || state.playerHands?.some((hand) => Boolean(hand.cards?.length)),
+      || state.playerHands?.some((hand) => Boolean(hand.cards?.length)),
   );
   if (!hasHeroPayload && !selfSeat) {
     return [];
@@ -206,6 +206,7 @@ function getRemoteBlackjackBindings(
   const normalizedSelfSeatId = normalizeBlackjackIdentity(selfSeat?.id || selfSeat?.userId);
   const normalizedSelfSeatName = normalizeBlackjackIdentity(selfSeat?.name || selfSeat?.username);
   const seenSeats = new Set<string>();
+
   const seats = [...(state?.seats || []), ...(state?.aiSeats || [])].filter((seat) => {
     const dedupeKey = normalizeBlackjackIdentity(seat.id || seat.userId || seat.name || seat.username);
     if (dedupeKey && seenSeats.has(dedupeKey)) {
@@ -224,36 +225,40 @@ function getRemoteBlackjackBindings(
       || (normalizedSelfSeatName && seatName === normalizedSelfSeatName)
     );
   });
+
   const normalizedCurrentUserId = normalizeBlackjackIdentity(currentUserId);
   const normalizedPlayerName = normalizeBlackjackIdentity(playerName);
+
   const pendingSeats = (state?.pendingSeats || []).filter((seat) => {
     const seatId = normalizeBlackjackIdentity(seat.userId);
     const seatName = normalizeBlackjackIdentity(seat.username);
     return seatId !== normalizedCurrentUserId && seatName !== normalizedPlayerName;
   });
-  const remoteParticipants = participants.filter(
-    (participant) => {
-      const participantId = normalizeBlackjackIdentity(participant.userId);
-      const participantName = normalizeBlackjackIdentity(participant.username);
-      return participantId !== normalizedCurrentUserId && participantName !== normalizedPlayerName;
-    },
-  );
+
+  const remoteParticipants = participants.filter((participant) => {
+    const participantId = normalizeBlackjackIdentity(participant.userId);
+    const participantName = normalizeBlackjackIdentity(participant.username);
+    return participantId !== normalizedCurrentUserId && participantName !== normalizedPlayerName;
+  });
 
   const participantBindings = remoteParticipants.map((participant) => {
     const seat = findBlackjackSeat(participant, seats);
     const pendingSeat = findBlackjackPendingSeat(participant, pendingSeats);
+
     if (seat) {
       const usedIndex = seats.findIndex((entry) => entry === seat);
       if (usedIndex >= 0) {
         seats.splice(usedIndex, 1);
       }
     }
+
     if (pendingSeat) {
       const usedPendingIndex = pendingSeats.findIndex((entry) => entry === pendingSeat);
       if (usedPendingIndex >= 0) {
         pendingSeats.splice(usedPendingIndex, 1);
       }
     }
+
     return {
       key: participant.userId || participant.username,
       label: participant.username,
@@ -301,18 +306,22 @@ export default function BlackjackTableScene({
   onBetChipRemove,
 }: BlackjackTableSceneProps) {
   void bet;
+
   const selfSeat = findBlackjackSelfSeat(state, currentUserId, playerName);
   const hands = getRenderableHands(state, selfSeat);
   const remoteBindings = getRemoteBlackjackBindings(state, participants, currentUserId, playerName);
   const remoteSeatLayout = getBlackjackSeatLayout();
+
   const selectedChipTotal = sumChipValues(betChips);
   const lockedWager = hands.reduce((sum, hand) => sum + (hand.wager || 0), 0) || state?.wager || 0;
   const totalWager = betLocked ? lockedWager || selectedChipTotal : selectedChipTotal;
+
   const displayedBetChips = !betLocked
     ? betChips
     : betChips.length && selectedChipTotal === totalWager
       ? betChips
       : buildChipStackValues(totalWager);
+
   const playerDelta = state?.lastDelta || 0;
   const playerOutcome =
     state?.stage === "resolved"
@@ -324,26 +333,35 @@ export default function BlackjackTableScene({
               : null
         )
       : null;
+
   const playerSeatName = String(playerName || "Toi").trim();
   const splitHands = hands.length > 1;
   const showHeroOutcome = Boolean(playerOutcome && !splitHands);
+  const heroOutcome = showHeroOutcome ? playerOutcome : null;
   const showSpectatorBanner = !hands.length;
-  const spectatorBannerLabel =
-    queuedForNextRound
+const isReplayPending = queuedForNextRound && state?.stage === "resolved";
+
+const spectatorBannerLabel =
+  isReplayPending
+    ? "En attente..."
+    : queuedForNextRound
       ? "Prochaine donne reservee"
       : state?.stage === "player-turn"
-      ? "Manche en cours"
-      : state?.stage === "resolved"
-        ? "Resultat de table"
-        : "Phase de mise";
-  const spectatorBannerDetail =
-    queuedForNextRound
+        ? "Manche en cours"
+        : state?.stage === "resolved"
+          ? "Resultat de table"
+          : "Phase de mise";
+
+const spectatorBannerDetail =
+  isReplayPending
+    ? "Ton clic a bien ete pris en compte. La prochaine donne partira automatiquement des que la revelation sera terminee."
+    : queuedForNextRound
       ? "La main actuelle se termine. Ta mise est deja posee pour la prochaine donne de cette table."
       : state?.stage === "player-turn"
-      ? "La table joue une donne multijoueur. Attends la prochaine phase de mise pour reprendre une place."
-      : state?.stage === "resolved"
-        ? "La donne se termine sur la table. La prochaine phase de mise va rouvrir pour tous les joueurs presents."
-        : "";
+        ? "La table joue une donne multijoueur. Attends la prochaine phase de mise pour reprendre une place."
+        : state?.stage === "resolved"
+          ? "La donne se termine sur la table. La prochaine phase de mise va rouvrir pour tous les joueurs presents."
+          : "";
 
   return (
     <div className={`casino-card-felt casino-card-felt--blackjack casino-card-felt--table ${isDecisionPhase ? "is-decision-phase" : ""}`}>
@@ -354,18 +372,19 @@ export default function BlackjackTableScene({
               <strong>Croupier</strong>
               <span>{state?.dealerHidden ? "Main cachee" : `${state?.dealerScore.total || 0} points`}</span>
             </div>
+
             <div className="casino-card-row casino-card-row--dealer casino-card-row--fan casino-card-row--fan-dealer">
-              {(state?.dealerCards || []).length ? (
-                (state?.dealerCards || []).map((card, index) => (
-                  <PiratePlayingCardView
-                    key={`dealer-${card.id}-${index}`}
-                    card={card}
-                    hidden={Boolean(state?.dealerHidden && index === 1)}
-                    dealt={Boolean(dealtCardDelays[`dealer-${card.id}-${index}`] !== undefined)}
-                    dealDelayMs={dealtCardDelays[`dealer-${card.id}-${index}`] || 0}
-                  />
-                ))
-              ) : null}
+              {(state?.dealerCards || []).length
+                ? (state?.dealerCards || []).map((card, index) => (
+                    <PiratePlayingCardView
+                      key={`dealer-${card.id}-${index}`}
+                      card={card}
+                      hidden={Boolean(state?.dealerHidden && index === 1)}
+                      dealt={Boolean(dealtCardDelays[`dealer-${card.id}-${index}`] !== undefined)}
+                      dealDelayMs={dealtCardDelays[`dealer-${card.id}-${index}`] || 0}
+                    />
+                  ))
+                : null}
             </div>
           </section>
         </div>
@@ -378,15 +397,15 @@ export default function BlackjackTableScene({
             ? "En attente de mise"
             : placeholder
               ? "Joueur a table"
-            : seat?.isActive
-              ? "A jouer"
-              : seat?.result
-                ? seat.result
-                : seat?.status
-                  ? seat.status
-                  : seat?.score
-                    ? `${seat.score.total || 0} points`
-                    : "En jeu";
+              : seat?.isActive
+                ? "A jouer"
+                : seat?.result
+                  ? seat.result
+                  : seat?.status
+                    ? seat.status
+                    : seat?.score
+                      ? `${seat.score.total || 0} points`
+                      : "En jeu";
 
           return (
             <article
@@ -398,10 +417,12 @@ export default function BlackjackTableScene({
               }}
             >
               <span className="casino-oval-seat__tag">{layout.tag}</span>
+
               <header>
                 <strong>{seatName}</strong>
                 <span>{waiting ? "En attente" : placeholder ? "A table" : seat?.isActive ? "Tour actif" : "Table"}</span>
               </header>
+
               <div className="casino-seat-role-row" aria-label={`Informations de ${seatName}`}>
                 {typeof seat?.wager === "number" && seat.wager > 0 ? (
                   <span className="casino-seat-role-chip casino-seat-role-chip--stake">
@@ -410,6 +431,7 @@ export default function BlackjackTableScene({
                 ) : null}
                 {seat?.isActive ? <span className="casino-seat-role-chip casino-seat-role-chip--action">A jouer</span> : null}
               </div>
+
               <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-peer">
                 {seatCards.length ? (
                   seatCards.map((card, cardIndex) => (
@@ -433,10 +455,12 @@ export default function BlackjackTableScene({
                   </div>
                 )}
               </div>
+
               <div className="casino-blackjack-peer-caption" aria-label={`Main de ${seatName}`}>
                 <strong>{seatName}</strong>
                 <span>{seatStatus}</span>
               </div>
+
               <small>{seatStatus}</small>
             </article>
           );
@@ -445,10 +469,10 @@ export default function BlackjackTableScene({
         <div className="casino-blackjack-player-layer">
           <article className={`casino-oval-seat casino-oval-seat--player casino-oval-seat--blackjack-player ${isDecisionPhase ? "is-focus" : ""}`}>
             <div className="casino-blackjack-player-core">
-              {showHeroOutcome ? (
-                <div className={`casino-blackjack-seat-outcome casino-blackjack-seat-outcome--hero is-${playerOutcome.tone}`} aria-live="polite">
-                  <strong>{playerOutcome.label}</strong>
-                  {playerOutcome.detail ? <span>{playerOutcome.detail}</span> : null}
+              {heroOutcome ? (
+                <div className={`casino-blackjack-seat-outcome casino-blackjack-seat-outcome--hero is-${heroOutcome.tone}`} aria-live="polite">
+                  <strong>{heroOutcome.label}</strong>
+                  {heroOutcome.detail ? <span>{heroOutcome.detail}</span> : null}
                 </div>
               ) : null}
 
@@ -483,17 +507,17 @@ export default function BlackjackTableScene({
                         </header>
 
                         <div className="casino-card-row casino-card-row--player casino-card-row--fan casino-card-row--fan-player">
-                          {hand.cards.length ? (
-                            hand.cards.map((card, index) => (
-                              <PiratePlayingCardView
-                                key={`${hand.id}-${card.id}-${index}`}
-                                card={card}
-                                emphasis="strong"
-                                dealt={Boolean(dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] !== undefined)}
-                                dealDelayMs={dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] || 0}
-                              />
-                            ))
-                          ) : null}
+                          {hand.cards.length
+                            ? hand.cards.map((card, index) => (
+                                <PiratePlayingCardView
+                                  key={`${hand.id}-${card.id}-${index}`}
+                                  card={card}
+                                  emphasis="strong"
+                                  dealt={Boolean(dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] !== undefined)}
+                                  dealDelayMs={dealtCardDelays[`player-${handIndex}-${card.id}-${index}`] || 0}
+                                />
+                              ))
+                            : null}
                         </div>
 
                         <div className="casino-blackjack-player-banner" aria-label={`Main de ${playerSeatName}`}>
@@ -541,6 +565,7 @@ export default function BlackjackTableScene({
                 </button>
               ))}
             </div>
+
             <span className="casino-seat-chip-stack__total">{formatCredits(totalWager)}</span>
           </div>
         </div>

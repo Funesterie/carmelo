@@ -180,13 +180,14 @@ function getPokerShowdownReplayKey(state: PokerState | null) {
 function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string, playerName: string): PokerLastHandRecap | null {
   const replayKey = getPokerShowdownReplayKey(state);
   if (!replayKey) return null;
+  const showdownState = state!;
 
-  const selfSeat = findPokerSelfSeat(state, currentUserId, playerName);
-  const normalizedSelfSeatId = normalizeIdentity(selfSeat?.id || selfSeat?.userId || state.selfSeatId);
+  const selfSeat = findPokerSelfSeat(showdownState, currentUserId, playerName);
+  const normalizedSelfSeatId = normalizeIdentity(selfSeat?.id || selfSeat?.userId || showdownState.selfSeatId);
   const normalizedPlayerName = normalizeIdentity(playerName);
   const heroName = String(playerName || selfSeat?.name || selfSeat?.username || "Toi").trim();
-  const heroHandLabel = formatPokerHandLabel(state.playerHand || selfSeat?.hand) || "";
-  const heroAmount = Number(state.lastDelta || state.payoutAmount || 0);
+  const heroHandLabel = formatPokerHandLabel(showdownState.playerHand || selfSeat?.hand) || "";
+  const heroAmount = Number(showdownState.lastDelta || showdownState.payoutAmount || 0);
   const heroWon = Boolean(selfSeat?.isWinner || heroAmount > 0);
   const winners: PokerLastHandRecapWinner[] = [];
 
@@ -201,7 +202,7 @@ function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string
   }
 
   const seenSeatIds = new Set<string>(winners.map((winner) => winner.id));
-  [...(state.seats || []), ...(state.aiSeats || [])].forEach((seat) => {
+  [...(showdownState.seats || []), ...(showdownState.aiSeats || [])].forEach((seat) => {
     const seatId = normalizeIdentity(seat.id || seat.userId || seat.name || seat.username);
     const seatName = String(seat.name || seat.username || "Joueur").trim();
     const seatHandLabel = formatPokerHandLabel(seat.hand) || seat.read || "";
@@ -227,12 +228,12 @@ function buildPokerLastHandRecap(state: PokerState | null, currentUserId: string
   });
 
   return {
-    handId: String(state.handId || replayKey),
+    handId: String(showdownState.handId || replayKey),
     resolvedAt: Date.now(),
-    message: state.message || "Main terminee.",
+    message: showdownState.message || "Main terminee.",
     winners,
     heroHandLabel,
-    actionLog: [...(state.actionLog || [])].slice(-8),
+    actionLog: [...(showdownState.actionLog || [])].slice(-8),
   };
 }
 

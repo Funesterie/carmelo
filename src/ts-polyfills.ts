@@ -6,25 +6,30 @@ if (!Array.prototype.includes) {
 }
 if (!Array.prototype.flat) {
   Array.prototype.flat = function <A, D extends number = 1>(this: A, depth?: D) {
-    var flattend: FlatArray<A, D>[] = [];
-    (function flat(arr: any[], d: number | undefined) {
-      for (var i = 0; i < arr.length; i++) {
-        if (Array.isArray(arr[i]) && (d > 0 || d === undefined)) {
-          flat(arr[i], d === undefined ? 1 : d - 1);
+    const flattened: FlatArray<A, D>[] = [];
+    const initialDepth = typeof depth === "number" && !Number.isNaN(depth) ? depth : 1;
+    (function flat(arr: unknown[], d: number | undefined) {
+      for (let i = 0; i < arr.length; i += 1) {
+        const item = arr[i];
+        if (Array.isArray(item) && ((d ?? 0) > 0 || d === undefined)) {
+          flat(item, d === undefined ? 1 : d - 1);
         } else {
-          flattend.push(arr[i] as FlatArray<A, D>);
+          flattened.push(item as FlatArray<A, D>);
         }
       }
-    })(Array.isArray(this) ? this : [this], isNaN(depth as number) ? 1 : Number(depth));
-    return flattend;
+    })(Array.isArray(this) ? (this as unknown[]) : [this], initialDepth);
+    return flattened;
   };
 }
 // Polyfill Object.entries
 if (!Object.entries) {
-  Object.entries = function(obj) {
-    var ownProps = Object.keys(obj), i = ownProps.length, resArray = new Array(i);
-    while (i--)
-      resArray[i] = [ownProps[i], obj[ownProps[i]]];
+  Object.entries = function <T extends object>(obj: T) {
+    const ownProps = Object.keys(obj) as Array<keyof T>;
+    const resArray = new Array<[string, T[keyof T]]>(ownProps.length);
+    for (let i = ownProps.length - 1; i >= 0; i -= 1) {
+      const key = ownProps[i];
+      resArray[i] = [String(key), obj[key]];
+    }
     return resArray;
   };
 }

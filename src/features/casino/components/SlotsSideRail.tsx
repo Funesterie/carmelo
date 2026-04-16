@@ -11,7 +11,10 @@ import {
 import { formatCredits } from "../../../lib/casinoRoomState";
 import type { CasinoProfile, CasinoSpin } from "../../../lib/casinoApi";
 
-type SlotsFeatureMedia = (typeof SLOT_INTRO_MEDIA | typeof SLOT_AMBIENT_MEDIA | (typeof SLOT_FEATURE_MEDIA)[SlotFeatureKey]);
+type SlotsFeatureMedia =
+  | typeof SLOT_INTRO_MEDIA
+  | typeof SLOT_AMBIENT_MEDIA
+  | (typeof SLOT_FEATURE_MEDIA)[SlotFeatureKey];
 
 type SlotsSideRailProps = {
   profile: CasinoProfile;
@@ -39,6 +42,7 @@ function pickDisplaySymbolId(
   const nonJokerSymbols = symbols
     .filter((symbolId) => symbolId && symbolId !== "JOKER")
     .map((symbolId) => getSlotDisplaySymbolId(symbolId));
+
   if (!nonJokerSymbols.length) return fallbackSymbolId;
 
   const counts = new Map<string, number>();
@@ -54,6 +58,7 @@ function resolveWinTrail(spin: CasinoSpin, win: CasinoSpin["wins"][number], grid
   const displaySymbolId = pickDisplaySymbolId(win.symbol, trailSymbols);
   const displayMeta = getSlotSymbolMeta(displaySymbolId);
   const displayLabel = displayMeta.label || win.label;
+
   const trail = trailSymbols.map((symbolId, trailIndex) => {
     const meta = getSlotSymbolMeta(symbolId);
     return {
@@ -101,19 +106,35 @@ export default function SlotsSideRail({
             <span className="casino-chip">Dernier spin</span>
             <h3>Alignements</h3>
           </div>
+
           <div className="casino-win-list">
             {lastSpin.wins.length ? (
               lastSpin.wins.map((win) => {
-                const sourceGrid = isRenderableGrid(recapGrid, lastSpin)
-                  ? recapGrid
-                  : lastSpin.bonus?.triggered && isRenderableGrid(lastSpin.bonus.openingGrid, lastSpin)
-                    ? lastSpin.bonus.openingGrid
-                    : lastSpin.grid;
+                let sourceGrid: string[][] = lastSpin.grid;
+
+                if (isRenderableGrid(recapGrid, lastSpin) && recapGrid) {
+                  sourceGrid = recapGrid;
+                } else if (
+                  lastSpin.bonus?.triggered &&
+                  isRenderableGrid(lastSpin.bonus.openingGrid, lastSpin) &&
+                  lastSpin.bonus.openingGrid
+                ) {
+                  sourceGrid = lastSpin.bonus.openingGrid;
+                }
                 const resolvedWin = resolveWinTrail(lastSpin, win, sourceGrid);
+
                 return (
-                  <article key={`${win.lineIndex}-${win.symbol}-${win.indexes.join("-")}`} className="casino-win-entry">
+                  <article
+                    key={`${win.lineIndex}-${win.symbol}-${win.indexes.join("-")}`}
+                    className="casino-win-entry"
+                  >
                     <div className="casino-win-entry__summary">
-                      <img className="casino-paytable__symbol-art" src={resolvedWin.displayMeta.image} alt="" aria-hidden="true" />
+                      <img
+                        className="casino-paytable__symbol-art"
+                        src={resolvedWin.displayMeta.image}
+                        alt=""
+                        aria-hidden="true"
+                      />
                       <div className="casino-win-entry__copy">
                         <strong>{resolvedWin.displayLabel}</strong>
                         <span>
@@ -121,19 +142,30 @@ export default function SlotsSideRail({
                         </span>
                         {resolvedWin.wildCount ? (
                           <span className="casino-win-entry__note">
-                            {resolvedWin.wildCount} joker{resolvedWin.wildCount > 1 ? "s" : ""} wild complete{resolvedWin.wildCount > 1 ? "nt" : ""} la ligne
+                            {resolvedWin.wildCount} joker{resolvedWin.wildCount > 1 ? "s" : ""} wild complete
+                            {resolvedWin.wildCount > 1 ? "nt" : ""} la ligne
                           </span>
                         ) : null}
                       </div>
                     </div>
+
                     <b>+{formatCredits(win.payout)}</b>
-                    <div className="casino-win-entry__trail" aria-label={`Symboles de la ligne ${win.lineIndex + 1}`}>
+
+                    <div
+                      className="casino-win-entry__trail"
+                      aria-label={`Symboles de la ligne ${win.lineIndex + 1}`}
+                    >
                       {resolvedWin.trail.map((entry, trailIndex) => (
                         <div
                           key={`${win.lineIndex}-${entry.index}-${trailIndex}`}
                           className={`casino-win-entry__tile ${entry.isWild ? "is-wild" : ""}`}
                         >
-                          <img className="casino-paytable__symbol-art" src={entry.meta.image} alt="" aria-hidden="true" />
+                          <img
+                            className="casino-paytable__symbol-art"
+                            src={entry.meta.image}
+                            alt=""
+                            aria-hidden="true"
+                          />
                           <span>{entry.meta.label}</span>
                           {entry.isWild ? <small>Wild</small> : null}
                         </div>

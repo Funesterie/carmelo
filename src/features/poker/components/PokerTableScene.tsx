@@ -319,7 +319,7 @@ export default function PokerTableScene({
   const heroName = String(playerName || "Toi").trim();
   const showHeroSeat = queuedForNextHand || !isSpectatingRound || Boolean(selfSeat) || Boolean(heroCards.length);
   const displayedPotTotal = stage === "waiting" ? 0 : potTotal;
-  const heroWon = Boolean(selfSeat?.isWinner || state?.lastDelta > 0 || state?.payoutAmount > 0);
+  const heroWon = Boolean(selfSeat?.isWinner || (state?.lastDelta ?? 0) > 0 || (state?.payoutAmount ?? 0) > 0);
   const heroStatus =
     queuedForNextHand
       ? "Inscrit prochaine main"

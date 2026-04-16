@@ -224,7 +224,7 @@ export default function RouletteRoom({
   const profileSignatureRef = useRef<string>("");
   const pollTimeoutRef = useRef<number | null>(null);
   const syncInFlightRef = useRef(false);
-  const drawTimeoutRef = useRef<number | null>(null);
+  const drawTimeoutRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const celebrationTimeoutRef = useRef<number | null>(null);
   const prizeRainTimeoutRef = useRef<number | null>(null);
   const kickoffTimeoutRef = useRef<number | null>(null);

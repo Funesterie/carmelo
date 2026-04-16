@@ -148,7 +148,6 @@ export default function CasinoGameScreen({
     [activeCasinoRoom],
   );
 
-  // Ne lance l'intro qu'une fois le media vraiment debloque.
   React.useEffect(() => {
     const video = introVideoRef.current;
     if (!video) return;
@@ -170,6 +169,7 @@ export default function CasinoGameScreen({
     } catch {
       // ignore reset errors
     }
+
     const playPromise = video.play();
     if (playPromise && typeof playPromise.catch === "function") {
       playPromise.catch((err) => {
@@ -178,16 +178,20 @@ export default function CasinoGameScreen({
       });
     }
   }, [mediaReady, showImmersionOneVideo]);
+
   const [clockLabel, setClockLabel] = React.useState(() =>
     new Date().toLocaleTimeString("fr-FR", {
       hour: "2-digit",
       minute: "2-digit",
     }),
   );
+
   const profileMenuRef = React.useRef<HTMLDivElement | null>(null);
+
   const [tableLobby, setTableLobby] = React.useState(() =>
     isTableChannelRoom(activeCasinoRoom) ? readTableLobbySnapshot(activeCasinoRoom) : null,
   );
+
   const [tableSelectionFallback, setTableSelectionFallback] = React.useState(() =>
     isTableChannelRoom(activeCasinoRoom) ? readSyncedTableSelection(activeCasinoRoom) : "",
   );
@@ -199,6 +203,12 @@ export default function CasinoGameScreen({
   }
 
   void mediaReady;
+  void mediaStatus;
+  void freshVideo;
+  void districtArtwork;
+  void HAMBURGER_ROOM_ICONS;
+  void HeaderWidgetIcon;
+
   const showHeaderAmbient = true;
   const usesDedicatedAmbient = activeCasinoRoom === "slots" || activeCasinoRoom === "roulette";
   const showImmersionAmbientVideo = showImmersion && showImmersionOneVideo;
@@ -207,17 +217,20 @@ export default function CasinoGameScreen({
   const showAmbientUnderlay = !showImmersion && activeCasinoRoom === "roulette";
   const tableGame = isTableChannelRoom(activeCasinoRoom) ? activeCasinoRoom : null;
   const channelRooms = tableGame ? tableLobby?.rooms || [] : [];
-  const joinedTableRoomId =
-    tableGame
-      ? String(tableLobby?.joinedRoomId || (!channelRooms.length ? tableSelectionFallback : "") || "").trim()
-      : "";
+
+  const joinedTableRoomId = tableGame
+    ? String(tableLobby?.joinedRoomId || (!channelRooms.length ? tableSelectionFallback : "") || "").trim()
+    : "";
+
   const joinedTableRoomIndex = joinedTableRoomId
     ? Math.max(0, channelRooms.findIndex((room) => room.id === joinedTableRoomId))
     : 0;
+
   const joinedTableChannelMeta =
     tableGame && joinedTableRoomId
       ? getTableChannelDisplayMeta(tableGame, joinedTableRoomId, joinedTableRoomIndex)
       : null;
+
   const channelOptions = React.useMemo(() => {
     if (!tableGame) return [];
     return channelRooms.map((room, index) => ({
@@ -241,6 +254,7 @@ export default function CasinoGameScreen({
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
@@ -275,6 +289,7 @@ export default function CasinoGameScreen({
     const unsubscribeLobby = subscribeTableLobbySnapshot(tableGame, (snapshot) => {
       setTableLobby(snapshot);
     });
+
     const unsubscribeSelection = subscribeSyncedTableSelection(tableGame, (roomId) => {
       setTableSelectionFallback(roomId);
     });
@@ -287,7 +302,6 @@ export default function CasinoGameScreen({
 
   return (
     <div className={`casino-game-shell ${showHeaderAmbient ? "casino-game-shell--with-ambient" : ""}`}>
-
       {showImmersion ? (
         <div
           className="casino-immersion-overlay"
@@ -300,32 +314,14 @@ export default function CasinoGameScreen({
               <span className="casino-chip">Connexion rituelle</span>
               <h2>Cap sur le pont pirate</h2>
               <p>{immersionLine}</p>
+
               <div className="casino-immersion-overlay__stats">
                 <span>Intro video unique</span>
                 <span>Tables ATS en cours d'arrimage</span>
                 <span>Canon live en veille sur la roulette</span>
               </div>
+
               <div className="casino-immersion-overlay__actions">
-                <div className="casino-immersion-overlay__room-pills" role="tablist" aria-label="Acces direct aux jeux">
-                  {ROOM_DEFINITIONS.map((room) => {
-                    const roomIcon = HAMBURGER_ROOM_ICONS[room.id] || room.icon;
-                    return (
-                      <button
-                        key={room.id}
-                        type="button"
-                        className={`casino-ghost-button casino-immersion-overlay__room-button ${room.id === activeCasinoRoom ? "is-active" : ""}`}
-                        onClick={() => handleRoomSelection(room.id)}
-                        role="tab"
-                        aria-selected={room.id === activeCasinoRoom}
-                      >
-                        <span className="casino-button-icon casino-button-icon--room" aria-hidden="true">
-                          <img src={roomIcon} alt="" />
-                        </span>
-                        <span className="casino-button-label">{room.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
                 <button
                   type="button"
                   className="casino-primary-button casino-primary-button--cyan casino-immersion-overlay__skip"
@@ -384,7 +380,11 @@ export default function CasinoGameScreen({
                   </video>
                 ) : null}
                 <div className="casino-account-bar__ambient-overlay">
-                  {showDedicatedAmbientPanel ? ambientPanel : <div className="casino-account-bar__ambient--placeholder" aria-hidden="true" />}
+                  {showDedicatedAmbientPanel ? (
+                    ambientPanel
+                  ) : (
+                    <div className="casino-account-bar__ambient--placeholder" aria-hidden="true" />
+                  )}
                 </div>
               </>
             ) : (
@@ -393,10 +393,7 @@ export default function CasinoGameScreen({
           </div>
         ) : null}
 
-        <div
-          ref={profileMenuRef}
-          className={`casino-account-bar__menu ${menuOpen ? "is-open" : ""}`}
-        >
+        <div ref={profileMenuRef} className={`casino-account-bar__menu ${menuOpen ? "is-open" : ""}`}>
           <button
             type="button"
             className="casino-ghost-button casino-account-bar__menu-toggle"
@@ -422,6 +419,7 @@ export default function CasinoGameScreen({
               </div>
               <p className="casino-account-bar__menu-note">{currentRoom.body}</p>
             </section>
+
             <div className="casino-account-bar__room-list" role="tablist" aria-label="Jeux casino">
               {ROOM_DEFINITIONS.map((room) => {
                 const roomIcon = HAMBURGER_ROOM_ICONS[room.id] || room.icon;
@@ -457,6 +455,7 @@ export default function CasinoGameScreen({
                 {profile.wallet.canClaimDailyBonus ? `Bonus +${profile.wallet.dailyBonusAmount}` : "Bonus pris"}
               </span>
             </button>
+
             {tableGame ? (
               <section className="casino-account-bar__channel-panel" aria-label={`Canaux ${tableGame}`}>
                 <div className="casino-account-bar__channel-copy">
@@ -464,20 +463,23 @@ export default function CasinoGameScreen({
                   <strong>{joinedTableChannelMeta?.channelLabel || "Canal en cours"}</strong>
                   <small>{joinedTableChannelMeta?.title || "Connexion de table en cours..."}</small>
                 </div>
+
                 <div className="casino-account-bar__channel-list" role="tablist" aria-label={`Canaux ${tableGame}`}>
                   {(channelOptions.length
                     ? channelOptions
                     : joinedTableChannelMeta
-                      ? [{
-                          room: {
-                            id: joinedTableRoomId || `${tableGame}-channel-1`,
-                            playerCount: 0,
-                            participants: [],
-                            isCurrent: true,
-                            hasSelf: false,
+                      ? [
+                          {
+                            room: {
+                              id: joinedTableRoomId || `${tableGame}-channel-1`,
+                              playerCount: 0,
+                              participants: [],
+                              isCurrent: true,
+                              hasSelf: false,
+                            },
+                            meta: joinedTableChannelMeta,
                           },
-                          meta: joinedTableChannelMeta,
-                        }]
+                        ]
                       : []
                   ).map(({ room, meta }) => (
                     <button
@@ -501,6 +503,7 @@ export default function CasinoGameScreen({
                 </div>
               </section>
             ) : null}
+
             <button
               type="button"
               className="casino-ghost-button casino-ghost-button--menu"
@@ -513,6 +516,7 @@ export default function CasinoGameScreen({
               </span>
               <span className="casino-button-label">Sync</span>
             </button>
+
             <button
               type="button"
               className="casino-ghost-button casino-ghost-button--menu"
@@ -527,8 +531,25 @@ export default function CasinoGameScreen({
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", position: "relative", width: "100%" }}>
-          <div style={{ position: "absolute", right: 0, bottom: -36, display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            position: "relative",
+            width: "100%",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: -36,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
             <div className="casino-account-bar__clock">{clockLabel}</div>
           </div>
         </div>
@@ -538,7 +559,7 @@ export default function CasinoGameScreen({
         </div>
       </header>
 
-      {(error || notice) ? (
+      {error || notice ? (
         <div className="casino-toast-rail" aria-live="polite">
           {error ? <div className="casino-alert casino-alert--error">{error}</div> : null}
           {notice ? <div className="casino-alert casino-alert--success">{notice}</div> : null}
