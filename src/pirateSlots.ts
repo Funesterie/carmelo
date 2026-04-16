@@ -2,7 +2,7 @@
 import { randInt } from "./rng";
 import * as React from "react";
 
-export type PirateSymbolId = "PIRATE" | "CHEST" | "COIN" | "BAT" | "BLUNDERBUSS" | "MAP" | "SOLDAT";
+export type PirateSymbolId = "PIRATE" | "CHEST" | "COIN" | "BAT" | "BLUNDERBUSS" | "MAP" | "SOLDAT" | "PARROT"; // 🦜 nouveau symbole
 
 export const pirateSymbols: { id: PirateSymbolId; weight: number; emoji: string }[] = [
   { id: "PIRATE", weight: 18, emoji: "🏴‍☠️" }, // pirate
@@ -11,7 +11,8 @@ export const pirateSymbols: { id: PirateSymbolId; weight: number; emoji: string 
   { id: "BAT", weight: 14, emoji: "🦇" }, // bat
   { id: "BLUNDERBUSS", weight: 10, emoji: "🔫" }, // gun
   { id: "MAP", weight: 12, emoji: "🗺️" }, // map
-  { id: "SOLDAT", weight: 9, emoji: "🛡️" } // soldat
+  { id: "SOLDAT", weight: 9, emoji: "🛡️" }, // soldat
+  { id: "PARROT", weight: 5, emoji: "🦜" } // symbole rare pour gros gain
 ];
 
 export function pickWeightedPirate(): PirateSymbolId {
@@ -44,14 +45,15 @@ export function spinPirateSlots(bet: number): PirateSpinResult {
   const threeSame = [a, b, c, d, e].some((v, i, arr) => arr.filter(x => x === v).length === 3);
 
   if (allSame) {
-    if (a === "PIRATE") payout = bet * 50;
-    else if (a === "CHEST") payout = bet * 30;
-    else if (a === "COIN") payout = bet * 20;
-    else payout = bet * 10;
+    if (a === "PARROT")      payout = bet * 80;   // Perroquet 777 → x80
+    else if (a === "PIRATE") payout = bet * 50;
+    else if (a === "CHEST")  payout = bet * 30;
+    else if (a === "COIN")   payout = bet * 20;
+    else                     payout = bet * 10;
   } else if (fourSame) {
-    payout = bet * 5;
+    payout = a === "PARROT" ? bet * 10 : bet * 5;
   } else if (threeSame) {
-    payout = bet * 2;
+    payout = a === "PARROT" ? bet * 4 : bet * 2;
   }
 
   const win = payout;

@@ -1,3 +1,16 @@
+// Table des poids des symboles (synchronisée avec le backend)
+export const SYMBOL_WEIGHTS: Record<string, number> = {
+  PIRATE: 18,
+  CHEST: 15,
+  COIN: 22,
+  BAT: 14,
+  BLUNDERBUSS: 10,
+  MAP: 12,
+  PARROT: 5,
+  SOLDAT: 9,
+  ELEPHANT: 6,
+  JOKER: 6,
+};
 import batIconImg from "../../images/bat.png";
 import blackjackCaptainArt from "../../images/blackjack-captain-art.png";
 import cardArtwork from "../../images/Cartes de pirate au crépuscule.png";
@@ -35,6 +48,7 @@ import rouletteArtwork from "../../images/casino ats.png";
 import soldatImg from "../../images/soldat.png";
 import batVideo from "../../videos/bat.mp4";
 import boobaVideo from "../../videos/booba.mp4";
+import cocoVideo from "../../videos/coco.mp4";
 import deppVideo from "../../videos/depp.mp4";
 import expVideo from "../../videos/exp.mp4";
 import jokerVideo from "../../videos/joker.mp4";
@@ -99,11 +113,16 @@ export function getSlotSymbolMeta(symbolId: string) {
 }
 
 export const PAYOUT_TABLE = [
-  { symbol: "PIRATE", three: "x12", four: "x28", five: "x75" },
-  { symbol: "ELEPHANT", three: "x15", four: "x34", five: "x90" },
-  { symbol: "JOKER", three: "x20", four: "x80", five: "x200" },
-  { symbol: "MAP", three: "x9", four: "x18", five: "x34" },
-  { symbol: "CHEST", three: "x8", four: "x18", five: "x40" },
+  { symbol: "PIRATE",      three: 12,  four: 28,  five: 75 },
+  { symbol: "CHEST",       three: 8,   four: 18,  five: 40 },
+  { symbol: "COIN",        three: 6,   four: 12,  five: 22 },
+  { symbol: "BAT",         three: 5,   four: 10,  five: 18 },
+  { symbol: "BLUNDERBUSS", three: 7,   four: 14,  five: 26 },
+  { symbol: "MAP",         three: 9,   four: 18,  five: 34 },
+  { symbol: "PARROT",      three: 20,  four: 40,  five: 80 },
+  { symbol: "SOLDAT",      three: 12,  four: 26,  five: 60 },
+  { symbol: "ELEPHANT",    three: 15,  four: 34,  five: 90 },
+  { symbol: "JOKER",       three: 20,  four: 80,  five: 200 },
 ] as const;
 
 export const ROOM_DEFINITIONS = [
@@ -233,7 +252,8 @@ export type SlotFeatureKey =
   | "gun"
   | "joker-line"
   | "joker-cross"
-  | "joker-full";
+  | "joker-full"
+  | "parrot"; // nouveau
 
 export type RouletteSoundEvent =
   | { type: "enter" | "join"; roundId: number; participants: number }
@@ -316,6 +336,12 @@ export const SLOT_FEATURE_MEDIA: Record<
     body: "La grille entiere se transforme en wilds. Le ranger prend le pont pour la pluie de lingots.",
     image: drapImg,
     video: rangerVideo,
+  },
+  parrot: {
+    title: "Gros gain Perroquet 777",
+    body: "Cinq perroquets apportent un jackpot et une pluie d'or !",
+    image: slot777ParrotImg,
+    video: cocoVideo
   },
 };
 
@@ -400,9 +426,10 @@ function normalizeBonusFeatureKey(feature: string | null | undefined) {
   return SLOT_BONUS_FEATURE_ALIASES[normalized] || normalized;
 }
 
-export function buildGoldRainDrops(totalPayout: number, bet: number) {
+export function buildGoldRainDrops(totalPayout: number, bet: number, isFullLineWin: boolean = false) {
   const ratio = totalPayout / Math.max(1, bet);
-  const count = Math.max(0, Math.min(40, Math.round(ratio * 4)));
+  // Si c'est une ligne complète (full line win), toujours pluie d'or massive
+  const count = isFullLineWin ? 60 : Math.max(0, Math.min(40, Math.round(ratio * 4)));
   return Array.from({ length: count }, (_, index) => ({
     id: `gold-${Date.now()}-${index}`,
     left: `${4 + ((index * 11) % 88)}%`,
@@ -480,21 +507,14 @@ export function getSlotFeatureForBonusGrid(grid: string[][]): SlotFeatureKey {
 export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
   if (!spin) return "idle";
 
-  if (spin.bonus?.triggered) {
-    const bonusFeature = getSlotFeatureForBonusGrid(spin.bonus.openingGrid);
-    if (bonusFeature !== "idle") return bonusFeature;
-
-    const mappedBonusFeature = getSlotFeatureForBonusFeature(spin.bonus?.feature);
-    if (mappedBonusFeature !== "idle") return mappedBonusFeature;
-  }
-
   const strongestWin = [...spin.wins].sort((left, right) => right.payout - left.payout)[0];
   const strongestWinMatchCount = Math.max(
     Number(strongestWin?.matchCount || 0),
     Array.isArray(strongestWin?.indexes) ? strongestWin.indexes.length : 0,
   );
-  if (strongestWinMatchCount < 5) return "idle";
   const strongestWinSymbol = getSlotDisplaySymbolId(strongestWin?.symbol || "");
+  if (strongestWinSymbol === "PARROT" && strongestWinMatchCount >= 5) return "parrot";
+  if (strongestWinMatchCount < 5) return "idle";
   if (strongestWinSymbol === "ELEPHANT") return "elephant";
   if (strongestWinSymbol === "SOLDAT") return "soldat";
   if (strongestWinSymbol === "BAT") return "bat";

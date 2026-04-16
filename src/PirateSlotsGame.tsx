@@ -1,3 +1,10 @@
+// Détermine si le spin contient une ligne complète de symboles identiques (full line win)
+function isFullLineWin(spin: CasinoSpin): boolean {
+  if (!spin || !Array.isArray(spin.wins)) return false;
+  // On considère qu'une win est "full line" si elle couvre toute la largeur de la grille
+  // (par exemple, 5 symboles alignés sur une ligne)
+  return spin.wins.some(win => Array.isArray(win.indexes) && win.indexes.length >= 5);
+}
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import alerteSound from "./audio/alerte.mp3";
@@ -790,7 +797,7 @@ function SlotsRoom({
       return;
     }
 
-    const nextDrops = buildSlotPrizeRain(spin.totalPayout, spin.bet, tone);
+    const nextDrops = buildSlotPrizeRain(spin.totalPayout, spin.bet, tone, isFullLineWin(spin));
     setGoldRain(nextDrops);
     if (!nextDrops.length) return;
 
@@ -821,15 +828,16 @@ function SlotsRoom({
     return "Gain encaisse";
   }
 
-  function buildSlotPrizeRain(totalPayout: number, betAmount: number, tone: SlotCelebrationTone): SlotPrizeRainItem[] {
+  function buildSlotPrizeRain(totalPayout: number, betAmount: number, tone: SlotCelebrationTone, isFullLineWin: boolean = false): SlotPrizeRainItem[] {
     const ratio = totalPayout / Math.max(1, betAmount);
-    const count =
-      tone === "epic"
-        ? Math.min(36, Math.max(18, Math.round(ratio * 3.4)))
-        : Math.min(22, Math.max(10, Math.round(ratio * 2.4)));
+    const count = isFullLineWin
+      ? 60
+      : tone === "epic"
+      ? Math.min(36, Math.max(18, Math.round(ratio * 3.4)))
+      : Math.min(22, Math.max(10, Math.round(ratio * 2.4)));
 
     return Array.from({ length: count }, (_, index) => {
-      const useDiamond = tone === "epic" ? index % 2 === 0 : index % 3 === 0;
+      const useDiamond = isFullLineWin || tone === "epic" ? index % 2 === 0 : index % 3 === 0;
       const asset = useDiamond
         ? [saphirImg, rubisImg, opaleImg][index % 3] || saphirImg
         : lingotImg;
