@@ -41,17 +41,18 @@ function pickDisplaySymbolId(
   symbols: string[],
 ) {
   const nonJokerSymbols = symbols
-    .filter((symbolId) => symbolId && symbolId !== "JOKER")
     .map((symbolId) => getSlotDisplaySymbolId(symbolId));
+  const visibleBaseSymbols = nonJokerSymbols
+    .filter((symbolId) => symbolId && symbolId !== "JOKER");
 
-  if (!nonJokerSymbols.length) return fallbackSymbolId;
+  if (!visibleBaseSymbols.length) return getSlotDisplaySymbolId(fallbackSymbolId);
 
   const counts = new Map<string, number>();
-  nonJokerSymbols.forEach((symbolId) => {
+  visibleBaseSymbols.forEach((symbolId) => {
     counts.set(symbolId, Number(counts.get(symbolId) || 0) + 1);
   });
 
-  return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || fallbackSymbolId;
+  return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || getSlotDisplaySymbolId(fallbackSymbolId);
 }
 
 function resolveWinTrail(spin: CasinoSpin, win: CasinoSpin["wins"][number], grid: string[][]) {
@@ -66,7 +67,7 @@ function resolveWinTrail(spin: CasinoSpin, win: CasinoSpin["wins"][number], grid
       index: win.indexes[trailIndex],
       symbolId,
       meta,
-      isWild: symbolId === "JOKER" && displaySymbolId !== "JOKER",
+      isWild: getSlotDisplaySymbolId(symbolId) === "JOKER" && displaySymbolId !== "JOKER",
     };
   });
 
@@ -106,7 +107,7 @@ export default function SlotsSideRail({
         <section className="casino-panel">
           <div className="casino-panel__header">
             <span className="casino-chip">Phase bonus</span>
-            <h3>Jokers verrouilles</h3>
+            <h3>Wilds verrouilles</h3>
           </div>
 
           <p className="casino-history-empty">
@@ -157,7 +158,7 @@ export default function SlotsSideRail({
                         </span>
                         {resolvedWin.wildCount ? (
                           <span className="casino-win-entry__note">
-                            {resolvedWin.wildCount} joker{resolvedWin.wildCount > 1 ? "s" : ""} wild complete
+                            {resolvedWin.wildCount} wild{resolvedWin.wildCount > 1 ? "s" : ""} complete
                             {resolvedWin.wildCount > 1 ? "nt" : ""} la ligne
                           </span>
                         ) : null}

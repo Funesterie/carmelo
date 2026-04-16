@@ -62,7 +62,7 @@ export const SYMBOL_META: Record<string, { emoji: string; label: string; accent:
   PARROT: { emoji: "🦜", label: "Perroquet 777", accent: "var(--casino-lime)", image: slot777ParrotImg },
   SOLDAT: { emoji: "🛡️", label: "Spartiate", accent: "var(--casino-silver)", image: slotSoldatImg },
   ELEPHANT: { emoji: "🐘", label: "Elephant royal", accent: "var(--casino-ice)", image: slotElephantImg },
-  JOKER: { emoji: "🃏", label: "Joker royal", accent: "var(--casino-violet)", image: slotJokerImg },
+  JOKER: { emoji: "🃏", label: "Wild royal", accent: "var(--casino-violet)", image: slotJokerImg },
 };
 
 const SLOT_SYMBOL_DISPLAY_ALIASES: Record<string, string> = {
@@ -73,6 +73,8 @@ const SLOT_SYMBOL_DISPLAY_ALIASES: Record<string, string> = {
   SPARTA: "SOLDAT",
   SPARTAN: "SOLDAT",
   SOLDIER: "SOLDAT",
+  WILD: "JOKER",
+  WILDS: "JOKER",
   JOKER_LINE: "JOKER",
   JOKER_CROSS: "JOKER",
   JOKER_FULL: "JOKER",
@@ -274,8 +276,8 @@ export const SLOT_FEATURE_MEDIA: Record<
   video: CASINO_INTRO_VIDEO_PUBLIC_SRC,
   },
   "joker-line": {
-    title: "Alignement joker",
-    body: "Le drapeau joker ouvre la phase bonus et garde chaque symbole royal a sa place.",
+    title: "Alignement wild",
+    body: "Les wilds ouvrent la phase bonus et gardent chaque symbole royal a sa place.",
     image: drapImg,
     video: jokerVideo,
   },
@@ -304,14 +306,14 @@ export const SLOT_FEATURE_MEDIA: Record<
     video: expVideo,
   },
   "joker-cross": {
-    title: "Croix joker",
-    body: "Les jokers forment une croix complete sur les diagonales et passent en phase power.",
+    title: "Ligne wild power",
+    body: "Les wilds alignes sur 5 rouleaux declenchent la phase power.",
     image: drapImg,
     video: powerVideo,
   },
   "joker-full": {
-    title: "Full joker",
-    body: "La grille entiere se transforme en jokers. Le ranger prend le pont pour la pluie de lingots.",
+    title: "Full wild",
+    body: "La grille entiere se transforme en wilds. Le ranger prend le pont pour la pluie de lingots.",
     image: drapImg,
     video: rangerVideo,
   },
@@ -381,7 +383,7 @@ export function formatTransactionTime(value: string | null) {
 export function getJokerIndexes(grid: string[][]) {
   const reelCount = grid[0]?.length || 0;
   return grid.flatMap((row, rowIndex) =>
-    row.flatMap((symbolId, columnIndex) => (symbolId === "JOKER" ? [rowIndex * reelCount + columnIndex] : [])),
+    row.flatMap((symbolId, columnIndex) => (getSlotDisplaySymbolId(symbolId) === "JOKER" ? [rowIndex * reelCount + columnIndex] : [])),
   );
 }
 
@@ -424,6 +426,36 @@ export function getSlotFeatureForBonusFeature(feature: string | null | undefined
   }
 }
 
+function hasFiveJokerLine(grid: string[][]) {
+  const rowCount = grid.length;
+  const reelCount = grid[0]?.length || 0;
+  if (rowCount <= 0 || reelCount <= 0) return false;
+
+  const jokerRowsByColumn = Array.from({ length: reelCount }, (_, columnIndex) =>
+    Array.from({ length: rowCount }, (_, rowIndex) => rowIndex)
+      .filter((rowIndex) => getSlotDisplaySymbolId(grid[rowIndex]?.[columnIndex] || "") === "JOKER"),
+  );
+
+  if (jokerRowsByColumn.some((rows) => !rows.length)) return false;
+
+  let reachableRows = new Set(jokerRowsByColumn[0]);
+  for (let columnIndex = 1; columnIndex < jokerRowsByColumn.length; columnIndex += 1) {
+    const nextReachableRows = new Set<number>();
+    jokerRowsByColumn[columnIndex].forEach((rowIndex) => {
+      for (const previousRowIndex of reachableRows) {
+        if (Math.abs(previousRowIndex - rowIndex) <= 1) {
+          nextReachableRows.add(rowIndex);
+          break;
+        }
+      }
+    });
+    if (!nextReachableRows.size) return false;
+    reachableRows = nextReachableRows;
+  }
+
+  return reachableRows.size > 0;
+}
+
 export function getSlotFeatureForBonusGrid(grid: string[][]): SlotFeatureKey {
   const rowCount = grid.length;
   const reelCount = grid[0]?.length || 0;
@@ -434,16 +466,7 @@ export function getSlotFeatureForBonusGrid(grid: string[][]): SlotFeatureKey {
     return "joker-full";
   }
 
-  const hasCrossPattern =
-    rowCount === 3
-    && reelCount === 5
-    && grid[0]?.[0] === "JOKER"
-    && grid[0]?.[4] === "JOKER"
-    && grid[1]?.[2] === "JOKER"
-    && grid[2]?.[0] === "JOKER"
-    && grid[2]?.[4] === "JOKER";
-
-  if (hasCrossPattern) {
+  if (hasFiveJokerLine(grid)) {
     return "joker-cross";
   }
 
@@ -482,15 +505,15 @@ export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
 export function getBonusNarration(spin: CasinoSpin) {
   const normalizedBonusFeature = spin.bonus?.feature ? normalizeBonusFeatureKey(spin.bonus.feature) : "";
   if (normalizedBonusFeature === "joker_full") {
-    return "Full joker verrouille. Toute la grille bascule sous le ranger.";
+    return "Full wild verrouille. Toute la grille bascule sous le ranger.";
   }
   if (normalizedBonusFeature === "joker_cross") {
-    return "Croix joker detectee. Les diagonales sont tenues.";
+    return "Ligne wild detectee. La phase power prend la main.";
   }
   if (spin.bonus?.triggered) {
     return spin.bonus.trigger === "joker_count"
-      ? "Cinq jokers disperses ouvrent la phase bonus."
-      : "Alignement joker detecte. Les symboles royaux restent figes.";
+      ? "Quatre wilds ouvrent la phase bonus."
+      : "Alignement wild detecte. Les symboles royaux restent figes.";
   }
   return spin.totalPayout > 0
     ? `Table gagnee: +${formatCredits(spin.totalPayout)} credits.`

@@ -164,6 +164,7 @@ function SlotsRoom({
   const [lastSpin, setLastSpin] = useState<CasinoSpin | null>(null);
   const [lastMessage, setLastMessage] = useState("Pret a lancer les reels.");
   const [activeFeature, setActiveFeature] = useState<SlotFeatureKey>("idle");
+  const [queuedFeatures, setQueuedFeatures] = useState<SlotFeatureKey[]>([]);
   const [slotIntroPlayed, setSlotIntroPlayed] = useState(() => {
     try {
       return sessionStorage.getItem(SLOT_VIDEO_INTRO_SESSION_KEY) === "1";
@@ -194,12 +195,22 @@ function SlotsRoom({
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const featureVideoRef = useRef<HTMLVideoElement | null>(null);
   const ambientLoopVideoRef = useRef<HTMLVideoElement | null>(null);
+  const activeFeatureRef = useRef<SlotFeatureKey>("idle");
+  const queuedFeaturesRef = useRef<SlotFeatureKey[]>([]);
   const ambientResumeTimeRef = useRef(0);
   const ambientResumePendingRef = useRef(false);
   const slotIntroPlaybackStartedRef = useRef(false);
   const lastAppliedFeaturePlaybackNonceRef = useRef(-1);
   const jokerFeaturePlayedForBonusRef = useRef(false);
   const powerFeaturePlayedForBonusRef = useRef(false);
+
+  useEffect(() => {
+    activeFeatureRef.current = activeFeature;
+  }, [activeFeature]);
+
+  useEffect(() => {
+    queuedFeaturesRef.current = queuedFeatures;
+  }, [queuedFeatures]);
 
   useEffect(() => {
     if (slotIntroPlayed && !slotIntroArmed) return;
@@ -457,6 +468,14 @@ function SlotsRoom({
 
     const handleEnded = () => {
       if (isAlertFeatureActive) {
+        const [nextFeature, ...restQueue] = queuedFeaturesRef.current;
+        if (nextFeature) {
+          queuedFeaturesRef.current = restQueue;
+          setQueuedFeatures(restQueue);
+          startFeaturePlayback(nextFeature);
+          return;
+        }
+        activeFeatureRef.current = "idle";
         setActiveFeature("idle");
         return;
       }
@@ -855,6 +874,26 @@ function SlotsRoom({
     }, tone === "epic" ? SLOT_EPIC_RAIN_MS : SLOT_CELEBRATION_FLASH_MS);
   }
 
+  function startFeaturePlayback(nextFeature: SlotFeatureKey) {
+    const ambientVideo = ambientLoopVideoRef.current;
+    if (ambientVideo && !ambientVideo.paused) {
+      try {
+        ambientResumeTimeRef.current = ambientVideo.currentTime;
+      } catch {
+        // ignore seek read failures
+      }
+      ambientResumePendingRef.current = true;
+      ambientVideo.pause();
+    }
+    markSlotsIntroPlayed();
+    activeFeatureRef.current = nextFeature;
+    setActiveFeature(nextFeature);
+    setFeaturePlaybackNonce((current) => current + 1);
+    if (SLOT_FEATURE_MEDIA[nextFeature].video) {
+      playCue(alertAudioRef, alerteSound, 0.78);
+    }
+  }
+
   function activateFeature(nextFeature: SlotFeatureKey, options?: { isBonusFeature?: boolean }) {
     if (nextFeature === "idle") return;
     if (options?.isBonusFeature && nextFeature === "joker-line") {
@@ -869,22 +908,19 @@ function SlotsRoom({
       }
       powerFeaturePlayedForBonusRef.current = true;
     }
-    const ambientVideo = ambientLoopVideoRef.current;
-    if (ambientVideo && !ambientVideo.paused) {
-      try {
-        ambientResumeTimeRef.current = ambientVideo.currentTime;
-      } catch {
-        // ignore seek read failures
-      }
-      ambientResumePendingRef.current = true;
-      ambientVideo.pause();
+
+    if (activeFeatureRef.current === nextFeature || queuedFeaturesRef.current.includes(nextFeature)) {
+      return;
     }
-    markSlotsIntroPlayed();
-    setActiveFeature(nextFeature);
-    setFeaturePlaybackNonce((current) => current + 1);
-    if (SLOT_FEATURE_MEDIA[nextFeature].video) {
-      playCue(alertAudioRef, alerteSound, 0.78);
+
+    if (activeFeatureRef.current !== "idle") {
+      const nextQueue = [...queuedFeaturesRef.current, nextFeature];
+      queuedFeaturesRef.current = nextQueue;
+      setQueuedFeatures(nextQueue);
+      return;
     }
+
+    startFeaturePlayback(nextFeature);
   }
 
   function triggerSlotFeedback(spin: CasinoSpin) {
@@ -929,8 +965,8 @@ function SlotsRoom({
       }
       const bonusMessage =
         bonus.trigger === "joker_count"
-          ? `Bonus joker arme avec ${bonus.initialJokerCount} wilds. ${visualBonusStages.length || 0} tours bonus a reveler, relance pour continuer.`
-          : `Alignement joker detecte. ${visualBonusStages.length || 0} tours bonus a jouer, sans spoiler avant la fin.`;
+          ? `Bonus wild arme avec ${bonus.initialJokerCount} wilds. ${visualBonusStages.length || 0} tours bonus a reveler, relance pour continuer.`
+          : `Alignement wild detecte. ${visualBonusStages.length || 0} tours bonus a jouer, sans spoiler avant la fin.`;
       setLastMessage(bonusMessage);
       onProfileChange(result.profile, bonusMessage);
       await waitForMs(Math.min(1800, Math.max(480, bonus.holdDurationMs || 0)));
@@ -1004,8 +1040,11 @@ function SlotsRoom({
     if (!restStages.length) {
       jokerFeaturePlayedForBonusRef.current = false;
       powerFeaturePlayedForBonusRef.current = false;
-      if (lastSpin) {
+      if (lastSpin && !lastSpin.bonus?.triggered) {
         triggerSlotFeedback(lastSpin);
+        triggerCelebration(lastSpin);
+        triggerGoldRain(lastSpin);
+      } else if (lastSpin) {
         triggerCelebration(lastSpin);
         triggerGoldRain(lastSpin);
       }
@@ -1014,7 +1053,7 @@ function SlotsRoom({
     setLastMessage(
       restStages.length
         ? `Tour bonus ${nextStageNumber}/${bonusFlow.totalStages}. Relance pour la prochaine volee.`
-        : "Bonus joker resolu. Les gains finaux sont maintenant reveles.",
+        : "Bonus wild resolu. Les gains finaux sont maintenant reveles.",
     );
   }
 
