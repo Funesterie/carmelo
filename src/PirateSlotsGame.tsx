@@ -1,9 +1,11 @@
-// Détermine si le spin contient une ligne complète de symboles identiques (full line win)
-function isFullLineWin(spin: CasinoSpin): boolean {
+function isParrotJackpotSpin(spin: CasinoSpin | null): boolean {
   if (!spin || !Array.isArray(spin.wins)) return false;
-  // On considère qu'une win est "full line" si elle couvre toute la largeur de la grille
-  // (par exemple, 5 symboles alignés sur une ligne)
-  return spin.wins.some(win => Array.isArray(win.indexes) && win.indexes.length >= 5);
+  if (spin.specialJackpot === true) return true;
+  return spin.wins.some((win) => {
+    const symbolId = String(win?.symbol || "").trim().toUpperCase();
+    const indexCount = Array.isArray(win?.indexes) ? win.indexes.length : 0;
+    return symbolId === "PARROT" && Math.max(Number(win?.matchCount || 0), indexCount) >= 5;
+  });
 }
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
@@ -49,9 +51,9 @@ import CasinoFloorShell from "./features/casino/components/CasinoFloorShell";
 import SlotsSideRail from "./features/casino/components/SlotsSideRail";
 import { formatCredits } from "./lib/casinoRoomState";
 import {
+  continueCasinoSlotsBonus,
   spinCasinoSlots,
   type CasinoProfile,
-  type CasinoSpinBonusStage,
   type CasinoSpin,
   type CasinoTransaction,
 } from "./lib/casinoApi";
@@ -115,7 +117,6 @@ function SlotsRoom({
 }: PirateSlotsGameProps) {
   void ambientVideoRef;
   const BIG_WIN_MULTIPLIER = 8;
-  const BONUS_MIN_VISUAL_STAGES = 5;
   const SLOT_CELEBRATION_FLASH_MS = 3_400;
   const SLOT_BIG_RAIN_MS = 4_800;
   const SLOT_EPIC_RAIN_MS = 6_000;
@@ -126,8 +127,10 @@ function SlotsRoom({
   type PendingBonusFlow = {
     holdDurationMs: number;
     stageDurationMs: number;
-    stages: CasinoSpinBonusStage[];
+    token: string;
     totalStages: number;
+    completedStages: number;
+    featureHint: SlotFeatureKey;
   };
 
   type BonusHeldTurns = Partial<Record<number, number>>;
@@ -296,7 +299,12 @@ function SlotsRoom({
     return highlighted;
   }, [visibleSpin]);
 
-  const canSpin = spinState !== "spinning" && !busy && bet !== undefined && profile.wallet.balance >= bet;
+  const canSpin = spinState !== "spinning"
+    && !busy
+    && (
+      Boolean(pendingBonusFlow?.token)
+      || (bet !== undefined && profile.wallet.balance >= bet)
+    );
 
   const netChangeTone = useMemo(() => {
     if (!lastSpin) return "neutral";
@@ -640,151 +648,6 @@ function SlotsRoom({
     return nextHeldTurns;
   }
 
-  function cloneGrid(grid: string[][]) {
-    return grid.map((row) => [...row]);
-  }
-
-  function setGridSymbolAtIndex(grid: string[][], reelCount: number, index: number, symbolId: string) {
-    const rowIndex = Math.floor(index / reelCount);
-    const columnIndex = index % reelCount;
-    if (!grid[rowIndex] || columnIndex < 0) return;
-    grid[rowIndex][columnIndex] = symbolId;
-  }
-
-  function getGridChangeIndexes(fromGrid: string[][], toGrid: string[][]) {
-    const reelCount = toGrid[0]?.length || 0;
-    const changes: Array<{ index: number; symbolId: string }> = [];
-
-    toGrid.forEach((row, rowIndex) => {
-      row.forEach((symbolId, columnIndex) => {
-        if ((fromGrid[rowIndex]?.[columnIndex] || "") === symbolId) return;
-        changes.push({
-          index: rowIndex * reelCount + columnIndex,
-          symbolId,
-        });
-      });
-    });
-
-    return changes
-      .sort((left, right) => {
-        const jokerPriority = Number(right.symbolId === "JOKER") - Number(left.symbolId === "JOKER");
-        if (jokerPriority !== 0) return jokerPriority;
-        return left.index - right.index;
-      })
-      .map((entry) => entry.index);
-  }
-
-  function distributeBonusExtraStages(openingGrid: string[][], stages: CasinoSpinBonusStage[], extraStagesNeeded: number) {
-    if (extraStagesNeeded <= 0 || !stages.length) {
-      return stages.map(() => 0);
-    }
-
-    const weightedStages = stages.map((stage, stageIndex) => {
-      const previousGrid = stageIndex === 0 ? openingGrid : stages[stageIndex - 1]?.grid || openingGrid;
-      const weight = Math.max(1, getGridChangeIndexes(previousGrid, stage.grid).length);
-      return {
-        stageIndex,
-        weight,
-        exactShare: (extraStagesNeeded * weight) / Math.max(1, stages.reduce((sum, candidate, candidateIndex) => {
-          const candidatePreviousGrid = candidateIndex === 0 ? openingGrid : stages[candidateIndex - 1]?.grid || openingGrid;
-          return sum + Math.max(1, getGridChangeIndexes(candidatePreviousGrid, candidate.grid).length);
-        }, 0)),
-      };
-    });
-
-    const extras = stages.map(() => 0);
-    let assigned = 0;
-
-    weightedStages.forEach((entry) => {
-      const baseAllocation = Math.floor(entry.exactShare);
-      extras[entry.stageIndex] = baseAllocation;
-      assigned += baseAllocation;
-    });
-
-    weightedStages
-      .slice()
-      .sort((left, right) => {
-        const remainder = (right.exactShare - Math.floor(right.exactShare)) - (left.exactShare - Math.floor(left.exactShare));
-        if (remainder !== 0) return remainder > 0 ? 1 : -1;
-        return right.weight - left.weight;
-      })
-      .forEach((entry) => {
-        if (assigned >= extraStagesNeeded) return;
-        extras[entry.stageIndex] += 1;
-        assigned += 1;
-      });
-
-    return extras;
-  }
-
-  function expandBonusStages(openingGrid: string[][], stages: CasinoSpinBonusStage[]) {
-    if (!stages.length || stages.length >= BONUS_MIN_VISUAL_STAGES) return stages;
-
-    const extraStagesByStep = distributeBonusExtraStages(openingGrid, stages, BONUS_MIN_VISUAL_STAGES - stages.length);
-    const expandedStages: CasinoSpinBonusStage[] = [];
-    let visualStep = 1;
-
-    stages.forEach((stage, stageIndex) => {
-      const previousGrid = stageIndex === 0 ? openingGrid : stages[stageIndex - 1]?.grid || openingGrid;
-      const previousRatio = Number(stageIndex === 0 ? 0 : stages[stageIndex - 1]?.ratio || 0);
-      const targetRatio = Number(stage.ratio || previousRatio);
-      const changedIndexes = getGridChangeIndexes(previousGrid, stage.grid);
-      const segmentCount = 1 + Number(extraStagesByStep[stageIndex] || 0);
-
-      if (!changedIndexes.length || segmentCount <= 1) {
-        const jokerIndexes = getJokerIndexes(stage.grid);
-        expandedStages.push({
-          ...stage,
-          step: visualStep,
-          heldIndexes: jokerIndexes,
-          jokerCount: jokerIndexes.length,
-        });
-        visualStep += 1;
-        return;
-      }
-
-      let revealedChangeCount = 0;
-
-      for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
-        const nextRevealTarget = segmentIndex === segmentCount - 1
-          ? changedIndexes.length
-          : Math.min(
-            changedIndexes.length,
-            Math.max(
-              revealedChangeCount < changedIndexes.length ? revealedChangeCount + 1 : changedIndexes.length,
-              Math.ceil((changedIndexes.length * (segmentIndex + 1)) / segmentCount),
-            ),
-          );
-
-        revealedChangeCount = Math.max(revealedChangeCount, nextRevealTarget);
-
-        const intermediateGrid = cloneGrid(previousGrid);
-        changedIndexes.slice(0, revealedChangeCount).forEach((index) => {
-          const symbolId = getSlotGridSymbolAtIndex(stage.grid, stage.grid[0]?.length || 0, index);
-          if (!symbolId) return;
-          setGridSymbolAtIndex(intermediateGrid, stage.grid[0]?.length || 0, index, symbolId);
-        });
-
-        const jokerIndexes = getJokerIndexes(intermediateGrid);
-        const progressRatio = segmentIndex === segmentCount - 1
-          ? targetRatio
-          : previousRatio + ((targetRatio - previousRatio) * ((segmentIndex + 1) / segmentCount));
-
-        expandedStages.push({
-          ...stage,
-          step: visualStep,
-          ratio: Number(progressRatio.toFixed(3)),
-          heldIndexes: jokerIndexes,
-          jokerCount: jokerIndexes.length,
-          grid: intermediateGrid,
-        });
-        visualStep += 1;
-      }
-    });
-
-    return expandedStages;
-  }
-
   function triggerGoldRain(spin: CasinoSpin) {
     if (goldRainTimeoutRef.current) {
       window.clearTimeout(goldRainTimeoutRef.current);
@@ -797,7 +660,7 @@ function SlotsRoom({
       return;
     }
 
-    const nextDrops = buildSlotPrizeRain(spin.totalPayout, spin.bet, tone, isFullLineWin(spin));
+    const nextDrops = buildSlotPrizeRain(spin.totalPayout, spin.bet, tone, isParrotJackpotSpin(spin));
     setGoldRain(nextDrops);
     if (!nextDrops.length) return;
 
@@ -823,21 +686,22 @@ function SlotsRoom({
 
   function getSlotCelebrationCaption(spin: CasinoSpin, tone: SlotCelebrationTone) {
     if (tone === "epic") return "Jackpot full wild";
+    if (isParrotJackpotSpin(spin)) return "Jackpot perroquet 777";
     if (tone === "big") return "La cale deborde d'or et de diamants";
     if (spin.wins.length > 1) return `${spin.wins.length} lignes payeuses`;
     return "Gain encaisse";
   }
 
-  function buildSlotPrizeRain(totalPayout: number, betAmount: number, tone: SlotCelebrationTone, isFullLineWin: boolean = false): SlotPrizeRainItem[] {
+  function buildSlotPrizeRain(totalPayout: number, betAmount: number, tone: SlotCelebrationTone, isParrotJackpot: boolean = false): SlotPrizeRainItem[] {
     const ratio = totalPayout / Math.max(1, betAmount);
-    const count = isFullLineWin
+    const count = isParrotJackpot
       ? 60
       : tone === "epic"
       ? Math.min(36, Math.max(18, Math.round(ratio * 3.4)))
       : Math.min(22, Math.max(10, Math.round(ratio * 2.4)));
 
     return Array.from({ length: count }, (_, index) => {
-      const useDiamond = isFullLineWin || tone === "epic" ? index % 2 === 0 : index % 3 === 0;
+      const useDiamond = isParrotJackpot || tone === "epic" ? index % 2 === 0 : index % 3 === 0;
       const asset = useDiamond
         ? [saphirImg, rubisImg, opaleImg][index % 3] || saphirImg
         : lingotImg;
@@ -939,8 +803,7 @@ function SlotsRoom({
   async function animateResolvedSpin(result: Awaited<ReturnType<typeof spinCasinoSlots>>, runId: number) {
     const bonus = result.spin.bonus;
 
-    if (bonus?.triggered) {
-      const visualBonusStages = expandBonusStages(bonus.openingGrid, bonus.stages);
+    if (bonus?.triggered && bonus.pending && bonus.token) {
       // Stop autospin immediately if a bonus is triggered
       setAutoSpinCount(0);
       if (autoSpinTimeoutRef.current) {
@@ -954,32 +817,31 @@ function SlotsRoom({
           return accumulator;
         }, {}),
       );
-      setLastSpin(result.spin);
-      activateFeature(chooseSlotFeature(result.spin), { isBonusFeature: true });
+      setLastSpin(null);
+      activateFeature(getSlotFeatureForBonusGrid(bonus.openingGrid), { isBonusFeature: true });
       setPendingBonusFlow({
         holdDurationMs: bonus.holdDurationMs,
         stageDurationMs: bonus.stageDurationMs,
-        stages: visualBonusStages,
-        totalStages: visualBonusStages.length,
+        token: bonus.token,
+        totalStages: Math.max(1, Number(bonus.totalStages || 5)),
+        completedStages: Math.max(0, Number(bonus.completedStages || 0)),
+        featureHint: getSlotFeatureForBonusFeature(bonus.feature),
       });
-      if (!visualBonusStages.length) {
-        jokerFeaturePlayedForBonusRef.current = false;
-        powerFeaturePlayedForBonusRef.current = false;
-      }
       setAutoSpinCount(0);
       if (autoSpinTimeoutRef.current) {
         window.clearTimeout(autoSpinTimeoutRef.current);
         autoSpinTimeoutRef.current = null;
       }
+      const totalStages = Math.max(1, Number(bonus.totalStages || 5));
       const bonusMessage =
         bonus.trigger === "joker_count"
-          ? `Bonus wild arme avec ${bonus.initialJokerCount} wilds. ${visualBonusStages.length || 0} tours bonus a reveler, relance pour continuer.`
-          : `Alignement wild detecte. ${visualBonusStages.length || 0} tours bonus a jouer, sans spoiler avant la fin.`;
+          ? `Bonus wild arme avec ${bonus.initialJokerCount} wilds. ${totalStages} tours bonus a reveler, relance pour continuer.`
+          : `Alignement wild detecte. ${totalStages} tours bonus a jouer, sans spoiler avant la fin.`;
       setLastMessage(bonusMessage);
       onProfileChange(result.profile, bonusMessage);
       await waitForMs(Math.min(1800, Math.max(480, bonus.holdDurationMs || 0)));
       if (spinRunIdRef.current !== runId) return;
-      setSpinState(visualBonusStages.length ? "bonus" : "idle");
+      setSpinState("bonus");
       return;
     }
 
@@ -1000,14 +862,14 @@ function SlotsRoom({
 
   async function playPendingBonusStage(runId: number) {
     const bonusFlow = pendingBonusFlow;
-    if (!bonusFlow?.stages.length) {
+    if (!bonusFlow?.token) {
       setPendingBonusFlow(null);
       setSpinState("idle");
       return;
     }
 
-    const [stage, ...restStages] = bonusFlow.stages;
     let step = 0;
+    const stagePromise = continueCasinoSlotsBonus(bonusFlow.token);
     intervalRef.current = window.setInterval(() => {
       step += 1;
       setDisplayGrid(buildPlaceholderGrid(lastSpin?.rowCount || 3, lastSpin?.reelCount || 5));
@@ -1017,11 +879,20 @@ function SlotsRoom({
       }
     }, SPIN_ANIMATION_INTERVAL_MS);
 
+    const result = await stagePromise;
     await waitForMs(Math.max(SPIN_ANIMATION_INTERVAL_MS * (SPIN_ANIMATION_STEPS + 1), bonusFlow.stageDurationMs || 0));
     if (spinRunIdRef.current !== runId) return;
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
+    }
+
+    const stage = result.spin.bonus?.stage;
+    if (!stage) {
+      setPendingBonusFlow(null);
+      setSpinState("idle");
+      onProfileChange(result.profile);
+      return;
     }
 
     setDisplayGrid(stage.grid);
@@ -1032,34 +903,38 @@ function SlotsRoom({
     activateFeature(
       stageFeature !== "idle"
         ? stageFeature
-        : getSlotFeatureForBonusFeature(lastSpin?.bonus?.feature),
+        : bonusFlow.featureHint,
       { isBonusFeature: true },
     );
 
-    const nextStageNumber = bonusFlow.totalStages - restStages.length;
+    const responseBonus = result.spin.bonus;
+    const nextStageNumber = Math.max(1, Number(responseBonus?.completedStages || bonusFlow.completedStages + 1));
+    const hasMoreStages = Boolean(responseBonus?.pending && responseBonus?.token);
+
     setPendingBonusFlow(
-      restStages.length
+      hasMoreStages
         ? {
             ...bonusFlow,
-            stages: restStages,
+            token: String(responseBonus?.token || bonusFlow.token),
+            completedStages: nextStageNumber,
+            totalStages: Math.max(1, Number(responseBonus?.totalStages || bonusFlow.totalStages)),
+            featureHint: getSlotFeatureForBonusFeature(responseBonus?.feature) || bonusFlow.featureHint,
           }
         : null,
     );
-    if (!restStages.length) {
+    onProfileChange(result.profile);
+
+    if (!hasMoreStages) {
       jokerFeaturePlayedForBonusRef.current = false;
       powerFeaturePlayedForBonusRef.current = false;
-      if (lastSpin && !lastSpin.bonus?.triggered) {
-        triggerSlotFeedback(lastSpin);
-        triggerCelebration(lastSpin);
-        triggerGoldRain(lastSpin);
-      } else if (lastSpin) {
-        triggerCelebration(lastSpin);
-        triggerGoldRain(lastSpin);
-      }
+      setLastSpin(result.spin);
+      triggerSlotFeedback(result.spin);
+      triggerCelebration(result.spin);
+      triggerGoldRain(result.spin);
     }
-    setSpinState(restStages.length ? "bonus" : "idle");
+    setSpinState(hasMoreStages ? "bonus" : "idle");
     setLastMessage(
-      restStages.length
+      hasMoreStages
         ? `Tour bonus ${nextStageNumber}/${bonusFlow.totalStages}. Relance pour la prochaine volee.`
         : "Bonus wild resolu. Les gains finaux sont maintenant reveles.",
     );
@@ -1077,7 +952,7 @@ function SlotsRoom({
     setLastMessage(pendingBonusFlow ? "La vollee bonus se prepare..." : "Les tambours roulent...");
 
     try {
-      if (pendingBonusFlow?.stages.length) {
+      if (pendingBonusFlow?.token) {
         await playPendingBonusStage(runId);
         return;
       }

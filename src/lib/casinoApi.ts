@@ -29,6 +29,11 @@ export type CasinoSpinBonusStage = {
 
 export type CasinoSpinBonus = {
   triggered: boolean;
+  pending?: boolean;
+  token?: string | null;
+  stage?: CasinoSpinBonusStage | null;
+  totalStages?: number;
+  completedStages?: number;
   trigger: string;
   triggerIndexes: number[];
   initialJokerCount: number;
@@ -53,6 +58,7 @@ export type CasinoSpin = {
   totalPayout: number;
   netChange: number;
   bonus: CasinoSpinBonus | null;
+  specialJackpot?: boolean;
   generatedAt: string;
 };
 
@@ -389,10 +395,18 @@ export async function claimCasinoDailyBonus() {
 }
 
 export async function spinCasinoSlots(bet: number) {
+  return spinCasinoSlotsRequest({ bet });
+}
+
+export async function continueCasinoSlotsBonus(bonusToken: string) {
+  return spinCasinoSlotsRequest({ bonusToken });
+}
+
+async function spinCasinoSlotsRequest(body: { bet?: number; bonusToken?: string | null }) {
   const response = await fetch(getApiUrl('/api/casino/slots/spin'), {
     method: 'POST',
     headers: buildAuthHeaders(),
-    body: JSON.stringify({ bet }),
+    body: JSON.stringify(body),
   });
 
   const payload = (await readJsonSafe(response)) as SpinResponse | { error?: string } | null;

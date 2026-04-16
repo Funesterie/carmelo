@@ -1,19 +1,43 @@
 // Pirate Slots RNG & Logic
 import { randInt } from "./rng";
-import * as React from "react";
 
-export type PirateSymbolId = "PIRATE" | "CHEST" | "COIN" | "BAT" | "BLUNDERBUSS" | "MAP" | "SOLDAT" | "PARROT"; // 🦜 nouveau symbole
+export type PirateSymbolId =
+  | "PIRATE"
+  | "CHEST"
+  | "COIN"
+  | "BAT"
+  | "BLUNDERBUSS"
+  | "MAP"
+  | "PARROT"
+  | "SOLDAT"
+  | "ELEPHANT"
+  | "JOKER";
 
 export const pirateSymbols: { id: PirateSymbolId; weight: number; emoji: string }[] = [
-  { id: "PIRATE", weight: 18, emoji: "🏴‍☠️" }, // pirate
-  { id: "CHEST", weight: 15, emoji: "🧰" }, // chest
-  { id: "COIN", weight: 22, emoji: "🪙" }, // coin
-  { id: "BAT", weight: 14, emoji: "🦇" }, // bat
-  { id: "BLUNDERBUSS", weight: 10, emoji: "🔫" }, // gun
-  { id: "MAP", weight: 12, emoji: "🗺️" }, // map
-  { id: "SOLDAT", weight: 9, emoji: "🛡️" }, // soldat
-  { id: "PARROT", weight: 5, emoji: "🦜" } // symbole rare pour gros gain
+  { id: "PIRATE", weight: 18, emoji: "🏴‍☠️" },
+  { id: "CHEST", weight: 15, emoji: "🧰" },
+  { id: "COIN", weight: 22, emoji: "🪙" },
+  { id: "BAT", weight: 14, emoji: "🦇" },
+  { id: "BLUNDERBUSS", weight: 10, emoji: "🔫" },
+  { id: "MAP", weight: 12, emoji: "🗺️" },
+  { id: "PARROT", weight: 5, emoji: "🦜" },
+  { id: "SOLDAT", weight: 9, emoji: "🛡️" },
+  { id: "ELEPHANT", weight: 6, emoji: "🐘" },
+  { id: "JOKER", weight: 6, emoji: "🃏" },
 ];
+
+const piratePayouts: Record<PirateSymbolId, { 3: number; 4: number; 5: number }> = {
+  PIRATE: { 3: 12, 4: 28, 5: 75 },
+  CHEST: { 3: 8, 4: 18, 5: 40 },
+  COIN: { 3: 6, 4: 12, 5: 22 },
+  BAT: { 3: 5, 4: 10, 5: 18 },
+  BLUNDERBUSS: { 3: 7, 4: 14, 5: 26 },
+  MAP: { 3: 9, 4: 18, 5: 34 },
+  PARROT: { 3: 20, 4: 40, 5: 80 },
+  SOLDAT: { 3: 12, 4: 26, 5: 60 },
+  ELEPHANT: { 3: 15, 4: 34, 5: 90 },
+  JOKER: { 3: 20, 4: 80, 5: 200 },
+};
 
 export function pickWeightedPirate(): PirateSymbolId {
   const total = pirateSymbols.reduce((s, x) => s + x.weight, 0);
@@ -36,25 +60,14 @@ export function spinPirateSlots(bet: number): PirateSpinResult {
     pickWeightedPirate(), pickWeightedPirate(), pickWeightedPirate(), pickWeightedPirate(), pickWeightedPirate()
   ];
 
-  // Paytable pirate
-  const [a, b, c, d, e] = reels;
-  let payout = 0;
+  const counts = new Map<PirateSymbolId, number>();
+  reels.forEach((symbolId) => {
+    counts.set(symbolId, Number(counts.get(symbolId) || 0) + 1);
+  });
 
-  const allSame = a === b && b === c && c === d && d === e;
-  const fourSame = [a, b, c, d, e].some((v, i, arr) => arr.filter(x => x === v).length === 4);
-  const threeSame = [a, b, c, d, e].some((v, i, arr) => arr.filter(x => x === v).length === 3);
-
-  if (allSame) {
-    if (a === "PARROT")      payout = bet * 80;   // Perroquet 777 → x80
-    else if (a === "PIRATE") payout = bet * 50;
-    else if (a === "CHEST")  payout = bet * 30;
-    else if (a === "COIN")   payout = bet * 20;
-    else                     payout = bet * 10;
-  } else if (fourSame) {
-    payout = a === "PARROT" ? bet * 10 : bet * 5;
-  } else if (threeSame) {
-    payout = a === "PARROT" ? bet * 4 : bet * 2;
-  }
+  const [bestSymbol, bestCount] = [...counts.entries()].sort((left, right) => right[1] - left[1])[0] || ["COIN", 0];
+  const payoutMultiplier = bestCount >= 3 ? piratePayouts[bestSymbol]?.[bestCount as 3 | 4 | 5] || 0 : 0;
+  const payout = bet * payoutMultiplier;
 
   const win = payout;
   return { reels, win, payout };
