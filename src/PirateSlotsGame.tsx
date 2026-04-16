@@ -759,7 +759,28 @@ function SlotsRoom({
     }, tone === "epic" ? SLOT_EPIC_RAIN_MS : SLOT_CELEBRATION_FLASH_MS);
   }
 
-  function startFeaturePlayback(nextFeature: SlotFeatureKey) {
+  function resetQueuedFeatures() {
+    if (!queuedFeaturesRef.current.length) return;
+    queuedFeaturesRef.current = [];
+    setQueuedFeatures([]);
+  }
+
+  function stopFeatureMediaPlayback() {
+    const video = featureVideoRef.current;
+    if (!video) return;
+    video.pause();
+    try {
+      video.currentTime = 0;
+    } catch {
+      // ignore seek failures
+    }
+  }
+
+  function startFeaturePlayback(nextFeature: SlotFeatureKey, options?: { force?: boolean }) {
+    if (options?.force) {
+      resetQueuedFeatures();
+      stopFeatureMediaPlayback();
+    }
     const ambientVideo = ambientLoopVideoRef.current;
     if (ambientVideo && !ambientVideo.paused) {
       try {
@@ -779,7 +800,7 @@ function SlotsRoom({
     }
   }
 
-  function activateFeature(nextFeature: SlotFeatureKey, options?: { isBonusFeature?: boolean }) {
+  function activateFeature(nextFeature: SlotFeatureKey, options?: { isBonusFeature?: boolean; force?: boolean }) {
     if (nextFeature === "idle") return;
     if (options?.isBonusFeature && nextFeature === "joker-line") {
       if (jokerFeaturePlayedForBonusRef.current) {
@@ -792,6 +813,10 @@ function SlotsRoom({
         return;
       }
       powerFeaturePlayedForBonusRef.current = true;
+    }
+    if (options?.force) {
+      startFeaturePlayback(nextFeature, { force: true });
+      return;
     }
 
     if (activeFeatureRef.current === nextFeature || queuedFeaturesRef.current.includes(nextFeature)) {
@@ -831,7 +856,10 @@ function SlotsRoom({
         }, {}),
       );
       setLastSpin(null);
-      activateFeature(getSlotFeatureForBonusGrid(bonus.openingGrid), { isBonusFeature: true });
+      activateFeature(getSlotFeatureForBonusGrid(bonus.openingGrid), {
+        isBonusFeature: true,
+        force: true,
+      });
       setPendingBonusFlow({
         holdDurationMs: bonus.holdDurationMs,
         stageDurationMs: bonus.stageDurationMs,
@@ -915,16 +943,14 @@ function SlotsRoom({
     const responseBonus = result.spin.bonus;
     const nextStageNumber = Math.max(1, Number(responseBonus?.completedStages || bonusFlow.completedStages + 1));
     const hasMoreStages = Boolean(responseBonus?.pending && responseBonus?.token);
-
-    if (hasMoreStages) {
-      const stageFeature = getSlotFeatureForBonusGrid(stage.grid);
-      activateFeature(
-        stageFeature !== "idle"
-          ? stageFeature
-          : bonusFlow.featureHint,
-        { isBonusFeature: true },
-      );
-    }
+    const stageFeature = getSlotFeatureForBonusGrid(stage.grid);
+    const resolvedBonusFeature = stageFeature !== "idle"
+      ? stageFeature
+      : bonusFlow.featureHint;
+    activateFeature(resolvedBonusFeature, {
+      isBonusFeature: true,
+      force: true,
+    });
 
     setPendingBonusFlow(
       hasMoreStages

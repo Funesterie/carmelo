@@ -513,12 +513,11 @@ export function chooseSlotFeature(spin: CasinoSpin | null): SlotFeatureKey {
     Array.isArray(strongestWin?.indexes) ? strongestWin.indexes.length : 0,
   );
   const strongestWinSymbol = getSlotDisplaySymbolId(strongestWin?.symbol || "");
-  if (strongestWinSymbol === "PARROT" && strongestWinMatchCount >= 5) return "parrot";
-  if (strongestWinMatchCount < 5) return "idle";
-  if (strongestWinSymbol === "ELEPHANT") return "elephant";
-  if (strongestWinSymbol === "SOLDAT") return "soldat";
-  if (strongestWinSymbol === "BAT") return "bat";
-  if (strongestWinSymbol === "BLUNDERBUSS") return "gun";
+  if (strongestWinSymbol === "PARROT" && strongestWinMatchCount >= 4) return "parrot";
+  if (strongestWinSymbol === "ELEPHANT" && strongestWinMatchCount >= 3) return "elephant";
+  if (strongestWinSymbol === "SOLDAT" && strongestWinMatchCount >= 3) return "soldat";
+  if (strongestWinSymbol === "BAT" && strongestWinMatchCount >= 4) return "bat";
+  if (strongestWinSymbol === "BLUNDERBUSS" && strongestWinMatchCount >= 4) return "gun";
   return "idle";
 }
 
